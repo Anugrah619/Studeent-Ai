@@ -7,6 +7,48 @@ Last updated: 20 Sep 2026
 
 ---
 
+## 🔀 ARCHITECTURE CHANGE — 20 Sep 2026
+
+**Switched from HTMX to React + shadcn/ui + DRF, with OpenAPI as the contract.**
+
+Reason: to let multiple agents work in parallel, frontend and backend need a contract between them. `openapi.yaml` (generated from DRF serializers by drf-spectacular) is now the source of truth. The API gets reused by the student PWA in P4 anyway.
+
+Cost, stated honestly: more moving parts, a Node toolchain, and P3 "first sellable" slips roughly 2–3 weeks.
+
+```
+app/          Django 6.1.1 + DRF        ->  /api/schema/ -> openapi.yaml
+web/          React + Vite + shadcn/ui  ->  builds against openapi.yaml
+```
+
+**Rule: after ANY serializer change, regenerate the contract**
+`cd app && .venv\Scripts\python.exe manage.py spectacular --file ../openapi.yaml`
+
+### Agent ownership — strict, non-overlapping
+
+| Agent | Owns | Must not touch |
+|---|---|---|
+| **frontend** | `web/` (worktree `E:\Student_AI_agents\frontend`) | anything in `app/` |
+| **backend** | `app/apps/api/`, `*/services/` | `models.py`, migrations |
+| **db** | `*/models.py`, `*/migrations/`, `*/admin.py` | `app/apps/api/`, `web/` |
+| **testing** | `app/tests/` | everything else (read-only) |
+
+**Only the DB agent may run `makemigrations` / `migrate`.**
+
+### Agents run STRICTLY SEQUENTIALLY
+
+```
+1. DB       →  schema, RLS, admin        ← everything depends on it
+2. BACKEND  →  detectors, engines, API   ← needs schema settled
+3. TESTING  →  pytest, contract tests    ← needs something to test
+
+   FRONTEND →  runs throughout. Own worktree, MSW mocks,
+               decoupled via openapi.yaml, never touches app/
+```
+
+Each agent records what it added in [`AGENT_HANDOFF.md`](AGENT_HANDOFF.md) **before finishing** — what's now available, what the next agent can build, what can be tested, and what's still broken. That file is the coordination contract; the next agent starts from it.
+
+---
+
 ## ⚠️ Three separate tracks — don't conflate them
 
 This is the most common source of confusion, so it goes first.
