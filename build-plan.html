@@ -1,0 +1,681 @@
+<title>Student AI Build Plan</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#F5F6F9; --card:#FFFFFF; --card-2:#FAFBFD;
+    --ink:#161B26; --ink-2:#4A5468; --ink-3:#7A8499;
+    --line:#E2E6EF; --line-strong:#A9B3C6;
+    --accent:#2B4A9B; --accent-soft:#EBEFF9;
+    --good:#0E7C57; --good-soft:#E4F2EC;
+    --warn:#9A6B12; --warn-soft:#F6EEDC;
+    --crit:#B3352B; --crit-soft:#F8E8E6;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1118; --card:#151A24; --card-2:#12161F;
+      --ink:#E8EBF2; --ink-2:#A0A9BC; --ink-3:#6E7889;
+      --line:#252C3A; --line-strong:#4A5568;
+      --accent:#7396E8; --accent-soft:#1B2437;
+      --good:#3DBE92; --good-soft:#12291F;
+      --warn:#D9A43A; --warn-soft:#2A2314;
+      --crit:#F0766A; --crit-soft:#2C1917;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1118; --card:#151A24; --card-2:#12161F;
+    --ink:#E8EBF2; --ink-2:#A0A9BC; --ink-3:#6E7889;
+    --line:#252C3A; --line-strong:#4A5568;
+    --accent:#7396E8; --accent-soft:#1B2437;
+    --good:#3DBE92; --good-soft:#12291F;
+    --warn:#D9A43A; --warn-soft:#2A2314;
+    --crit:#F0766A; --crit-soft:#2C1917;
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);
+    font:400 15px/1.62 'IBM Plex Sans','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px 96px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:48px}
+  @media(max-width:1020px){.wrap{grid-template-columns:1fr;gap:0;padding:0 20px 72px}.toc{display:none}}
+
+  .mast{grid-column:1/-1;padding:56px 0 34px;border-bottom:1px solid var(--line);margin-bottom:40px}
+  .eyebrow{font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+  h1{font:700 40px/1.08 'Archivo',sans-serif;letter-spacing:-.022em;margin:14px 0 0;text-wrap:balance}
+  .sub{color:var(--ink-2);max-width:66ch;margin:16px 0 0;font-size:16px}
+  .metarow{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+  .chip{font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;text-transform:uppercase;
+    padding:7px 11px;border:1px solid var(--line);border-radius:3px;color:var(--ink-2);background:var(--card)}
+  .chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+
+  .toc{position:sticky;top:28px;align-self:start;padding-top:4px}
+  .toc h4{font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:0 0 14px}
+  .toc a{display:block;padding:5px 0 5px 12px;border-left:2px solid var(--line);
+    color:var(--ink-2);text-decoration:none;font-size:13.5px;line-height:1.35}
+  .toc a:hover{color:var(--accent);border-left-color:var(--accent)}
+  .toc a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+  section{scroll-margin-top:24px;margin-bottom:58px}
+  h2{font:600 13px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin:0 0 6px}
+  h2 + .htitle{font:600 27px/1.2 'Archivo',sans-serif;letter-spacing:-.016em;margin:0 0 18px;text-wrap:balance}
+  h3{font:600 18px/1.3 'Archivo',sans-serif;letter-spacing:-.008em;margin:32px 0 10px}
+  p{margin:0 0 14px;max-width:68ch}
+  ul,ol{margin:0 0 14px;padding-left:20px;max-width:68ch}
+  li{margin-bottom:6px}
+  code{font:400 12.8px 'IBM Plex Mono',monospace;background:var(--card-2);border:1px solid var(--line);
+    padding:1.5px 5px;border-radius:3px;color:var(--ink-2)}
+  strong{font-weight:600;color:var(--ink)}
+
+  .note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--card);
+    padding:18px 20px;border-radius:4px;margin:20px 0;max-width:72ch}
+  .note.warn{border-left-color:var(--warn)}
+  .note.crit{border-left-color:var(--crit)}
+  .note.good{border-left-color:var(--good)}
+  .note .lbl{font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);display:block;margin-bottom:9px}
+  .note.warn .lbl{color:var(--warn)} .note.crit .lbl{color:var(--crit)} .note.good .lbl{color:var(--good)}
+  .note p:last-child{margin-bottom:0}
+
+  figure{margin:26px 0 30px;background:var(--card);border:1px solid var(--line);border-radius:5px;
+    padding:22px 22px 16px;overflow-x:auto}
+  figure svg{display:block;width:100%;max-width:100%;height:auto;min-width:660px}
+  figcaption{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
+    font-size:13px;line-height:1.5;color:var(--ink-2);max-width:74ch}
+  figcaption b{color:var(--ink);font-weight:600}
+
+  svg .bx{fill:var(--card-2);stroke:var(--line-strong);stroke-width:1.1}
+  svg .bx-a{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5}
+  svg .bar{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.2}
+  svg .bar-g{fill:var(--good-soft);stroke:var(--good);stroke-width:1.4}
+  svg .ln{stroke:var(--line-strong);stroke-width:1.1;fill:none}
+  svg .ln-a{stroke:var(--accent);stroke-width:1.6;fill:none}
+  svg .ln-d{stroke:var(--good);stroke-width:1.5;fill:none;stroke-dasharray:5 3}
+  svg .grid{stroke:var(--line);stroke-width:1;fill:none}
+  svg .ah{fill:var(--line-strong)} svg .ah-a{fill:var(--accent)}
+  svg .t{fill:var(--ink);font:600 12.5px 'IBM Plex Sans',sans-serif}
+  svg .ts{fill:var(--ink-2);font:400 11px 'IBM Plex Sans',sans-serif}
+  svg .tm{fill:var(--ink-2);font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.03em}
+  svg .tl{fill:var(--ink-3);font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.1em}
+  svg .tg{fill:var(--good);font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.08em}
+  svg .ta{fill:var(--accent);font:600 12.5px 'IBM Plex Sans',sans-serif}
+
+  .tbl-wrap{overflow-x:auto;margin:20px 0 24px;border:1px solid var(--line);border-radius:5px;background:var(--card)}
+  table{border-collapse:collapse;width:100%;min-width:640px;font-size:13.5px}
+  th{font:500 10px/1.3 'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-3);text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);
+    background:var(--card-2);white-space:nowrap}
+  td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-2);line-height:1.5}
+  td:first-child{color:var(--ink);font-weight:500;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td code{font-size:12px}
+  .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+  /* stage blocks */
+  .stage{border:1px solid var(--line);border-radius:5px;background:var(--card);margin:0 0 18px;overflow:hidden}
+  .stage.sell{border-color:var(--good);border-width:1.5px}
+  .st-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+    padding:16px 20px;border-bottom:1px solid var(--line);background:var(--card-2)}
+  .st-id{font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:var(--accent);
+    background:var(--accent-soft);border:1px solid var(--accent);border-radius:3px;padding:6px 9px}
+  .stage.sell .st-id{color:var(--good);background:var(--good-soft);border-color:var(--good)}
+  .st-name{font:600 17px/1.25 'Archivo',sans-serif;letter-spacing:-.01em;margin:0;flex:1 1 auto}
+  .st-wks{font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:var(--ink-3);white-space:nowrap}
+  .st-body{padding:18px 20px}
+  .st-body p{margin-bottom:12px}
+  .st-body h5{font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--ink-3);margin:18px 0 8px}
+  .st-body h5:first-child{margin-top:0}
+  .st-body ul{margin-bottom:0}
+  .stack-list{list-style:none;padding:0;margin:0;display:grid;gap:7px}
+  .stack-list li{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;margin:0;font-size:13.5px}
+  .stack-list .k{font:400 11.5px/1.5 'IBM Plex Mono',monospace;color:var(--accent);letter-spacing:.01em}
+  .stack-list .v{color:var(--ink-2);line-height:1.5}
+  @media(max-width:620px){.stack-list li{grid-template-columns:1fr;gap:2px}}
+  .done{border-left:3px solid var(--good);background:var(--good-soft);padding:11px 14px;border-radius:0 3px 3px 0;
+    font-size:13.5px;color:var(--ink-2)}
+  .done b{color:var(--good);font-weight:600}
+  .trap{border-left:3px solid var(--crit);background:var(--crit-soft);padding:11px 14px;border-radius:0 3px 3px 0;
+    font-size:13.5px;color:var(--ink-2);margin-top:12px}
+  .trap b{color:var(--crit);font-weight:600}
+
+  .dont{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin:20px 0}
+  .dont-c{border:1px solid var(--line);border-radius:4px;background:var(--card);padding:14px 16px}
+  .dont-c .h{font:600 14px/1.3 'Archivo',sans-serif;margin:0 0 5px;color:var(--crit)}
+  .dont-c .b{font-size:13px;line-height:1.5;color:var(--ink-2)}
+
+  hr.rule{border:none;border-top:1px solid var(--line);margin:44px 0}
+  .foot{grid-column:1/-1;border-top:1px solid var(--line);padding-top:22px;margin-top:20px;
+    font-size:12.5px;color:var(--ink-3);max-width:70ch}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <div class="eyebrow">Build Roadmap · v0.1 · 17 Sep 2026</div>
+    <h1>Student AI — Build Plan</h1>
+    <p class="sub">Nine stages from empty repository to a system a coaching institute pays for, with the technology named at each one and the reasoning behind every choice. Companion to the architecture reference, which stays deliberately stack-agnostic; this document is where the opinions live.</p>
+    <div class="metarow">
+      <span class="chip on">9 stages</span>
+      <span class="chip on">~15 wks to first sale</span>
+      <span class="chip">Python · Django · Postgres</span>
+      <span class="chip">Solo-buildable</span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <h4>Contents</h4>
+    <a href="#stack">1 · Stack decisions</a>
+    <a href="#timeline">2 · Timeline</a>
+    <a href="#stages">3 · The nine stages</a>
+    <a href="#deploy">4 · Deployment</a>
+    <a href="#llm">5 · LLM layer &amp; cost</a>
+    <a href="#testing">6 · Testing</a>
+    <a href="#dont">7 · What not to build</a>
+  </nav>
+
+  <main>
+
+  <!-- ===== 1 ===== -->
+  <section id="stack">
+    <h2>01 — Stack decisions</h2>
+    <div class="htitle">Named choices, with the alternative that lost</div>
+
+    <p>Every row below is a decision, not a menu. Where a reasonable alternative exists it is named along with the condition that would make it the better call — so you can revisit any of these without re-deriving the whole argument.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Concern</th><th>Choice</th><th>Why this one</th><th>Alternative, and when</th></tr></thead>
+        <tbody>
+          <tr><td>Language</td><td>Python 3.12+</td><td>Knowledge tracing, IRT and FSRS are all Python-native. One language means one codebase and one deploy target.</td><td>A Node API with a Python ML service buys nothing here and costs you a serialization boundary.</td></tr>
+          <tr><td>Web framework</td><td>Django 5 + DRF</td><td>The admin gives you the question→topic review queue, syllabus tree editor and tenant management for free — the exact internal tools this product is made of.</td><td>FastAPI, if you would rather hand-build admin surfaces for async ergonomics you don't need until P7.</td></tr>
+          <tr><td>Database</td><td>PostgreSQL 16+</td><td>JSONB for evidence arrays, window functions for rolling features, row-level security as a tenancy backstop, native partitioning for the attempts table.</td><td>None. This one is not a preference — the feature store is window functions.</td></tr>
+          <tr><td>Tenancy</td><td>Shared schema + <code>tenant_id</code> + RLS</td><td>One migration path, one connection pool, isolation enforced at the data layer where it can't be forgotten.</td><td>Schema-per-tenant becomes migration pain around the 20th institute; database-per-tenant is ops pain from the first.</td></tr>
+          <tr><td>Background jobs</td><td>Celery + Redis</td><td><code>celery beat</code> handles nightly recompute; retries and routing are already solved when ingestion gets messy.</td><td>RQ or Dramatiq if Celery's operational weight bites before your scale justifies it.</td></tr>
+          <tr><td>File ingestion</td><td>pandas · openpyxl · rapidfuzz</td><td>Excel and CSV parsing plus fuzzy name matching for identity resolution.</td><td>—</td></tr>
+          <tr><td>Console UI</td><td>HTMX + Alpine.js + ECharts</td><td>P3 is tables, filters and drill-downs — server-rendered territory. Ships in weeks; no API layer to maintain alongside it.</td><td>React + Vite + TanStack Table if you already have React fluency or plan a large interactive surface.</td></tr>
+          <tr><td>Student app</td><td>PWA first</td><td>No app-store friction for a pilot, instant updates, Android-dominant market, and web push covers the daily nudge.</td><td>React Native (Expo) once adoption is proven and you need reliable iOS push or offline capture.</td></tr>
+          <tr><td>Knowledge tracing</td><td>SQL → pyBKT → py-irt → PyTorch</td><td>Rung 0 is a window function. Each rung is adopted only when the one below it measurably fails.</td><td>—</td></tr>
+          <tr><td>Spaced repetition</td><td><code>py-fsrs</code>, forked</td><td>Best available starting point; the deadline-aware objective is a modification you will own.</td><td>SM-2 from scratch is simpler but leaves accuracy on the table.</td></tr>
+          <tr><td>LLM</td><td><code>anthropic</code> SDK · <code>claude-opus-5</code></td><td>Narration quality is what the institute reads; 1M context leaves room for rich payloads. Batch API halves cost on overnight generation.</td><td><code>claude-haiku-4-5</code> for the highest-volume route if unit economics demand it — a measured decision, not a default.</td></tr>
+          <tr><td>PDF reports</td><td>WeasyPrint</td><td>HTML → PDF in Python; reuse the same templates as the web console.</td><td>—</td></tr>
+          <tr><td>Parent delivery</td><td>WhatsApp Business API</td><td>This is how Indian parents actually receive things. Via Gupshup, AiSensy or Twilio.</td><td>Email, if you are content not to be read.</td></tr>
+          <tr><td>Hosting</td><td>Docker Compose on a VPS, <code>ap-south-1</code></td><td>India data residency for DPDP; long-running batch jobs make serverless a poor fit; Kubernetes is unjustifiable at this scale.</td><td>Managed Postgres (RDS / Neon) from day one is a reasonable trade of money for backup peace of mind.</td></tr>
+          <tr><td>Object storage</td><td>Cloudflare R2</td><td>S3-compatible with no egress fees — you will be serving generated PDFs repeatedly.</td><td>S3 if you are already in AWS for everything else.</td></tr>
+          <tr><td>Errors</td><td>Sentry</td><td>—</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <span class="lbl">The Django call, specifically</span>
+      <p>This product is unusually admin-heavy: someone has to confirm question→topic mappings, edit per-institute syllabus trees, resolve duplicate students and onboard tenants. In FastAPI each of those is a small application you build and maintain. In Django they are a <code>ModelAdmin</code> class each. That single fact is worth more than every ergonomic argument on the other side.</p>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ===== 2 ===== -->
+  <section id="timeline">
+    <h2>02 — Timeline</h2>
+    <div class="htitle">Fifteen weeks to something sellable</div>
+
+    <figure>
+      <svg viewBox="0 0 900 400" role="img" aria-label="A timeline of nine build stages across thirty-six weeks, with the first sellable unit reached at week fifteen after schema, ingestion, feature store and the console are complete.">
+        <line class="grid" x1="110" y1="44" x2="110" y2="352"/>
+        <line class="grid" x1="278" y1="44" x2="278" y2="352"/>
+        <line class="grid" x1="446" y1="44" x2="446" y2="352"/>
+        <line class="grid" x1="614" y1="44" x2="614" y2="352"/>
+        <line class="grid" x1="782" y1="44" x2="782" y2="352"/>
+        <text x="110" y="36" class="tl" text-anchor="middle">WEEK 0</text>
+        <text x="278" y="36" class="tl" text-anchor="middle">8</text>
+        <text x="446" y="36" class="tl" text-anchor="middle">16</text>
+        <text x="614" y="36" class="tl" text-anchor="middle">24</text>
+        <text x="782" y="36" class="tl" text-anchor="middle">32</text>
+
+        <text x="14" y="66" class="tm">P0 Schema</text>
+        <rect class="bar" x="110" y="54" width="42" height="18" rx="3"/>
+        <text x="14" y="98" class="tm">P1 Ingestion</text>
+        <rect class="bar" x="152" y="86" width="126" height="18" rx="3"/>
+        <text x="288" y="99" class="tl">LARGEST SURFACE</text>
+        <text x="14" y="130" class="tm">P2 Features</text>
+        <rect class="bar" x="278" y="118" width="63" height="18" rx="3"/>
+        <text x="14" y="162" class="tm">P3 Console</text>
+        <rect class="bar-g" x="341" y="150" width="84" height="18" rx="3"/>
+        <text x="14" y="194" class="tm">P4 Student app</text>
+        <rect class="bar" x="425" y="182" width="84" height="18" rx="3"/>
+        <text x="14" y="226" class="tm">P5 Revision</text>
+        <rect class="bar" x="509" y="214" width="63" height="18" rx="3"/>
+        <text x="14" y="258" class="tm">P6 Planner</text>
+        <rect class="bar" x="572" y="246" width="63" height="18" rx="3"/>
+        <text x="14" y="290" class="tm">P7 Narration</text>
+        <rect class="bar" x="635" y="278" width="63" height="18" rx="3"/>
+        <text x="14" y="322" class="tm">P8 Scale</text>
+        <rect class="bar" x="698" y="310" width="168" height="18" rx="3"/>
+
+        <line class="ln-d" x1="425" y1="44" x2="425" y2="352"/>
+        <text x="433" y="352" class="tg">WEEK 15 — FIRST SELLABLE UNIT</text>
+        <text x="433" y="368" class="ts">Pilot can start here. Everything after this is</text>
+        <text x="433" y="384" class="ts">built against a paying institute's real data.</text>
+
+        <text x="14" y="368" class="tl">SOLO, FULL-TIME</text>
+        <text x="14" y="384" class="ts">Double if part-time.</text>
+      </svg>
+      <figcaption><b>The week-15 line is the only date that matters.</b> Everything to its left is unpaid build; everything to its right can be funded by, and validated against, a live pilot. Compressing P0–P3 is worth more than optimising any later stage.</figcaption>
+    </figure>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ===== 3 ===== -->
+  <section id="stages">
+    <h2>03 — The nine stages</h2>
+    <div class="htitle">What you build, and what you build it with</div>
+
+    <!-- P0 -->
+    <div class="stage">
+      <div class="st-head"><span class="st-id">P0</span><h3 class="st-name">Syllabus tree &amp; canonical schema</h3><span class="st-wks">≈ 1–2 weeks</span></div>
+      <div class="st-body">
+        <p>The foundation everything references. Get it wrong and every later stage inherits the mistake; there is no cheap fix once real attempt data is bound to it.</p>
+        <h5>Build</h5>
+        <ul>
+          <li>Exam → subject → unit → topic tree, versioned per institute</li>
+          <li>Append-only event tables with <code>tenant_id</code> on every row</li>
+          <li>Multi-tenant skeleton with Postgres RLS policies</li>
+          <li>Django admin for tree editing and tenant onboarding</li>
+        </ul>
+        <h5>Tech</h5>
+        <ul class="stack-list">
+          <li><span class="k">django 5 + DRF</span><span class="v">Project skeleton, custom user model from day one — swapping it later is a migration nightmare</span></li>
+          <li><span class="k">postgres 16</span><span class="v"><code>ltree</code> or adjacency list for the tree; <code>ltree</code> if you want cheap subtree queries</span></li>
+          <li><span class="k">RLS policies</span><span class="v">Tenancy enforced in the database, not in a Django manager someone forgets to use</span></li>
+          <li><span class="k">django-environ</span><span class="v">Config from environment; no settings committed</span></li>
+        </ul>
+        <div class="trap" style="margin-top:16px"><b>Trap:</b> a single global syllabus tree. Two Kota institutes teaching JEE split and name chapters differently. Version per institute with a canonical mapping underneath, or your second customer forces a rewrite.</div>
+        <div class="done" style="margin-top:10px"><b>Done when:</b> you can create two institutes with different trees, and a query as institute A provably cannot return institute B's rows.</div>
+      </div>
+    </div>
+
+    <!-- P1 -->
+    <div class="stage">
+      <div class="st-head"><span class="st-id">P1</span><h3 class="st-name">Roster &amp; mock result ingestion</h3><span class="st-wks">≈ 4–6 weeks</span></div>
+      <div class="st-body">
+        <p>The largest engineering surface in the project, and the one everyone underestimates. Every institute exports differently; names have three spellings; roll numbers collide across batches; half the papers carry no chapter tags.</p>
+        <h5>Build</h5>
+        <ul>
+          <li>File upload with format sniffing (xlsx / csv / vendor OMR exports)</li>
+          <li>Per-institute column-mapping profiles, stored as JSONB and reused</li>
+          <li>Identity resolution: exact on roll number, fuzzy on name, human queue for the rest</li>
+          <li>Question→topic mapping tool with a review queue in Django admin</li>
+          <li>Idempotent re-import — the same file twice must not double every attempt</li>
+        </ul>
+        <h5>Tech</h5>
+        <ul class="stack-list">
+          <li><span class="k">pandas + openpyxl</span><span class="v">Parsing. Stream large files rather than loading whole sheets</span></li>
+          <li><span class="k">rapidfuzz</span><span class="v">Name matching — far faster than fuzzywuzzy, same API shape</span></li>
+          <li><span class="k">celery</span><span class="v">Ingestion is a job, not a request. Never parse a file in a web worker</span></li>
+          <li><span class="k">django admin</span><span class="v">The mapping review queue. This is the payoff for the framework choice</span></li>
+          <li><span class="k">jsonb</span><span class="v">Column-mapping profiles and raw row snapshots for replay</span></li>
+        </ul>
+        <div class="trap" style="margin-top:16px"><b>Trap:</b> building OMR sheet scanning. Nearly every institute already has an OMR vendor that exports CSV. Build the importer, not the scanner — this decision alone saves a month.</div>
+        <div class="done" style="margin-top:10px"><b>Done when:</b> an institute's real historical mock file imports end-to-end, unmapped questions land in the queue, and re-importing the same file changes nothing.</div>
+      </div>
+    </div>
+
+    <!-- P2 -->
+    <div class="stage">
+      <div class="st-head"><span class="st-id">P2</span><h3 class="st-name">Feature store &amp; mock analyzer</h3><span class="st-wks">≈ 2–3 weeks</span></div>
+      <div class="st-body">
+        <p>Where the system starts knowing things nobody told it. Rung-0 mastery only — a time-decayed rolling accuracy per (student, topic), computed in SQL.</p>
+        <h5>Build</h5>
+        <ul>
+          <li><code>topic_state</code> and <code>student_state</code>, recomputed on event and nightly</li>
+          <li>Marks-lost attribution: conceptual gap · execution error · time exhaustion · avoidable skip</li>
+          <li>Time-per-question baselines per student</li>
+          <li>Full rebuild-from-events command, so state is always reproducible</li>
+        </ul>
+        <h5>Tech</h5>
+        <ul class="stack-list">
+          <li><span class="k">postgres windows</span><span class="v"><code>OVER (PARTITION BY student, topic ORDER BY ts)</code> — the whole of rung 0. No ML library</span></li>
+          <li><span class="k">materialized views</span><span class="v">Cohort aggregates; refresh nightly via beat</span></li>
+          <li><span class="k">celery beat</span><span class="v">Nightly recompute, idempotent and replayable</span></li>
+          <li><span class="k">pytest</span><span class="v">Golden-file tests: known event stream in, known feature values out</span></li>
+        </ul>
+        <div class="done" style="margin-top:16px"><b>Done when:</b> you can drop all derived tables, replay the event log, and land on byte-identical state.</div>
+      </div>
+    </div>
+
+    <!-- P3 -->
+    <div class="stage sell">
+      <div class="st-head"><span class="st-id">P3</span><h3 class="st-name">Detectors, mentor console, director dashboard</h3><span class="st-wks">≈ 3–4 weeks · FIRST SALE</span></div>
+      <div class="st-body">
+        <p>The first thing anyone will pay for, and demonstrable on an institute's historical files with no student onboarding at all. This is the pilot.</p>
+        <h5>Build</h5>
+        <ul>
+          <li>Tier-0 detectors: weak topic, over-attempting, plateau</li>
+          <li>Evidenced flags with severity, routed to a named mentor</li>
+          <li>Intervention logging and outcome tracking — the loop must close</li>
+          <li>Director view: institute health, batch comparison, at-risk triage list</li>
+          <li>Alert hygiene: minimum evidence, personal baselines, cooldown windows</li>
+        </ul>
+        <h5>Tech</h5>
+        <ul class="stack-list">
+          <li><span class="k">htmx + alpine</span><span class="v">Server-rendered tables, filters, drill-downs. No API layer, no build step</span></li>
+          <li><span class="k">echarts</span><span class="v">Trend lines and heatmaps; loaded from CDN, configured server-side</span></li>
+          <li><span class="k">django templates</span><span class="v">Shared with the PDF renderer later — write them once</span></li>
+          <li><span class="k">detector registry</span><span class="v">Each detector a class with <code>evaluate()</code> returning evidence; version the rule so flags stay auditable</span></li>
+        </ul>
+        <div class="trap" style="margin-top:16px"><b>Trap:</b> firing flags on thin evidence. Three wrong answers is noise. A console that cries wolf in week one is ignored by week three, and you will not get a second chance with that mentor.</div>
+        <div class="done" style="margin-top:10px"><b>Done when:</b> you can load a real institute's last six months and show its director five students they did not know were in trouble — with the evidence for each.</div>
+      </div>
+    </div>
+
+    <!-- P4 -->
+    <div class="stage">
+      <div class="st-head"><span class="st-id">P4</span><h3 class="st-name">Student app &amp; study logging</h3><span class="st-wks">≈ 3–4 weeks</span></div>
+      <div class="st-body">
+        <p>All the adoption risk in the product lives here. The design constraint is friction, not features: a log form that takes three minutes collects nothing by week three.</p>
+        <h5>Build</h5>
+        <ul>
+          <li>Daily log capture in under forty seconds — topic, minutes, mode</li>
+          <li>Chapter self-rating (1–5) for the confidence signal</li>
+          <li>Personal dashboard: consistency, subject balance, mock trend</li>
+          <li>Web push for the daily nudge</li>
+        </ul>
+        <h5>Tech</h5>
+        <ul class="stack-list">
+          <li><span class="k">PWA</span><span class="v">Installable, no app store. Svelte or vanilla + Vite — the surface is small</span></li>
+          <li><span class="k">service worker</span><span class="v">Offline log capture, queued and synced. Students log on patchy data</span></li>
+          <li><span class="k">web push + VAPID</span><span class="v">Works on Android Chrome, which is the overwhelming majority of this market</span></li>
+          <li><span class="k">DRF + JWT</span><span class="v">The API layer finally earns its place here</span></li>
+        </ul>
+        <div class="trap" style="margin-top:16px"><b>Trap:</b> shipping native apps first. App-store review between you and a pilot fix is an unnecessary tax before adoption is even proven.</div>
+        <div class="done" style="margin-top:10px"><b>Done when:</b> median daily log time is under forty seconds and week-3 retention in the pilot batch is above half.</div>
+      </div>
+    </div>
+
+    <!-- P5 -->
+    <div class="stage">
+      <div class="st-head"><span class="st-id">P5</span><h3 class="st-name">Retention model &amp; revision scheduler</h3><span class="st-wks">≈ 2–3 weeks</span></div>
+      <div class="st-body">
+        <p>Per-topic decay estimation and the revision cycle queue — with the deadline modification that no existing library provides.</p>
+        <h5>Build</h5>
+        <ul>
+          <li>Per-topic retention estimate with decay since last touch</li>
+          <li>Revision cycles R1 / R2 / R3 with due dates</li>
+          <li>Deadline-aware interval compression as the exam approaches</li>
+          <li>Revision debt as a first-class metric on both consoles</li>
+        </ul>
+        <h5>Tech</h5>
+        <ul class="stack-list">
+          <li><span class="k">py-fsrs</span><span class="v">Starting point. You will fork it — the objective function differs</span></li>
+          <li><span class="k">custom objective</span><span class="v">Maximise recall probability on <em>exam date</em>, not minimise lifetime reviews</span></li>
+          <li><span class="k">scipy.optimize</span><span class="v">Fitting decay parameters per student once you have volume</span></li>
+        </ul>
+        <div class="note warn" style="margin:16px 0 0;max-width:none">
+          <span class="lbl">Genuinely novel work</span>
+          <p>Anki-lineage schedulers assume indefinite retention with minimum review cost. Exam prep inverts that: fixed syllabus, hard deadline, finite hours. Topics whose forecast recall on exam day is already sufficient should be <em>deprioritised</em>. Budget research time, not install time.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- P6 -->
+    <div class="stage">
+      <div class="st-head"><span class="st-id">P6</span><h3 class="st-name">Daily planner</h3><span class="st-wks">≈ 2–3 weeks</span></div>
+      <div class="st-body">
+        <p>Four prioritised queues competing for a fixed number of minutes, under constraints the student does not control.</p>
+        <h5>Build</h5>
+        <ul>
+          <li>Priority scoring across due revisions, weak topics, syllabus remaining, mock follow-ups</li>
+          <li>Constraint packing into the day around coaching class timings</li>
+          <li>A reason code on every block, shown to the student</li>
+          <li>Replanning when a day is missed — without cascading guilt into a 14-hour backlog</li>
+        </ul>
+        <h5>Tech</h5>
+        <ul class="stack-list">
+          <li><span class="k">greedy scorer</span><span class="v">Weighted sort, fill until minutes exhausted. One day's work, ~80% of the value</span></li>
+          <li><span class="k">ortools CP-SAT</span><span class="v">Only when you can point at plans the greedy version demonstrably ruins</span></li>
+          <li><span class="k">celery beat</span><span class="v">Nightly plan generation for every active student</span></li>
+        </ul>
+        <div class="trap" style="margin-top:16px"><b>Trap:</b> rolling missed work forward indefinitely. A student who skips two days must not open the app to a 14-hour plan — that is the moment they uninstall. Decay the backlog deliberately.</div>
+      </div>
+    </div>
+
+    <!-- P7 -->
+    <div class="stage">
+      <div class="st-head"><span class="st-id">P7</span><h3 class="st-name">Narration layer</h3><span class="st-wks">≈ 2–3 weeks</span></div>
+      <div class="st-body">
+        <p>Last, not first — its entire input is the output of P2 through P6. See §5 for the model, caching and cost detail.</p>
+        <h5>Build</h5>
+        <ul>
+          <li>Context builder assembling a bounded, single-student payload</li>
+          <li>Prompt templates per surface: daily nudge, weekly summary, student Q&amp;A, parent language</li>
+          <li>Claim validator — every figure in the output must exist in the payload</li>
+          <li>Response cache keyed on a hash of the state that produced it</li>
+        </ul>
+        <h5>Tech</h5>
+        <ul class="stack-list">
+          <li><span class="k">anthropic SDK</span><span class="v"><code>claude-opus-5</code>, <code>thinking: {type:"adaptive"}</code></span></li>
+          <li><span class="k">batch API</span><span class="v">Overnight generation at 50% cost — nudges and summaries are not latency-sensitive</span></li>
+          <li><span class="k">prompt caching</span><span class="v">Stable template prefix first, volatile student payload last</span></li>
+          <li><span class="k">redis</span><span class="v">State-hash cache. Unchanged state must never regenerate</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- P8 -->
+    <div class="stage">
+      <div class="st-head"><span class="st-id">P8</span><h3 class="st-name">Parent reports, cohort intelligence, scale</h3><span class="st-wks">ongoing</span></div>
+      <div class="st-body">
+        <h5>Build</h5>
+        <ul>
+          <li>Weekly parent report delivered on WhatsApp</li>
+          <li>Cross-batch and cross-institute benchmarks</li>
+          <li>Mastery rungs 1–2: BKT, then Elo / IRT</li>
+          <li>Attempts table partitioning; read replica for analytics</li>
+        </ul>
+        <h5>Tech</h5>
+        <ul class="stack-list">
+          <li><span class="k">weasyprint</span><span class="v">HTML → PDF reusing the console templates</span></li>
+          <li><span class="k">whatsapp BSP</span><span class="v">Gupshup / AiSensy / Twilio. Templates need pre-approval — start that early</span></li>
+          <li><span class="k">pyBKT · py-irt</span><span class="v">Rungs 1–2, adopted only on a measured AUC improvement</span></li>
+          <li><span class="k">pg_partman</span><span class="v">Monthly partitions on <code>attempts</code> — the table that grows fastest by an order of magnitude</span></li>
+        </ul>
+        <div class="note" style="margin:16px 0 0;max-width:none">
+          <span class="lbl">Volume math</span>
+          <p>300 students × 75 questions × 2 mocks a month ≈ 45,000 attempt rows per institute per month. At 50 institutes that is 2.25M rows a month. Partition before you need to, not after.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ===== 4 ===== -->
+  <section id="deploy">
+    <h2>04 — Deployment</h2>
+    <div class="htitle">What actually runs where</div>
+
+    <figure>
+      <svg viewBox="0 0 900 350" role="img" aria-label="Deployment topology: browsers and the PWA reach nginx and Django via a synchronous request path, while Celery workers driven by Redis handle ingestion, nightly recompute and narration asynchronously, all sharing one Postgres instance in the Mumbai region.">
+        <defs>
+          <marker id="d1" viewBox="0 0 8 8" refX="7.2" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" class="ah"/></marker>
+          <marker id="d2" viewBox="0 0 8 8" refX="7.2" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" class="ah-a"/></marker>
+        </defs>
+
+        <text x="14" y="26" class="tl">SYNCHRONOUS PATH</text>
+        <rect class="bx" x="14" y="38" width="120" height="52" rx="4"/>
+        <text x="74" y="60" class="t" text-anchor="middle">Browser</text>
+        <text x="74" y="78" class="tm" text-anchor="middle">console · PWA</text>
+        <line class="ln" x1="134" y1="64" x2="158" y2="64" marker-end="url(#d1)"/>
+
+        <rect class="bx" x="160" y="38" width="104" height="52" rx="4"/>
+        <text x="212" y="60" class="t" text-anchor="middle">nginx</text>
+        <text x="212" y="78" class="tm" text-anchor="middle">tls · static</text>
+        <line class="ln" x1="264" y1="64" x2="288" y2="64" marker-end="url(#d1)"/>
+
+        <rect class="bx-a" x="290" y="38" width="150" height="52" rx="4"/>
+        <text x="365" y="60" class="ta" text-anchor="middle">Django / gunicorn</text>
+        <text x="365" y="78" class="tm" text-anchor="middle">web + admin</text>
+
+        <text x="14" y="136" class="tl">ASYNCHRONOUS PATH</text>
+        <rect class="bx" x="14" y="148" width="120" height="52" rx="4"/>
+        <text x="74" y="170" class="t" text-anchor="middle">Redis</text>
+        <text x="74" y="188" class="tm" text-anchor="middle">broker + cache</text>
+        <line class="ln" x1="134" y1="174" x2="158" y2="174" marker-end="url(#d1)"/>
+
+        <rect class="bx" x="160" y="140" width="280" height="68" rx="4"/>
+        <text x="300" y="164" class="t" text-anchor="middle">Celery workers + beat</text>
+        <text x="300" y="182" class="tm" text-anchor="middle">ingestion · nightly recompute · planning</text>
+        <text x="300" y="198" class="tm" text-anchor="middle">narration batch · report generation</text>
+
+        <path class="ln-a" d="M365 90 L365 240" marker-end="url(#d2)"/>
+        <path class="ln-a" d="M300 208 L300 240" marker-end="url(#d2)"/>
+
+        <rect class="bx-a" x="160" y="242" width="280" height="56" rx="4"/>
+        <text x="300" y="266" class="ta" text-anchor="middle">PostgreSQL</text>
+        <text x="300" y="284" class="tm" text-anchor="middle">events · features · RLS · partitioned attempts</text>
+
+        <line class="bnd" x1="480" y1="20" x2="480" y2="320" stroke="var(--line-strong)" stroke-dasharray="4 4" fill="none"/>
+        <text x="496" y="26" class="tl">EXTERNAL</text>
+
+        <rect class="bx" x="496" y="38" width="180" height="52" rx="4"/>
+        <text x="586" y="60" class="t" text-anchor="middle">Anthropic API</text>
+        <text x="586" y="78" class="tm" text-anchor="middle">batch · overnight</text>
+        <path class="ln" d="M440 174 L470 174 L470 64 L492 64" marker-end="url(#d1)"/>
+
+        <rect class="bx" x="496" y="104" width="180" height="52" rx="4"/>
+        <text x="586" y="126" class="t" text-anchor="middle">Cloudflare R2</text>
+        <text x="586" y="144" class="tm" text-anchor="middle">uploads · PDFs</text>
+        <path class="ln" d="M440 174 L470 174 L470 130 L492 130" marker-end="url(#d1)"/>
+
+        <rect class="bx" x="496" y="170" width="180" height="52" rx="4"/>
+        <text x="586" y="192" class="t" text-anchor="middle">WhatsApp BSP</text>
+        <text x="586" y="210" class="tm" text-anchor="middle">parent reports</text>
+        <path class="ln" d="M440 180 L492 190" marker-end="url(#d1)"/>
+
+        <rect class="bx" x="496" y="236" width="180" height="52" rx="4"/>
+        <text x="586" y="258" class="t" text-anchor="middle">Sentry</text>
+        <text x="586" y="276" class="tm" text-anchor="middle">errors</text>
+
+        <rect class="bx" x="700" y="38" width="186" height="118" rx="4"/>
+        <text x="716" y="62" class="t">One VPS</text>
+        <text x="716" y="84" class="ts">Everything left of the dashed</text>
+        <text x="716" y="102" class="ts">line is one Docker Compose</text>
+        <text x="716" y="120" class="ts">file on a single machine in</text>
+        <text x="716" y="138" class="ts">ap-south-1 (Mumbai).</text>
+
+        <rect class="bx" x="700" y="170" width="186" height="118" rx="4"/>
+        <text x="716" y="194" class="t">Why not serverless</text>
+        <text x="716" y="216" class="ts">Ingestion runs for minutes.</text>
+        <text x="716" y="234" class="ts">Nightly recompute touches</text>
+        <text x="716" y="252" class="ts">every student. Both are hostile</text>
+        <text x="716" y="270" class="ts">to function timeouts and cold</text>
+        <text x="716" y="288" class="ts">starts. Kubernetes is worse.</text>
+
+        <text x="14" y="330" class="ts">Data residency: Mumbai region is a DPDP requirement, not a latency preference — most users are minors and institutes will ask.</text>
+      </svg>
+      <figcaption><b>One machine, two paths.</b> The synchronous path serves pages; everything expensive runs on the async path. Splitting these from day one is what lets a single VPS carry the first fifty institutes — and is the only scaling decision you need to make before you have customers.</figcaption>
+    </figure>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ===== 5 ===== -->
+  <section id="llm">
+    <h2>05 — LLM layer</h2>
+    <div class="htitle">Model choice is a cost decision, so make it with numbers</div>
+
+    <p>The narration layer is the only recurring per-student cost in the system. Everything else is fixed infrastructure, so this is where unit economics are won or lost. Three levers, applied in order: cache first, batch second, model choice last.</p>
+
+    <h3>Available models</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Model</th><th>ID</th><th>Context</th><th class="num">Input /1M</th><th class="num">Output /1M</th></tr></thead>
+        <tbody>
+          <tr><td>Claude Opus 5</td><td><code>claude-opus-5</code></td><td class="num">1M</td><td class="num">$5.00</td><td class="num">$25.00</td></tr>
+          <tr><td>Claude Sonnet 5</td><td><code>claude-sonnet-5</code></td><td class="num">1M</td><td class="num">$2.00</td><td class="num">$10.00</td></tr>
+          <tr><td>Claude Haiku 4.5</td><td><code>claude-haiku-4-5</code></td><td class="num">200K</td><td class="num">$1.00</td><td class="num">$5.00</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>The volume driver</h3>
+    <p>A daily nudge per student is the high-frequency route. Assume a bounded payload of ~1,500 input tokens of computed state and ~200 output tokens of prose, at 10,000 students:</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Configuration</th><th class="num">Per day</th><th class="num">Per month</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Opus 5, no optimisation</td><td class="num">≈ $125</td><td class="num">≈ $3,750</td><td>Best narration quality, full price</td></tr>
+          <tr><td>Opus 5 + Batch API</td><td class="num">≈ $63</td><td class="num">≈ $1,875</td><td>Overnight generation; 50% discount</td></tr>
+          <tr><td>Opus 5 + batch + state cache</td><td class="num">varies</td><td class="num">materially lower</td><td>Only students whose state changed regenerate</td></tr>
+          <tr><td>Haiku 4.5 + batch</td><td class="num">≈ $13</td><td class="num">≈ $375</td><td>Cheapest; validate quality on real payloads first</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <span class="lbl">How to read that table</span>
+      <p>Default to <code>claude-opus-5</code> — narration is what the institute and the parent actually read, and it is the surface that makes the product feel intelligent. Batching and state-hash caching together cut the bill substantially without touching quality, so exhaust both before considering a smaller model. If you do move the daily-nudge route to Haiku, treat it as a measured decision on real payloads, and keep weekly summaries and parent reports on Opus where the writing carries more weight.</p>
+    </div>
+
+    <h3>Implementation notes</h3>
+    <ul>
+      <li><strong>Batch API</strong> — <code>client.messages.batches.create()</code> with a <code>custom_id</code> per student. Results arrive in any order; key by <code>custom_id</code>, never by position. Half price, and nightly generation has no latency requirement.</li>
+      <li><strong>Prompt caching</strong> — render order is <code>tools</code> → <code>system</code> → <code>messages</code>. Put the stable template prefix first and the volatile student payload after the last breakpoint. Verify with <code>usage.cache_read_input_tokens</code>; if it stays zero, something in your prefix is changing per request.</li>
+      <li><strong>Thinking</strong> — <code>thinking: {type: "adaptive"}</code>. Do not use <code>budget_tokens</code>; it is rejected on current models.</li>
+      <li><strong>Structured output</strong> — where you want fields rather than prose, use <code>output_config: {format: {...}}</code>, not the deprecated <code>output_format</code>.</li>
+      <li><strong>Claim validation</strong> — extract every number and proper noun from the generated text and assert each appears in the payload. This is a string scan, not a second model call, so it costs nothing and prevents the one failure mode that would destroy trust.</li>
+    </ul>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ===== 6 ===== -->
+  <section id="testing">
+    <h2>06 — Testing</h2>
+    <div class="htitle">Three test types carry this system</div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Type</th><th>What it does</th><th>Why it matters most here</th></tr></thead>
+        <tbody>
+          <tr><td>Ingestion golden files</td><td>Real (anonymised) institute exports in, expected canonical events out</td><td>Every new institute is a new format. This suite is your regression net against the messiest surface in the product.</td></tr>
+          <tr><td>Detector replay</td><td>A known event stream in, an assertion that a specific flag does or does not fire</td><td>The highest-value tests you will write. A detector that silently stops firing is invisible until a customer asks why nobody was flagged.</td></tr>
+          <tr><td>Rebuild equivalence</td><td>Drop derived state, replay events, assert identical output</td><td>Proves the append-only invariant holds — which is what makes model upgrades and backfills safe.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Tooling: <code>pytest</code> + <code>pytest-django</code> + <code>factory_boy</code> for fixtures, <code>freezegun</code> for the time-dependent decay and cooldown logic. Skip end-to-end browser tests until P4 — before then the console is thin enough that detector tests cover the real risk.</p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ===== 7 ===== -->
+  <section id="dont">
+    <h2>07 — What not to build</h2>
+    <div class="htitle">The scope you save is the deadline you keep</div>
+
+    <div class="dont">
+      <div class="dont-c"><div class="h">OMR sheet scanning</div><div class="b">Institutes already have OMR vendors that export CSV. Import their output. Saves roughly a month of OpenCV work for zero differentiation.</div></div>
+      <div class="dont-c"><div class="h">Your own test platform</div><div class="b">You integrate with what they run; you do not replace it. Replacing it makes you a competitor to their existing vendor and doubles the sale.</div></div>
+      <div class="dont-c"><div class="h">Question banks or content</div><div class="b">The positioning is explicit: not a content play. Content is a commodity with entrenched incumbents and ongoing production cost.</div></div>
+      <div class="dont-c"><div class="h">Rank prediction</div><div class="b">Institutes have been burned by vendors selling confident numbers. Refusing to predict rank is a credibility asset — say so out loud in the pitch.</div></div>
+      <div class="dont-c"><div class="h">Native mobile apps</div><div class="b">Not before a PWA proves students will log at all. App-store review between you and a pilot fix is a tax you have not earned.</div></div>
+      <div class="dont-c"><div class="h">A feature store product</div><div class="b">Feast and friends solve a problem you do not have. Your feature store is two Postgres tables and a nightly job.</div></div>
+      <div class="dont-c"><div class="h">Kubernetes or microservices</div><div class="b">One Docker Compose file on one VPS carries the first fifty institutes. Distributed systems problems are not the ones you need.</div></div>
+      <div class="dont-c"><div class="h">Deep learning models early</div><div class="b">DKT needs six figures of attempts. You will have four. Rung 0 is a window function and it is enough to sell.</div></div>
+    </div>
+
+    <div class="note good">
+      <span class="lbl">The shortest honest summary</span>
+      <p>Stages P0–P3 are the product. They take about fifteen weeks, need no student to change any behaviour, and are demonstrable on files the institute already owns. Everything from P4 onward is better built against a paying pilot's real data than against your assumptions — so the objective is not to finish the roadmap, it is to reach week fifteen with something a director will sign.</p>
+    </div>
+  </section>
+
+  </main>
+
+  <div class="foot">
+    Companion to <em>Student AI — System Architecture</em>, which describes the same system without naming technologies. Where the two disagree, the architecture document defines the responsibility and this one defines only how it is currently implemented.
+  </div>
+
+</div>

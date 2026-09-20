@@ -1,0 +1,1402 @@
+openapi: 3.0.3
+info:
+  title: Student AI API
+  version: 0.1.0
+  description: Contract between the Django backend and the React console / student
+    PWA. This schema is the source of truth — regenerate with `manage.py spectacular
+    --file ../openapi.yaml` after any serializer change.
+paths:
+  /api/batches/:
+    get:
+      operationId: batches_list
+      description: Restrict every queryset to the caller's institute.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - batches
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBatchList'
+          description: ''
+  /api/batches/{id}/:
+    get:
+      operationId: batches_retrieve
+      description: Restrict every queryset to the caller's institute.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this batch.
+        required: true
+      tags:
+      - batches
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Batch'
+          description: ''
+  /api/dashboard/summary/:
+    get:
+      operationId: dashboard_summary_retrieve
+      description: Restrict every queryset to the caller's institute.
+      tags:
+      - dashboard
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+          description: ''
+  /api/flags/:
+    get:
+      operationId: flags_list
+      description: Restrict every queryset to the caller's institute.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - flags
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFlagList'
+          description: ''
+  /api/flags/{id}/:
+    get:
+      operationId: flags_retrieve
+      description: Restrict every queryset to the caller's institute.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this flag.
+        required: true
+      tags:
+      - flags
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flag'
+          description: ''
+  /api/flags/{id}/intervene/:
+    post:
+      operationId: flags_intervene_create
+      description: Log what the mentor did. This is what closes the risk loop.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this flag.
+        required: true
+      tags:
+      - flags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InterventionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InterventionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InterventionRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Intervention'
+          description: ''
+  /api/my/plan/:
+    get:
+      operationId: my_plan_list
+      description: Today's plan for the logged-in student.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPlanBlockList'
+          description: ''
+  /api/my/plan/{id}/complete/:
+    post:
+      operationId: my_plan_complete_create
+      description: Today's plan for the logged-in student.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this plan block.
+        required: true
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanBlock'
+          description: ''
+  /api/my/study-logs/:
+    get:
+      operationId: my_study_logs_list
+      description: Restrict every queryset to the caller's institute.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStudyLogCreateList'
+          description: ''
+    post:
+      operationId: my_study_logs_create
+      description: Restrict every queryset to the caller's institute.
+      tags:
+      - student-app
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudyLogCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudyLogCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudyLogCreateRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyLogCreate'
+          description: ''
+  /api/papers/:
+    get:
+      operationId: papers_list
+      description: Restrict every queryset to the caller's institute.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - papers
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTestPaperList'
+          description: ''
+  /api/papers/{id}/:
+    get:
+      operationId: papers_retrieve
+      description: Restrict every queryset to the caller's institute.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this test paper.
+        required: true
+      tags:
+      - papers
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestPaper'
+          description: ''
+  /api/students/:
+    get:
+      operationId: students_list
+      description: Restrict every queryset to the caller's institute.
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: boolean
+      - in: query
+        name: at_risk
+        schema:
+          type: boolean
+      - in: query
+        name: batch
+        schema:
+          type: integer
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - students
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStudentListList'
+          description: ''
+  /api/students/{id}/:
+    get:
+      operationId: students_retrieve
+      description: Restrict every queryset to the caller's institute.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      tags:
+      - students
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDetail'
+          description: ''
+  /api/students/{id}/attempts/:
+    get:
+      operationId: students_attempts_list
+      description: Restrict every queryset to the caller's institute.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - students
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAttemptList'
+          description: ''
+  /api/students/{id}/marks-lost/:
+    get:
+      operationId: students_marks_lost_retrieve
+      description: |-
+        Partition lost marks by cause for one paper.
+
+        Cause is inferred from status plus prior mastery on the topic:
+        a wrong answer on a topic the student knows is an execution error,
+        not a conceptual gap.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      - in: query
+        name: paper
+        schema:
+          type: integer
+        required: true
+      tags:
+      - students
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarksLost'
+          description: ''
+  /api/students/{id}/mock-scores/:
+    get:
+      operationId: students_mock_scores_list
+      description: Per-subject totals for every paper this student sat.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - students
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMockScoreList'
+          description: ''
+  /api/students/{id}/subject-breakdown/:
+    get:
+      operationId: students_subject_breakdown_list
+      description: Study-time share vs marks-lost share. The neglect chart.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - students
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSubjectBreakdownList'
+          description: ''
+  /api/students/{id}/topic-states/:
+    get:
+      operationId: students_topic_states_list
+      description: Restrict every queryset to the caller's institute.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - students
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTopicStateList'
+          description: ''
+components:
+  schemas:
+    Attempt:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        question_id:
+          type: string
+          maxLength: 100
+        topic_name:
+          type: string
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        time_spent:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        marks:
+          type: number
+          format: double
+        source:
+          $ref: '#/components/schemas/SourceEnum'
+        ts:
+          type: string
+          format: date-time
+      required:
+      - id
+      - question_id
+      - status
+      - topic_name
+      - ts
+    Batch:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        exam_code:
+          type: string
+          readOnly: true
+        year:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        exam_date:
+          type: string
+          format: date
+          nullable: true
+        student_count:
+          type: integer
+          readOnly: true
+      required:
+      - exam_code
+      - id
+      - name
+      - student_count
+      - year
+    BlankEnum:
+      enum:
+      - ''
+    DashboardSummary:
+      type: object
+      description: Director's KPI strip.
+      properties:
+        total_students:
+          type: integer
+        active_students:
+          type: integer
+        flagged_this_week:
+          type: integer
+        critical_flags:
+          type: integer
+        batch_mock_avg:
+          type: number
+          format: double
+          nullable: true
+        revision_debt_pct:
+          type: number
+          format: double
+        flags_resolved:
+          type: integer
+        recovery_rate_pct:
+          type: number
+          format: double
+          nullable: true
+          description: Share of closed flags whose outcome was 'recovered'.
+      required:
+      - active_students
+      - batch_mock_avg
+      - critical_flags
+      - flagged_this_week
+      - flags_resolved
+      - recovery_rate_pct
+      - revision_debt_pct
+      - total_students
+    Flag:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        student_id:
+          type: integer
+          readOnly: true
+        student_name:
+          type: string
+          readOnly: true
+        batch_name:
+          type: string
+          readOnly: true
+        mentor_name:
+          type: string
+          readOnly: true
+        topic_name:
+          type: string
+          readOnly: true
+        type:
+          type: string
+          maxLength: 40
+        severity:
+          $ref: '#/components/schemas/SeverityEnum'
+        headline:
+          type: string
+          maxLength: 300
+        evidence: {}
+        rule_version:
+          type: string
+          maxLength: 20
+        raised_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        outcome:
+          oneOf:
+          - $ref: '#/components/schemas/OutcomeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        is_open:
+          type: boolean
+          readOnly: true
+      required:
+      - batch_name
+      - headline
+      - id
+      - is_open
+      - mentor_name
+      - raised_at
+      - severity
+      - student_id
+      - student_name
+      - topic_name
+      - type
+    Intervention:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        flag:
+          type: integer
+        mentor:
+          type: integer
+        mentor_name:
+          type: string
+          readOnly: true
+        action:
+          type: string
+        taken_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action
+      - flag
+      - id
+      - mentor
+      - mentor_name
+      - taken_at
+    InterventionRequest:
+      type: object
+      properties:
+        flag:
+          type: integer
+        mentor:
+          type: integer
+        action:
+          type: string
+          minLength: 1
+      required:
+      - action
+      - flag
+      - mentor
+    KindEnum:
+      enum:
+      - subject
+      - unit
+      - chapter
+      type: string
+      description: |-
+        * `subject` - Subject
+        * `unit` - Unit
+        * `chapter` - Chapter
+    MarksLost:
+      type: object
+      description: Mistake taxonomy for one paper — the line that sells the product.
+      properties:
+        conceptual_gap:
+          type: integer
+        execution_error:
+          type: integer
+        time_exhaustion:
+          type: integer
+        avoidable_skip:
+          type: integer
+        total_lost:
+          type: integer
+        recoverable:
+          type: integer
+          description: Marks lost to causes that need no new learning.
+      required:
+      - avoidable_skip
+      - conceptual_gap
+      - execution_error
+      - recoverable
+      - time_exhaustion
+      - total_lost
+    Mentor:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        email:
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+      required:
+      - id
+      - name
+    MockScore:
+      type: object
+      properties:
+        paper_id:
+          type: integer
+        paper_name:
+          type: string
+        held_on:
+          type: string
+          format: date
+        physics:
+          type: number
+          format: double
+        chemistry:
+          type: number
+          format: double
+        maths:
+          type: number
+          format: double
+        total:
+          type: number
+          format: double
+      required:
+      - chemistry
+      - held_on
+      - maths
+      - paper_id
+      - paper_name
+      - physics
+      - total
+    ModeEnum:
+      enum:
+      - learn
+      - practice
+      - revise
+      type: string
+      description: |-
+        * `learn` - Learn
+        * `practice` - Practice
+        * `revise` - Revise
+    OutcomeEnum:
+      enum:
+      - recovered
+      - declined
+      - unknown
+      type: string
+      description: |-
+        * `recovered` - Recovered
+        * `declined` - Declined
+        * `unknown` - Unknown
+    PaginatedAttemptList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attempt'
+    PaginatedBatchList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Batch'
+    PaginatedFlagList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flag'
+    PaginatedMockScoreList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MockScore'
+    PaginatedPlanBlockList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanBlock'
+    PaginatedStudentListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentList'
+    PaginatedStudyLogCreateList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyLogCreate'
+    PaginatedSubjectBreakdownList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubjectBreakdown'
+    PaginatedTestPaperList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestPaper'
+    PaginatedTopicStateList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopicState'
+    PlanBlock:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        date:
+          type: string
+          format: date
+          readOnly: true
+        start_time:
+          type: string
+          format: time
+          readOnly: true
+          nullable: true
+        minutes:
+          type: integer
+          readOnly: true
+        mode:
+          type: string
+          readOnly: true
+        topic_name:
+          type: string
+          readOnly: true
+        subject:
+          type: string
+          readOnly: true
+        reason_code:
+          type: string
+          readOnly: true
+        reason_text:
+          type: string
+          maxLength: 200
+        completed:
+          type: boolean
+      required:
+      - date
+      - id
+      - minutes
+      - mode
+      - reason_code
+      - start_time
+      - subject
+      - topic_name
+    SeverityEnum:
+      enum:
+      - watch
+      - high
+      - critical
+      - improving
+      type: string
+      description: |-
+        * `watch` - Watch
+        * `high` - High
+        * `critical` - Critical
+        * `improving` - Improving
+    SourceEnum:
+      enum:
+      - mock
+      - practice
+      type: string
+      description: |-
+        * `mock` - Mock test
+        * `practice` - Practice
+    StatusEnum:
+      enum:
+      - correct
+      - wrong
+      - blank
+      - not_reached
+      type: string
+      description: |-
+        * `correct` - Correct
+        * `wrong` - Wrong
+        * `blank` - Skipped deliberately
+        * `not_reached` - Ran out of time
+    StudentDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        roll_no:
+          type: string
+          maxLength: 50
+        target:
+          type: string
+          maxLength: 100
+        joined_at:
+          type: string
+          format: date
+        exited_at:
+          type: string
+          format: date
+          nullable: true
+        batch:
+          allOf:
+          - $ref: '#/components/schemas/Batch'
+          readOnly: true
+        mentor:
+          allOf:
+          - $ref: '#/components/schemas/Mentor'
+          readOnly: true
+        state:
+          allOf:
+          - $ref: '#/components/schemas/StudentState'
+          readOnly: true
+      required:
+      - batch
+      - id
+      - joined_at
+      - mentor
+      - name
+      - roll_no
+      - state
+    StudentList:
+      type: object
+      description: Row in the director's triage table.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        roll_no:
+          type: string
+          maxLength: 50
+        batch_name:
+          type: string
+          readOnly: true
+        mentor_name:
+          type: string
+          readOnly: true
+        target:
+          type: string
+          maxLength: 100
+        risk_score:
+          type: number
+          format: double
+          readOnly: true
+        mock_trend:
+          type: number
+          format: double
+          readOnly: true
+        mock_avg:
+          type: number
+          format: double
+          readOnly: true
+        open_flags:
+          type: integer
+          readOnly: true
+        exited_at:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - batch_name
+      - id
+      - mentor_name
+      - mock_avg
+      - mock_trend
+      - name
+      - open_flags
+      - risk_score
+      - roll_no
+    StudentState:
+      type: object
+      properties:
+        consistency:
+          type: number
+          format: double
+          nullable: true
+        load_index:
+          type: number
+          format: double
+          nullable: true
+        balance_index:
+          type: number
+          format: double
+          nullable: true
+        revision_debt:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        risk_score:
+          type: number
+          format: double
+          nullable: true
+        mock_avg:
+          type: number
+          format: double
+          nullable: true
+        mock_trend:
+          type: number
+          format: double
+          nullable: true
+        syllabus_pct:
+          type: number
+          format: double
+          nullable: true
+        computed_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - computed_at
+    StudyLogCreate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        topic:
+          type: integer
+        minutes:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        mode:
+          $ref: '#/components/schemas/ModeEnum'
+        ts:
+          type: string
+          format: date-time
+      required:
+      - id
+      - minutes
+      - mode
+      - topic
+      - ts
+    StudyLogCreateRequest:
+      type: object
+      properties:
+        topic:
+          type: integer
+        minutes:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        mode:
+          $ref: '#/components/schemas/ModeEnum'
+        ts:
+          type: string
+          format: date-time
+      required:
+      - minutes
+      - mode
+      - topic
+      - ts
+    SubjectBreakdown:
+      type: object
+      description: Time share vs marks-lost share — the neglect chart.
+      properties:
+        subject:
+          type: string
+        time_share_pct:
+          type: number
+          format: double
+        marks_lost_share_pct:
+          type: number
+          format: double
+        accuracy_pct:
+          type: number
+          format: double
+          nullable: true
+      required:
+      - accuracy_pct
+      - marks_lost_share_pct
+      - subject
+      - time_share_pct
+    TestPaper:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        held_on:
+          type: string
+          format: date
+        total_questions:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        max_marks:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        duration_min:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+      required:
+      - held_on
+      - id
+      - name
+    Topic:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        kind:
+          $ref: '#/components/schemas/KindEnum'
+        weight:
+          type: number
+          format: double
+        subject:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - kind
+      - name
+      - subject
+    TopicState:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        topic:
+          allOf:
+          - $ref: '#/components/schemas/Topic'
+          readOnly: true
+        mastery:
+          type: number
+          format: double
+          nullable: true
+        retention:
+          type: number
+          format: double
+          nullable: true
+        attempts_n:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        correct_n:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        accuracy_30d:
+          type: number
+          format: double
+          nullable: true
+        exposure_min:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        avg_time_spent:
+          type: number
+          format: double
+          nullable: true
+        self_rating:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        confidence_gap:
+          type: number
+          format: double
+          readOnly: true
+        last_seen:
+          type: string
+          format: date-time
+          nullable: true
+        last_revised:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - confidence_gap
+      - id
+      - topic
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid

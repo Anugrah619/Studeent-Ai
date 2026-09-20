@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Django
+*.sqlite3
+/app/staticfiles/
+/app/media/
+
+# Secrets — never commit
+.env
+*.env
+!.env.example
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

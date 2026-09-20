@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16
+    container_name: student_ai_db
+    environment:
+      POSTGRES_DB: student_ai
+      POSTGRES_USER: sai
+      POSTGRES_PASSWORD: devpassword
+    ports:
+      - "5434:5432"          # host 5434 -> container 5432
+                             # 5432 = local Postgres install, 5433 = stocks_db container
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sai -d student_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
