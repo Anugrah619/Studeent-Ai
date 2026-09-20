@@ -131,6 +131,22 @@ class Flag(tenancy.TenantScoped):
                 fields=["institute", "resolved_at", "severity"], name="idx_flag_triage"
             ),
             models.Index(fields=["student", "type"], name="idx_flag_stu_type"),
+
+            # The console's landing query: open flags for one institute,
+            # optionally one severity, newest first. Specified in
+            # SYSTEM_DESIGN.md 3.6 and never actually built.
+            #
+            # Partial on purpose. A flag that is never closed is a bug in the
+            # detector, so the open set stays small while the resolved set
+            # grows forever — indexing only the open rows keeps this index
+            # roughly constant-sized instead of proportional to history.
+            # Verified to serve the severity-filtered form with no sort step
+            # at all (Index Cond on institute_id AND severity, cost 8.17).
+            models.Index(
+                fields=["institute", "severity", "-raised_at"],
+                condition=models.Q(resolved_at__isnull=True),
+                name="idx_flag_open",
+            ),
         ]
 
     def __str__(self) -> str:

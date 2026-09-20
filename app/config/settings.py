@@ -59,6 +59,10 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Must sit after AuthenticationMiddleware: it reads request.user to pick
+    # the tenant, then binds the connection to it for the rest of the
+    # request. See apps/tenancy/middleware.py and migration tenancy/0003.
+    "apps.tenancy.middleware.TenantMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

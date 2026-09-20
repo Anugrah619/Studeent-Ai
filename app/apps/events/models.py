@@ -60,7 +60,21 @@ class Attempt(tenancy.TenantScoped):
             # The hot path — every feature-store query uses this.
             models.Index(fields=["student", "topic", "ts"], name="idx_attempt_stu_top_ts"),
             models.Index(fields=["institute", "ts"], name="idx_attempt_inst_ts"),
-            models.Index(fields=["test_paper"], name="idx_attempt_paper"),
+
+            # Mock analysis: one student, one paper (marks-lost attribution and
+            # the per-question table). Without it Postgres enters on
+            # test_paper_id and throws away everyone else's answers — measured
+            # at 3,225 rows discarded to return 75, and that ratio grows
+            # linearly with the size of the batch that sat the paper.
+            # 0.064 ms / 4 buffers with this index, 0.510 ms / 55 without.
+            models.Index(fields=["student", "test_paper"], name="idx_attempt_stu_paper"),
+
+            # REMOVED: models.Index(fields=["test_paper"], name="idx_attempt_paper")
+            # It was byte-for-byte identical to the index Django already
+            # creates for the test_paper FK, so Postgres only ever used one of
+            # them (pg_stat_user_indexes: 111 scans vs 0) while both were
+            # maintained on every insert. Indexes on this table already weigh
+            # 99% of the heap; a free duplicate is not affordable here.
         ]
         ordering = ["-ts"]
 
