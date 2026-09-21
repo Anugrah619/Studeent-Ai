@@ -1,0 +1,81 @@
+import type { PlanBlock } from "@/api/types";
+import { isoDate } from "./rng";
+
+/**
+ * What the student's phone shows today. Every block carries the reason it is
+ * there — a plan a student cannot interrogate is a plan he stops following.
+ */
+export const planBlocks: PlanBlock[] = [
+  {
+    id: 1,
+    date: isoDate(0),
+    start_time: "06:30:00",
+    minutes: 45,
+    mode: "revise",
+    topic_name: "Chemical Bonding",
+    subject: "Chemistry",
+    reason_code: "revision_overdue",
+    reason_text: "Retention fell to 34% — 19 days since you last revised it",
+    completed: true,
+  },
+  {
+    id: 2,
+    date: isoDate(0),
+    start_time: "07:30:00",
+    minutes: 60,
+    mode: "learn",
+    topic_name: "Coordination Compounds",
+    subject: "Chemistry",
+    reason_code: "weak_topic",
+    reason_text: "4.8% of the paper, and your weakest chapter at 18% mastery",
+    completed: true,
+  },
+  {
+    id: 3,
+    date: isoDate(0),
+    start_time: "16:00:00",
+    minutes: 50,
+    mode: "practice",
+    topic_name: "Rotational Motion",
+    subject: "Physics",
+    reason_code: "execution_error",
+    reason_text: "You know this — 12 marks went to execution errors in Mock 14",
+    completed: false,
+  },
+  {
+    id: 4,
+    date: isoDate(0),
+    start_time: "17:00:00",
+    minutes: 40,
+    mode: "practice",
+    topic_name: "Ionic Equilibrium",
+    subject: "Chemistry",
+    reason_code: "weak_topic",
+    reason_text: "Accuracy 29% over your last 30 days on this chapter",
+    completed: false,
+  },
+  {
+    id: 5,
+    date: isoDate(0),
+    start_time: "20:00:00",
+    minutes: 45,
+    mode: "revise",
+    topic_name: "Indefinite & Definite Integration",
+    subject: "Maths",
+    reason_code: "retention_drop",
+    reason_text: "Highest-weight Maths chapter, due for its third pass",
+    completed: false,
+  },
+  {
+    id: 6,
+    date: isoDate(0),
+    start_time: "21:00:00",
+    minutes: 30,
+    mode: "practice",
+    topic_name: "p-Block Elements",
+    subject: "Chemistry",
+    reason_code: "subject_imbalance",
+    reason_text: "Chemistry is 11% of your hours and 46% of your lost marks",
+    completed: false,
+  },
+];
