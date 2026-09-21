@@ -103,15 +103,62 @@ export function marksLostFor(studentId: number, paperId: number): MarksLost | un
       0.15 + (rand() - 0.5) * 0.06,
     ]);
 
+  const totalLost = conceptual + execution + time + skip;
+  const causes: [MarksLost["causes"][number]["cause"], number][] = [
+    ["conceptual_gap", conceptual],
+    ["execution_error", execution],
+    ["time_exhaustion", time],
+    ["avoidable_skip", skip],
+  ];
+
   return {
+    // Paper identity now travels with the attribution, so the UI can render
+    // "98 of 166" without a second request (this closed
+    // API_GAPS.MARKS_LOST_DENOMINATOR).
+    paper_id: row.paper_id,
+    paper_name: row.paper_name,
+    held_on: row.held_on,
+    max_marks: MAX_MARKS,
+    questions: 75,
+    attempted: 66,
+    score: row.total,
+
     conceptual_gap: conceptual,
     execution_error: execution,
     time_exhaustion: time,
     avoidable_skip: skip,
-    total_lost: conceptual + execution + time + skip,
+    total_lost: totalLost,
     // Everything except a genuine conceptual gap needs no new learning.
     recoverable: execution + time + skip,
+
+    // The student's own median seconds-per-correct-answer. The backend uses
+    // it as the pace baseline that separates "wrong but knew it" from
+    // "wrong and didn't" — null when there are too few timed correct
+    // answers to trust, in which case the time rule was not applied.
+    time_baseline_sec: 94.5,
+
+    // Chart-ready form of the same four numbers.
+    causes: causes.map(([cause, marks]) => ({
+      cause,
+      marks,
+      questions: Math.max(1, Math.round(marks / 4)),
+      share_pct: totalLost ? round((marks / totalLost) * 100, 1) : 0,
+    })),
+
+    top_loss_topics: topLossTopicsFor(studentId, paperId),
   };
+}
+
+/** Where the marks actually went, by chapter — the mentor's next question. */
+function topLossTopicsFor(studentId: number, paperId: number) {
+  const rand = mulberry32(hashSeed("losstopics", studentId, paperId));
+  return [
+    { topic_id: 41, topic: "Some Basic Principles of Organic Chemistry", subject: "Chemistry", marks_lost: 24, questions: 6 },
+    { topic_id: 44, topic: "Organic Compounds Containing Oxygen", subject: "Chemistry", marks_lost: 20, questions: 5 },
+    { topic_id: 38, topic: "Coordination Compounds", subject: "Chemistry", marks_lost: 16, questions: 4 },
+    { topic_id: 5, topic: "Rotational Motion", subject: "Physics", marks_lost: 12, questions: 3 },
+    { topic_id: 30, topic: "Integral Calculus", subject: "Maths", marks_lost: 12, questions: 3 },
+  ].map((t) => ({ ...t, marks_lost: t.marks_lost + Math.round((rand() - 0.5) * 2) }));
 }
 
 /* ------------------------------------------------------------------ *

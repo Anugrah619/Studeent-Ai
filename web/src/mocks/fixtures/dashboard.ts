@@ -23,8 +23,22 @@ export function dashboardSummary(): DashboardSummary {
       (f) => now - Date.parse(f.raised_at) <= WEEK_MS,
     ).length,
     critical_flags: open.filter((f) => f.severity === "critical").length,
+
+    // The KPI strip is now scoped to the most recent paper rather than to
+    // every attempt the institute ever recorded — the backend changed this
+    // because the unscoped form was a Seq Scan that would take seconds at
+    // 20M rows. The paper identity travels with the number so the strip can
+    // say *which* mock the average is for, instead of implying it is
+    // lifetime.
     batch_mock_avg: 158.4,
+    latest_paper_id: 14,
+    latest_paper_name: "Mock 14",
+    latest_paper_held_on: "2026-09-06",
+    latest_paper_max_marks: 300,
+    latest_paper_students: 298,
+
     revision_debt_pct: 31.2,
+    avg_revision_debt: 4.7,
     flags_resolved: closed.length,
     recovery_rate_pct: closed.length
       ? round((recovered.length / closed.length) * 100, 1)
