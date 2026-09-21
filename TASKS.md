@@ -65,31 +65,35 @@ Track C has the longest lead time and should be started in parallel with anythin
 
 ---
 
-## 📍 Current state — 20 Sep 2026
+## 📍 Current state — 21 Sep 2026
 
 ### What actually exists
 
 ```
-✅ Django 6.1.1 project scaffolded at app/
-✅ 5 empty apps: syllabus, tenancy, events, ingestion, derived
-✅ PostgreSQL 16 in Docker, port 5434, healthy
-✅ Custom User model locked in before first migration (table: auth_user_custom)
-✅ Git repo initialised, .env gitignored
-✅ Dev superuser: admin / devadmin123
+✅ Django 6.1.1 + DRF, 21 tables across 5 apps
+✅ PostgreSQL 16 in Docker, port 5434
+✅ ROW-LEVEL SECURITY live and verified — tenants isolated, fails closed
+✅ 23 models in Django admin, incl. the question→topic mapping queue
+✅ Seeded: 2 institutes, 49 students, 24,000 attempts, 7 papers, 8,265 logs
+✅ Feature store: rung-0 mastery, 2,625 topic states (656 withheld below floor)
+✅ 8 detectors with evidence, rule_version, and enforced alert hygiene
+✅ Mock analyzer: marks-lost attribution with a per-student pace baseline
+✅ openapi.yaml — 22 endpoints, the contract
+✅ React + shadcn console: director triage, Student 360, mock intelligence
+✅ Frontend builds, typechecks, 5/5 tests pass, runs standalone on MSW mocks
 ```
 
-### What does NOT exist
+### What does NOT exist yet
 
 ```
-❌ Every model except User — no Institute, Topic, Student, Attempt, anything
-❌ Any admin registration
-❌ Any view, template, URL (besides /admin/)
-❌ Any seed data — database contains 1 user row and nothing else
-❌ Any frontend, dashboard, or prototype
-❌ Any real or mock student data
+❌ Backend tests (pytest) — the testing agent never ran
+❌ Ingestion (P1) — no way to import a real institute's file yet
+❌ Revision scheduler, planner, Gemini narration (P5–P7)
+❌ The static demo prototype (Track B) — still not started
+❌ Any real student data (Track C)
 ```
 
-**Honest summary: the project is scaffolded, not started.** Nothing is usable yet.
+**Honest summary: P0 is done and P2/P3 are substantially built.** The console runs on mock data; it has never been pointed at the live API.
 
 ---
 

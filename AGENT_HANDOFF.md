@@ -453,7 +453,50 @@ There is no content to hash. Institutes export answer keys and score sheets, not
 
 # 2 · BACKEND AGENT
 
-> Status: **waiting on DB agent**
+> Status: **terminated early on a session rate limit — work salvaged, verified and merged by the main session (`9b0d328`).**
+>
+> Everything below was verified by running it, not by reading it.
+
+### What was built and confirmed working
+
+| Component | File | Verified by |
+|---|---|---|
+| Feature store | `apps/derived/services/features.py` | `recompute_features` → 2,625 rows, 482ms |
+| Detector engine | `apps/derived/services/detectors.py` | `run_detectors` → 75 flags from 392 evaluations |
+| Mock analyzer | `apps/events/services/mock_analysis.py` | imported by `views.py`, schema regenerated |
+| Auth | `apps/api/auth.py` | `/api/auth/{csrf,login,logout}/`, `/api/me/` |
+
+**Evidence floor works:** mastery reported on 1,920 topic states, **withheld on 656 (25%)** below the 4-attempt floor. Null rather than a confident number from too little data.
+
+**Alert hygiene works:** 5 raises suppressed by cooldown on the seeded hero flags (`an open flag of this type already exists`).
+
+**Aarav Mehta's `subject_imbalance` evidence, from the database:**
+```json
+{"marks_trend": -37, "weakest_unit": "Organic Chemistry",
+ "time_share_pct": 11, "marks_lost_share_pct": 46}
+```
+
+### Contract changed — 18 → 22 endpoints
+Added `/api/auth/csrf/`, `/api/auth/login/`, `/api/auth/logout/`, `/api/me/`.
+`MarksLost` and `DashboardSummary` both gained fields. `openapi.yaml` regenerated.
+
+DRF's browsable-API login moved from `api/auth/` to `api-auth/` — it would have shadowed the JSON login the console posts to.
+
+### ⚠ Not finished (rate limit hit mid-task)
+- The dashboard Seq Scan fix was **in progress** — `_EMPTY_SUMMARY` and latest-paper fields exist, but the 12x improvement is unverified. Re-measure before trusting it.
+- No handoff notes were written by the agent itself; this section is reconstructed from the diff and from running the code.
+
+### ▶ What the TESTING agent can test now
+- `rls_check` as a pytest case — isolation, fail-closed, cross-tenant write refusal
+- Rebuild equivalence: drop `TopicState`, rerun `recompute_features`, assert identical
+- Detector replay: known event stream → assert a specific flag fires with specific evidence
+- Alert hygiene: assert cooldown suppresses a second raise
+- Contract tests: every response validated against `openapi.yaml`
+
+### ⚠ Known issue — seed data realism
+41 of 75 `weak_topic` flags read "**0% over N attempts**". Real students do not score 0% over 16 attempts on a chapter. This is an artefact of `seed_demo`: it sorts questions by latent ability and marks the top *c* correct, so the weakest chapters are *deterministically* always wrong. Harmless for testing detector logic, but **it would undermine a live demo** — a director will notice. Needs noise injected into the status assignment.
+
+---
 
 ### What I added
 
@@ -481,11 +524,41 @@ _(Route these back — say which agent owns each.)_
 
 # 4 · FRONTEND AGENT
 
-> Status: **running (decoupled)**
+> Status: **terminated early on a session rate limit — work salvaged, resynced and merged (`dc00c5a`, `b3e23ec`).**
 
-### What I built
+### What was built
+82 files in `web/`. Vite + React + TS + Tailwind + shadcn/ui (21 UI primitives).
 
-### Where `openapi.yaml` was ambiguous or insufficient
-_(Fields the UI needed that the contract does not expose. This is feedback for the backend agent.)_
+- **Routes:** `DirectorConsole`, `Student360`, `MockIntelligence`, `NotFound`
+- **Charts:** `NeglectChart` (time-share vs marks-lost), `MockTrendChart`, `MarksLostBar`, `Sparkline` — each wrapped in a `Figure` that offers a table view
+- **Director:** `KpiStrip`, `TriageTable`, `EvidenceList`, `InterveneDialog`, `ClosedLoopPanel`
+- **Student:** `HealthHeader`, `TopicMasteryGrid`, `DayPlanPanel`, `StudentFlagsPanel`
+- **MSW** with seeded deterministic fixtures — the console runs with **no backend at all**
 
-### ⚠ Gaps and known issues
+Verified: `typecheck` clean, `build` succeeds, **5/5 tests pass** (including "every chart offers a table view" and "logging an intervention closes the flag and drops the row").
+
+### The drift it caught — contract-first working as intended
+Types were generated from the **18-endpoint** schema. After the backend's additions, `npm run build` **failed to compile** on two fixtures missing new required fields. That is the system behaving correctly: drift surfaced as a compile error rather than as a blank panel in front of a buyer. Resynced in `b3e23ec`.
+
+### Contract gaps — `web/src/api/gaps.ts`
+Every gap is named in one greppable file rather than worked around inside components; when the contract catches up, the entry is deleted and the call sites stop compiling.
+
+**Now closed by the backend:** `NO_SESSION_ENDPOINT` (`/api/me/` exists), `MARKS_LOST_DENOMINATOR` (`max_marks` + `score` now on the payload).
+
+**Still open — for the next backend pass:**
+
+| Gap | Nature |
+|---|---|
+| `FLAGS_OPEN_FILTER` | The view **supports** `?open=true`; the schema doesn't declare it. Add `@extend_schema(parameters=[...])` |
+| `MOCK_SCORES_ORDER` | Same shape — the view sorts by `held_on`, the contract doesn't promise it |
+| `FLAGS_STUDENT_FILTER` | Not implemented. Student 360 fetches all flags and filters client-side |
+| `STUDENTS_ORDERING` | Not implemented. Triage table sorts client-side |
+| `DASHBOARD_BATCH_SCOPE` | Not implemented. Console has a batch filter the KPI strip ignores |
+| `NO_MENTOR_LIST` | Intervention needs a mentor id; no endpoint lists mentors |
+| `RISK_SCORE_BANDS` | Documentation — `risk_score` has no stated scale or severity thresholds |
+
+The first two are the interesting category: **the code does it, the contract doesn't say so.** Exactly what a contract-first setup is meant to expose.
+
+### ⚠ Known issues
+- One layout bug the agent reported before terminating: **value labels detach from short bars in the neglect chart.**
+- The console has **never been pointed at the live API** — only MSW. First real integration is untested.
