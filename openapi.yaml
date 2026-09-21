@@ -6,10 +6,92 @@ info:
     PWA. This schema is the source of truth — regenerate with `manage.py spectacular
     --file ../openapi.yaml` after any serializer change.
 paths:
+  /api/auth/csrf/:
+    get:
+      operationId: auth_csrf_retrieve
+      description: Sets the `csrftoken` cookie. Call once before POSTing to login.
+      tags:
+      - auth
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/auth/login/:
+    post:
+      operationId: auth_login_create
+      description: |-
+        Exchange credentials for a session cookie.
+
+        `authentication_classes` is empty on purpose: DRF's
+        `SessionAuthentication` enforces CSRF on the *authenticated* path, and
+        running it here would have it inspect a session that does not exist
+        yet. Django's `CsrfViewMiddleware` still protects this POST.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/auth/logout/:
+    post:
+      operationId: auth_logout_create
+      description: End the session. POST only — a GET logout is a CSRF vector.
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/batches/:
     get:
       operationId: batches_list
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       parameters:
       - name: page
         required: false
@@ -31,7 +113,24 @@ paths:
   /api/batches/{id}/:
     get:
       operationId: batches_retrieve
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       parameters:
       - in: path
         name: id
@@ -53,7 +152,34 @@ paths:
   /api/dashboard/summary/:
     get:
       operationId: dashboard_summary_retrieve
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        The director's KPI strip. Three things were wrong with it.
+
+        **① It read the institute's entire attempt history.** The old
+        `batch_mock_avg` query was `filter(test_paper__isnull=False)` with
+        an `order_by` that the aggregate discarded, so Postgres did a Seq
+        Scan over every attempt ever recorded — 24,000 rows and 343
+        buffers on the seed, and O(history) on the most-visited page in
+        the product. At the design's volume (45k attempts per institute
+        per month) that is a multi-second query on every dashboard load.
+
+        No index fixes it, because the query genuinely wanted every row.
+        Asking for one paper instead is what fixes it: the DB agent
+        measured the rewritten form at **56 buffers and 0.687 ms, 12x
+        faster**, and — the part that matters more than the multiple — it
+        stops growing with history.
+
+        **② `batch_mock_avg` was a SUM.** It added up every mark scored by
+        every student on every paper and presented the total as an
+        average. On the seeded institute it read 8,437.0 out of a possible
+        300. It is now the mean total per student on the latest paper.
+
+        **③ `revision_debt_pct` was not a percentage.** It divided a sum
+        of per-student overdue counts by the student count — a mean, not a
+        share, free to exceed 100 and meaningless against the `%` the UI
+        renders beside it. It is now the share of scheduled revisions that
+        are overdue, and the old quantity is still available under the
+        name it should always have had, `avg_revision_debt`.
       tags:
       - dashboard
       security:
@@ -68,7 +194,24 @@ paths:
   /api/flags/:
     get:
       operationId: flags_list
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       parameters:
       - name: page
         required: false
@@ -90,7 +233,24 @@ paths:
   /api/flags/{id}/:
     get:
       operationId: flags_retrieve
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       parameters:
       - in: path
         name: id
@@ -143,6 +303,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/Intervention'
           description: ''
+  /api/me/:
+    get:
+      operationId: me_retrieve
+      description: |-
+        Who the caller is, and which institute they are bound to.
+
+        The console reads `role` to decide which navigation to render, and
+        `institute` to label it. Both come from the same place the tenant
+        middleware reads, so a UI that trusts this payload and a database that
+        enforces RLS cannot disagree about who the caller is.
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+          description: ''
   /api/my/plan/:
     get:
       operationId: my_plan_list
@@ -190,7 +371,24 @@ paths:
   /api/my/study-logs/:
     get:
       operationId: my_study_logs_list
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       parameters:
       - name: page
         required: false
@@ -211,7 +409,24 @@ paths:
           description: ''
     post:
       operationId: my_study_logs_create
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       tags:
       - student-app
       requestBody:
@@ -238,7 +453,24 @@ paths:
   /api/papers/:
     get:
       operationId: papers_list
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       parameters:
       - name: page
         required: false
@@ -260,7 +492,24 @@ paths:
   /api/papers/{id}/:
     get:
       operationId: papers_retrieve
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       parameters:
       - in: path
         name: id
@@ -282,7 +531,24 @@ paths:
   /api/students/:
     get:
       operationId: students_list
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       parameters:
       - in: query
         name: active
@@ -316,7 +582,24 @@ paths:
   /api/students/{id}/:
     get:
       operationId: students_retrieve
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       parameters:
       - in: path
         name: id
@@ -338,7 +621,24 @@ paths:
   /api/students/{id}/attempts/:
     get:
       operationId: students_attempts_list
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       parameters:
       - in: path
         name: id
@@ -369,10 +669,15 @@ paths:
       description: |-
         Partition lost marks by cause for one paper.
 
-        Cause is inferred from status plus prior mastery on the topic:
-        a wrong answer on a topic the student knows is an execution error,
-        not a conceptual gap.
+        The attribution itself lives in
+        `apps.events.services.mock_analysis` — it is an engine, not a
+        view, and it is called by the planner and the narration layer too.
       parameters:
+      - in: query
+        name: detail
+        schema:
+          type: boolean
+        description: Include the per-question cause breakdown.
       - in: path
         name: id
         schema:
@@ -394,6 +699,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MarksLost'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
           description: ''
   /api/students/{id}/mock-scores/:
     get:
@@ -426,7 +737,17 @@ paths:
   /api/students/{id}/subject-breakdown/:
     get:
       operationId: students_subject_breakdown_list
-      description: Study-time share vs marks-lost share. The neglect chart.
+      description: |-
+        Study-time share vs marks-lost share. The neglect chart.
+
+        `marks_lost_share_pct` is now a share of **marks**, computed by
+        `features.marks_lost_by_topic`. It previously counted lost
+        *questions*, which priced a wrong answer and a skipped one
+        identically despite the negative marking, and so understated
+        exactly the subject a student was guessing through. Same field,
+        same units claimed, finally the units delivered — and the same
+        function the `subject_imbalance` detector reads, so the flag and
+        this chart can no longer disagree.
       parameters:
       - in: path
         name: id
@@ -454,7 +775,24 @@ paths:
   /api/students/{id}/topic-states/:
     get:
       operationId: students_topic_states_list
-      description: Restrict every queryset to the caller's institute.
+      description: |-
+        Restrict every queryset to the caller's institute.
+
+        Kept deliberately, alongside Postgres row-level security, and the DB
+        agent's handoff argues the case at length. The short version is that
+        RLS does not cover two cases this does:
+
+        * **Superusers bypass RLS entirely**, by design — the admin is
+          cross-tenant back-office. Without this mixin a superuser's API call
+          would quietly return every institute's students.
+        * **RLS binding happens in middleware, off `request.user`.** Add JWT
+          or token auth and DRF authenticates *inside* the view, by which
+          point the middleware has already seen `AnonymousUser` and left the
+          connection unscoped. This still works.
+
+        The two are not independent sources of truth: both derive the
+        institute from the same user, and `manage.py rls_check` asserts the
+        database half.
       parameters:
       - in: path
         name: id
@@ -546,9 +884,35 @@ components:
     BlankEnum:
       enum:
       - ''
+    CauseEnum:
+      enum:
+      - conceptual_gap
+      - execution_error
+      - time_exhaustion
+      - avoidable_skip
+      type: string
+      description: |-
+        * `conceptual_gap` - conceptual_gap
+        * `execution_error` - execution_error
+        * `time_exhaustion` - time_exhaustion
+        * `avoidable_skip` - avoidable_skip
     DashboardSummary:
       type: object
-      description: Director's KPI strip.
+      description: |-
+        Director's KPI strip.
+
+        Two fields here changed *meaning* in v0.2 and the frontend must know:
+
+        `batch_mock_avg` was a SUM of every mark every student ever scored on
+        every paper, labelled as an average. It is now the mean total per
+        student on the latest paper — which is what the label always claimed,
+        and is also 12x cheaper because it stops reading the institute's
+        entire history on every dashboard load.
+
+        `revision_debt_pct` divided a sum of per-student debts by a student
+        count and called the result a percentage; it could exceed 100 freely.
+        It is now the genuine share of scheduled revisions that are overdue.
+        The old quantity survives as `avg_revision_debt`, correctly named.
       properties:
         total_students:
           type: integer
@@ -562,9 +926,32 @@ components:
           type: number
           format: double
           nullable: true
+          description: Mean total marks per student on the most recent paper.
+        latest_paper_id:
+          type: integer
+          nullable: true
+        latest_paper_name:
+          type: string
+          nullable: true
+        latest_paper_held_on:
+          type: string
+          format: date
+          nullable: true
+        latest_paper_max_marks:
+          type: integer
+          nullable: true
+        latest_paper_students:
+          type: integer
+          description: How many students sat the paper `batch_mock_avg` is computed
+            over.
         revision_debt_pct:
           type: number
           format: double
+          description: Share of scheduled revisions now past due and not done.
+        avg_revision_debt:
+          type: number
+          format: double
+          description: Mean overdue revision cycles per student.
         flags_resolved:
           type: integer
         recovery_rate_pct:
@@ -574,13 +961,27 @@ components:
           description: Share of closed flags whose outcome was 'recovered'.
       required:
       - active_students
+      - avg_revision_debt
       - batch_mock_avg
       - critical_flags
       - flagged_this_week
       - flags_resolved
+      - latest_paper_held_on
+      - latest_paper_id
+      - latest_paper_max_marks
+      - latest_paper_name
+      - latest_paper_students
       - recovery_rate_pct
       - revision_debt_pct
       - total_students
+    Detail:
+      type: object
+      description: The one-key error/ack envelope DRF already uses everywhere.
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     Flag:
       type: object
       properties:
@@ -640,6 +1041,27 @@ components:
       - student_name
       - topic_name
       - type
+    Institute:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        city:
+          type: string
+          maxLength: 100
+        slug:
+          type: string
+          maxLength: 80
+          pattern: ^[-a-zA-Z0-9_]+$
+      required:
+      - city
+      - id
+      - name
+      - slug
     Intervention:
       type: object
       properties:
@@ -690,10 +1112,67 @@ components:
         * `subject` - Subject
         * `unit` - Unit
         * `chapter` - Chapter
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
+      - username
+    LossTopic:
+      type: object
+      description: Where the marks actually went, by chapter.
+      properties:
+        topic_id:
+          type: integer
+          nullable: true
+        topic:
+          type: string
+        subject:
+          type: string
+        marks_lost:
+          type: number
+          format: double
+        questions:
+          type: integer
+      required:
+      - marks_lost
+      - questions
+      - subject
+      - topic
+      - topic_id
     MarksLost:
       type: object
-      description: Mistake taxonomy for one paper — the line that sells the product.
+      description: |-
+        Mistake taxonomy for one paper — the line that sells the product.
+
+        The four cause fields and `total_lost` / `recoverable` are unchanged
+        from v0.1. Everything else is additive: paper identity, the score the
+        taxonomy partitions, the student's own pace baseline that the cause
+        rules used, and the per-chapter breakdown a mentor asks for next.
       properties:
+        paper_id:
+          type: integer
+        paper_name:
+          type: string
+        held_on:
+          type: string
+          format: date
+        max_marks:
+          type: integer
+        questions:
+          type: integer
+        attempted:
+          type: integer
+        score:
+          type: number
+          format: double
         conceptual_gap:
           type: integer
         execution_error:
@@ -707,13 +1186,104 @@ components:
         recoverable:
           type: integer
           description: Marks lost to causes that need no new learning.
+        time_baseline_sec:
+          type: number
+          format: double
+          nullable: true
+          description: Median seconds this student spends on a question they get right.
+            Null when they have fewer than 8 timed correct answers, in which case
+            the time rule was not applied.
+        causes:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarksLostCause'
+        top_loss_topics:
+          type: array
+          items:
+            $ref: '#/components/schemas/LossTopic'
       required:
+      - attempted
       - avoidable_skip
+      - causes
       - conceptual_gap
       - execution_error
+      - held_on
+      - max_marks
+      - paper_id
+      - paper_name
+      - questions
       - recoverable
+      - score
+      - time_baseline_sec
       - time_exhaustion
+      - top_loss_topics
       - total_lost
+    MarksLostCause:
+      type: object
+      description: One row of the mistake taxonomy, chart-ready.
+      properties:
+        cause:
+          $ref: '#/components/schemas/CauseEnum'
+        marks:
+          type: integer
+        questions:
+          type: integer
+        share_pct:
+          type: number
+          format: double
+      required:
+      - cause
+      - marks
+      - questions
+      - share_pct
+    Me:
+      type: object
+      description: The caller's identity. Drives navigation and the institute label.
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          nullable: true
+          description: |-
+            Null for an authenticated account attached to nothing — which sees no tenant data at all, by design.
+
+            * `mentor` - mentor
+            * `student` - student
+            * `director` - director
+          oneOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        institute:
+          allOf:
+          - $ref: '#/components/schemas/Institute'
+          nullable: true
+        mentor_id:
+          type: integer
+          nullable: true
+        student_id:
+          type: integer
+          nullable: true
+        is_staff:
+          type: boolean
+        is_superuser:
+          type: boolean
+      required:
+      - email
+      - id
+      - institute
+      - is_staff
+      - is_superuser
+      - mentor_id
+      - name
+      - role
+      - student_id
+      - username
     Mentor:
       type: object
       properties:
@@ -773,6 +1343,9 @@ components:
         * `learn` - Learn
         * `practice` - Practice
         * `revise` - Revise
+    NullEnum:
+      enum:
+      - null
     OutcomeEnum:
       enum:
       - recovered
@@ -1057,6 +1630,16 @@ components:
       - start_time
       - subject
       - topic_name
+    RoleEnum:
+      enum:
+      - mentor
+      - student
+      - director
+      type: string
+      description: |-
+        * `mentor` - mentor
+        * `student` - student
+        * `director` - director
     SeverityEnum:
       enum:
       - watch
