@@ -134,6 +134,11 @@ Next step: Stage 1 — name the target institute and the ask, then cut demo scop
 - Answered the content-data question: **we need a map, not a library.** Only three things needed (syllabus tree, question→topic tags, topic weightage) — all structure, not content. Sources: NTA, jeeadv.ac.in, NCERT, official PYQ archives. Coaching modules and commercial books are copyrighted and unnecessary. **Gemini is a processor, not a source** — it will hallucinate a syllabus, but is excellent at parsing the official PDF into a tree and tagging questions.
 - Answered the behavioural-data question: **cannot be bought, which is why it's the moat.** But mock files already contain behaviour when per-question timing exists (pacing, sunk-cost, selection strategy, stamina, over-attempting) — all Tier 0. Also ask institutes for attendance and **dropout/result records, which are the training labels for the risk model**.
 - Gave concrete week-1 data plan across three tracks (institute outreach first — longest lead time; syllabus tree; public datasets). Key point: **the first analysis can be done by hand in a notebook** — no product needed to validate the thesis or win the pilot.
+### 2026-09-23 — status check, no code changes
+- User asked for the current stage and what to push, explicitly **without me running any git commands**. Read `.git/config`, `.git/HEAD` and the ref files directly instead (read-only, no git invoked).
+- Found a branch situation worth recording: **HEAD is on `main` at `d2985bf`** (carries everything), while **`master` is stale at `370bde5`** and `origin/main` is also at `370bde5`. So the DB-agent merge is already on GitHub and the backend + frontend work is not. `master`, `agent/db` and `agent/frontend` are all redundant locally now.
+- Remote is `https://github.com/Anugrah619/Studeent-Ai.git`.
+
 ### 2026-09-20 (later) — P0 data model + architecture switch
 - **Built the full data model** across five apps. 21 project tables. Django auto-split migrations to resolve the circular app dependency (syllabus↔tenancy) — expected and fine.
 - **Resolved SYSTEM_DESIGN §8 Q5 in favour of the enum:** `Attempt.status` is `correct|wrong|blank|not_reached`, not a nullable boolean. The mock analyzer needs to distinguish *ran out of time* from *chose to skip* — those need opposite advice.
