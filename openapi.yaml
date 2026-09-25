@@ -1528,7 +1528,15 @@ components:
         recommended_action:
           type: string
         time_to_fix:
-          type: string
+          allOf:
+          - $ref: '#/components/schemas/TimeToFixEnum'
+          description: |-
+            How much teaching time this costs, as one of four bands. Bounded rather than free text because the model, asked for minutes, returned 40 / 20 / 45 for the same student and the same evidence while its recommended action stayed stable — false precision on a genuinely fuzzy judgement. minutes = a correction at the board · one_session = one focused sitting · several_sessions = a few sittings over a week or two · term_long = a foundational gap needing sustained work. The client supplies the display label.
+
+            * `minutes` - minutes
+            * `one_session` - one_session
+            * `several_sessions` - several_sessions
+            * `term_long` - term_long
         trace_id:
           type: integer
           description: Feed back agreement/disagreement against this id.
@@ -2721,6 +2729,18 @@ components:
       - held_on
       - id
       - name
+    TimeToFixEnum:
+      enum:
+      - minutes
+      - one_session
+      - several_sessions
+      - term_long
+      type: string
+      description: |-
+        * `minutes` - minutes
+        * `one_session` - one_session
+        * `several_sessions` - several_sessions
+        * `term_long` - term_long
     Topic:
       type: object
       properties:

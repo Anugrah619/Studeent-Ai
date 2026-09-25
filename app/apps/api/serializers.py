@@ -388,7 +388,20 @@ class DiagnosisSerializer(serializers.Serializer):
     pattern_found = serializers.BooleanField()
     hypotheses = DiagnosisHypothesisSerializer(many=True)
     recommended_action = serializers.CharField()
-    time_to_fix = serializers.CharField()
+    time_to_fix = serializers.ChoiceField(
+        choices=["minutes", "one_session", "several_sessions", "term_long"],
+        help_text=(
+            "How much teaching time this costs, as one of four bands. "
+            "Bounded rather than free text because the model, asked for "
+            "minutes, returned 40 / 20 / 45 for the same student and the "
+            "same evidence while its recommended action stayed stable — "
+            "false precision on a genuinely fuzzy judgement. "
+            "minutes = a correction at the board · one_session = one focused "
+            "sitting · several_sessions = a few sittings over a week or two · "
+            "term_long = a foundational gap needing sustained work. "
+            "The client supplies the display label."
+        ),
+    )
 
     trace_id = serializers.IntegerField(
         help_text="Feed back agreement/disagreement against this id."

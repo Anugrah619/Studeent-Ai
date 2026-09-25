@@ -29,7 +29,23 @@ from apps.reasoning.models import ReasoningTrace
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+#: Model ids move faster than this codebase does — `gemini-2.5-flash` was
+#: closed to new keys partway through development, with a 404 pointing at
+#: the successor. Read it from settings so a swap is an .env edit, and ask
+#: the API (`client.models.list()`) rather than guessing when it breaks.
+DEFAULT_MODEL = getattr(settings, "GEMINI_MODEL", "") or "gemini-3.8-flash"
+
+#: Tried in order when the preferred model is unavailable. Newest first,
+#: then progressively older Flash tiers, then Lite — quality degrades
+#: gently, which is the right trade against a panel that does not render.
+FALLBACK_MODELS = [
+    "gemini-3.8-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+]
 
 
 class NoCredentialsAndNoCache(RuntimeError):
@@ -88,48 +104,103 @@ def reason(
             "with a key so the trace can be replayed offline."
         )
 
-    trace = ReasoningTrace(
-        institute_id=institute_id, student_id=student_id, task=task,
-        context=context, context_hash=context_hash,
-        model=model, prompt_version=prompt_version,
+    from google.genai import types
+
+    config = types.GenerateContentConfig(
+        system_instruction=system_prompt,
+        response_mime_type="application/json",
+        response_schema=response_schema,
+        temperature=0.2,
+    )
+    body = json.dumps(context, indent=2)
+
+    last_error = ""
+    for candidate in _model_chain(model):
+        trace = ReasoningTrace(
+            institute_id=institute_id, student_id=student_id, task=task,
+            context=context, context_hash=context_hash,
+            model=candidate, prompt_version=prompt_version,
+        )
+        started = time.monotonic()
+        try:
+            response = client.models.generate_content(
+                model=candidate, contents=body, config=config
+            )
+            trace.latency_ms = int((time.monotonic() - started) * 1000)
+
+            raw = (response.text or "").strip()
+            if not raw:
+                raise GeminiUnavailable("Gemini returned an empty response.")
+            trace.output = json.loads(raw)
+
+            usage = getattr(response, "usage_metadata", None)
+            if usage:
+                trace.input_tokens = getattr(usage, "prompt_token_count", None)
+                trace.output_tokens = getattr(usage, "candidates_token_count", None)
+
+            trace.save()
+            if candidate != model:
+                logger.warning("reasoning: fell back from %s to %s", model, candidate)
+            return trace.output, trace
+
+        except json.JSONDecodeError as exc:
+            # Bad output, not a bad model — another one will fail the same way.
+            trace.latency_ms = int((time.monotonic() - started) * 1000)
+            trace.error = f"Model returned text that is not valid JSON: {exc}"
+            trace.save()
+            raise GeminiUnavailable(trace.error) from exc
+
+        except Exception as exc:
+            trace.latency_ms = int((time.monotonic() - started) * 1000)
+            trace.error = f"{type(exc).__name__}: {exc}"
+            trace.save()
+            last_error = trace.error
+            if not _try_another_model(exc):
+                raise GeminiUnavailable(trace.error) from exc
+            logger.warning("reasoning: %s unavailable, trying next — %s",
+                           candidate, str(exc)[:120])
+
+    raise GeminiUnavailable(
+        f"Every model in the fallback chain was unavailable. Last error: {last_error}"
     )
 
-    started = time.monotonic()
-    try:
-        from google.genai import types
 
-        response = client.models.generate_content(
-            model=model,
-            contents=json.dumps(context, indent=2),
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                response_mime_type="application/json",
-                response_schema=response_schema,
-                temperature=0.2,
-            ),
-        )
-        trace.latency_ms = int((time.monotonic() - started) * 1000)
+def _model_chain(preferred: str) -> list[str]:
+    """The preferred model, then progressively older ones.
 
-        raw = (response.text or "").strip()
-        if not raw:
-            raise GeminiUnavailable("Gemini returned an empty response.")
-        trace.output = json.loads(raw)
+    Added after a live run hit `503 UNAVAILABLE — this model is currently
+    experiencing high demand` on five models in a row. That is Google-side
+    capacity, not something we cause or can fix, and a pitch is exactly when
+    it will happen. Falling back to an older Flash costs a little quality;
+    a dead panel in front of a director costs the meeting.
 
-        usage = getattr(response, "usage_metadata", None)
-        if usage:
-            trace.input_tokens = getattr(usage, "prompt_token_count", None)
-            trace.output_tokens = getattr(usage, "candidates_token_count", None)
+    Paired with the trace cache this is belt and braces: rehearse the demo
+    once and the cached trace serves it even if the API is down entirely.
+    """
+    chain = [preferred] + [m for m in FALLBACK_MODELS if m != preferred]
+    return chain
 
-    except json.JSONDecodeError as exc:
-        trace.latency_ms = int((time.monotonic() - started) * 1000)
-        trace.error = f"Model returned text that is not valid JSON: {exc}"
-        trace.save()
-        raise GeminiUnavailable(trace.error) from exc
-    except Exception as exc:
-        trace.latency_ms = int((time.monotonic() - started) * 1000)
-        trace.error = f"{type(exc).__name__}: {exc}"
-        trace.save()
-        raise GeminiUnavailable(trace.error) from exc
 
-    trace.save()
-    return trace.output, trace
+def _try_another_model(exc: Exception) -> bool:
+    """Is the *next* model worth attempting, or is this fatal for all of them?
+
+    Worth continuing:
+      503 / 500 / 504  capacity — another model may have headroom
+      429              rate limit on this model
+      404              this model is gone or closed to new keys. Fatal for
+                       it, irrelevant to the rest — Google retires model ids
+                       faster than a codebase updates, and the first live run
+                       of this client hit exactly that on `gemini-2.5-flash`.
+
+    Not worth continuing: 400/401/403 are our request or our key, and every
+    model will reject them identically. Retrying just spends quota to reach
+    the same answer more slowly.
+    """
+    code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+    if code in (404, 429, 500, 502, 503, 504):
+        return True
+    text = str(exc)
+    return any(
+        s in text
+        for s in ("404", "503", "429", "NOT_FOUND", "UNAVAILABLE", "RESOURCE_EXHAUSTED")
+    )
