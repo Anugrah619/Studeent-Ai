@@ -416,10 +416,32 @@ class WeakTopicDetector(Detector):
     Fires on **one** topic, never on every topic below the line;
     `also_qualifying` says how many others cleared the bar, which is the
     information the suppressed flags would have carried.
+
+    TWO NUMBERS, TWO HORIZONS, AND WHY THE HEADLINE NOW SAYS SO (v2)
+        `mastery_pct` is a 20-attempt decayed window — where the student
+        is *now*. `marks_lost` is cumulative across every mock they have
+        sat — what the chapter has *cost*. Both are the right horizon for
+        what they measure (see `features.marks_lost_by_topic`), and the
+        v1 headline put them in one sentence with neither one labelled:
+
+            "Rotational Motion: 32% over 11 attempts, costing 42 marks"
+
+        A mentor reads that as one period. It is a current level next to a
+        career total, and the career total is the bigger, scarier number.
+        So the headline now names the span — "costing 42 marks across 7
+        mocks" — and the evidence carries `papers_covered`,
+        `first_paper`, `last_paper` and `marks_lost_per_paper`, which is
+        the per-mock figure a mentor was mentally trying to compute
+        anyway. Nothing about *when the flag fires* changed; the
+        thresholds are untouched.
     """
 
     type = "weak_topic"
-    rule_version = "v1"
+    #: v2: evidence and headline state the period `marks_lost` covers. The
+    #: firing rule is byte-identical to v1 — the bump is so that a v1 flag
+    #: read six months from now is not mistaken for one that had been held
+    #: to the labelling standard this one was.
+    rule_version = "v2"
     tier = 0
     min_evidence = (
         "6+ attempted questions on the chapter, the batch has been taught it, "
@@ -488,6 +510,13 @@ class WeakTopicDetector(Detector):
             severity = Flag.WATCH
 
         name = student.topic_names.get(ts.topic_id, "this chapter")
+        # The *period* `marks_lost` was summed over, from `paper_totals` —
+        # no extra query. It is a temporal label, not a claim that every
+        # mark came off a paper: `marks_lost_by_topic` also counts
+        # practice attempts, which is an open question recorded in its
+        # docstring and not settled here. On real data every attempt is
+        # mock-sourced and the two coincide.
+        papers = len(student.papers)
         evidence = {
             "topic": name,
             "topic_id": ts.topic_id,
@@ -497,6 +526,18 @@ class WeakTopicDetector(Detector):
             "attempts": ts.attempts_n,
             "correct": ts.correct_n,
             "marks_lost": round(marks, 1),
+            # The three keys below are the label on `marks_lost`. Without
+            # them it is a career total wearing a current-state sentence.
+            "papers_covered": papers,
+            "first_paper": student.papers[0].held_on.isoformat() if papers else None,
+            "last_paper": student.papers[-1].held_on.isoformat() if papers else None,
+            # Denominator is every mock sat, not only the ones this
+            # chapter appeared in — the question being answered is "what
+            # does this chapter drag off a typical paper", and a chapter
+            # that shows up in four mocks out of seven drags nothing off
+            # the other three. That is the average a mentor is planning
+            # against.
+            "marks_lost_per_paper": round(marks / papers, 1) if papers else None,
             "share_of_lost_marks_pct": pct(share, 1),
             "total_marks_lost": round(total_lost, 1),
             "chapter_weight": student.topic_weights.get(ts.topic_id),
@@ -504,9 +545,13 @@ class WeakTopicDetector(Detector):
             "also_qualifying": len(qualified) - 1,
             "last_seen": ts.last_seen.isoformat() if ts.last_seen else None,
         }
+        # "over 11 attempts" labels the mastery figure; "across 7 mocks"
+        # labels the marks figure. Both halves of the sentence now carry
+        # the period they were measured over.
+        span = f" across {papers} mock{'s' if papers != 1 else ''}" if papers else ""
         headline = (
             f"{name}: {pct(ts.mastery):.0f}% over {ts.attempts_n} attempts, "
-            f"costing {marks:.0f} marks — {pct(share):.0f}% of everything "
+            f"costing {marks:.0f} marks{span} — {pct(share):.0f}% of everything "
             f"this student loses."
         )
         return self.flag(
@@ -723,6 +768,14 @@ class SubjectImbalanceDetector(Detector):
     costs the four you did not get plus the one the negative marking took;
     a blank costs only the four. Counting questions treats those as equal
     and undercounts a subject the student is guessing in by a fifth.
+
+    This detector reads the same cumulative `marks_lost_by_topic` that
+    `weak_topic` does, and needs no equivalent to that flag's v2
+    relabelling: it compares two *shares* of the same student's own
+    totals, and a share is a composition rather than a level, so there is
+    no windowed figure beside it to be mismatched against. The evidence
+    already carries `papers`, and the headline already names the mock
+    count. Both halves stay as they are.
     """
 
     type = "subject_imbalance"
@@ -1367,7 +1420,9 @@ def run_detectors(
             reason = (
                 None
                 if ignore_cooldown
-                else _cooldown_reason(history.get((sid, detector.type)), detector, as_of)
+                else _cooldown_reason(
+                    history.get((sid, detector.type, flag.topic_id)), detector, as_of
+                )
             )
             passed.append(Candidate(flag=flag, detector=detector, suppressed_by=reason))
 
@@ -1386,14 +1441,26 @@ def run_detectors(
 
 
 def _flag_history(institute_id: int, ids: list[int]):
-    """(student_id, type) -> (latest raised_at, whether one is still open)."""
-    out: dict[tuple[int, str], tuple[dt.datetime, bool]] = {}
-    for sid, ftype, raised_at, resolved_at in (
+    """(student_id, type, topic_id) -> (latest raised_at, whether one is still open).
+
+    Keyed on the topic as well as the type, and that third element is the
+    whole point. Keyed on (student, type) alone, one open `weak_topic` on
+    Organic Chemistry silenced `weak_topic` on every other chapter for that
+    student, permanently — and since nothing resolved flags, "permanently"
+    was literal. Seven of the eight detectors had gone mute on the seeded
+    data before this was caught.
+
+    Topic-less detectors (overload, disengagement, subject_imbalance) carry
+    `None` here, so they still collapse to one open flag per student, which
+    for a whole-student condition is the correct behaviour.
+    """
+    out: dict[tuple[int, str, int | None], tuple[dt.datetime, bool]] = {}
+    for sid, ftype, topic_id, raised_at, resolved_at in (
         Flag.objects.filter(institute_id=institute_id, student_id__in=ids)
         .order_by("raised_at")
-        .values_list("student_id", "type", "raised_at", "resolved_at")
+        .values_list("student_id", "type", "topic_id", "raised_at", "resolved_at")
     ):
-        key = (sid, ftype)
+        key = (sid, ftype, topic_id)
         prev = out.get(key)
         still_open = resolved_at is None
         if prev is None:
@@ -1409,10 +1476,14 @@ def _cooldown_reason(entry, detector: Detector, as_of: dt.datetime) -> str | Non
         return None
     last_raised, still_open = entry
     if still_open:
-        # Re-raising a type that is already on the mentor's list is how a
-        # console turns into a wall. The open flag is the ticket; new
-        # evidence belongs on it, not beside it.
-        return "an open flag of this type already exists"
+        # Re-raising something already on the mentor's list is how a console
+        # turns into a wall. The open flag is the ticket; new evidence
+        # belongs on it, not beside it.
+        #
+        # This only suppresses the SAME (student, type, topic). A different
+        # weak chapter is a different ticket and must still get through —
+        # see _flag_history.
+        return "an open flag for this student, type and topic already exists"
     age_days = (as_of - last_raised).days
     if age_days < detector.cooldown_days:
         return f"cooldown: last raised {age_days}d ago, window {detector.cooldown_days}d"

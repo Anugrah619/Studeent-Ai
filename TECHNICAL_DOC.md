@@ -1,784 +1,361 @@
-# Student AI — Technical Document
+# Student AI — Technical Specification
 
-**Version 0.2 · 17 Sep 2026**
-Companion diagrams: [`WORKFLOW.md`](WORKFLOW.md) · Detailed schema & system design: [`SYSTEM_DESIGN.md`](SYSTEM_DESIGN.md) · Running decisions: [`PROJECT_LOG.md`](PROJECT_LOG.md)
+**v2.0 · 25 Sep 2026**
+Entry point: [`README.md`](README.md) · Next steps: [`TASKS.md`](TASKS.md) · History: [`PROJECT_LOG.md`](PROJECT_LOG.md)
 
----
-
-## What changed since v0.1
-
-| # | Change | Consequence |
-|---|---|---|
-| 1 | **LLM is Gemini**, not Claude | Free tier is usable for a pilot but has a hard 500 requests/day ceiling and a privacy condition that forces PII stripping — see §11 |
-| 2 | **Stack must be free or near-free** | Redis dropped in favour of a database-backed queue; hosting moved to permanently-free tiers; prototype is fully static |
-| 3 | **Prototype is a frontend, not an app** | No backend, no database, no live model calls for the demo — see §12 |
-| 4 | **Markdown, not published artifacts** | This document and `WORKFLOW.md` are the canonical reference. `architecture.html` and `build-plan.html` are superseded where they disagree |
-| 5 | **Train-vs-prompt boundary made explicit** | Our own models decide; Gemini only describes — see §2.1 |
-| 6 | **Data strategy added** | Four sources, volumes, processing pipeline, and the sequential-split trap — see §7 |
-
-> The earlier HTML documents remain accurate on architecture and reasoning. Where they name Claude, Redis, or paid hosting, **this document wins**.
+> **v2.0 consolidates and supersedes** `LLM_ARCHITECTURE.md`, `SYSTEM_DESIGN.md`, `WORKFLOW.md`, `AGENT_HANDOFF.md`, `architecture.html` and `build-plan.html`. Those are deleted. Where any surviving note disagrees with this document, this document wins.
 
 ---
 
-## 1 · Product summary
+## 1 · What this is
 
-An AI-assisted student performance and preparation system for competitive-exam aspirants (JEE, NEET, CAT, GATE, UPSC, CUET). It runs **alongside** coaching institutes rather than replacing teachers or content.
+A domain LLM for Indian competitive-exam preparation (JEE / NEET), sold to coaching institutes.
 
-Focus: preparation management, weakness tracking, revision intelligence, mock-test analytics, and data-grounded guidance.
+It ingests the mock-test results an institute already has and produces the judgement a good teacher makes when reading an answer sheet: **not what the student scored, but what they misunderstand, how much it costs them, and what to do about it.**
 
-Explicitly **not**: a doubt-solving chatbot, a lecture platform, a content library, or a generic AI tutor.
+Every piece of reasoning Gemini does is logged, and those transcripts become the training set for our own fine-tuned model.
 
-### The commercial fact that shapes everything
+### The correction from v1.0
 
-**The buyer is not the user.** The concept note is written student-facing, but the person who signs is the institute director. They care about retention, results, faculty time saved, and parent satisfaction — not about study plans.
+v1.0 said *"the LLM narrates; it never computes."* Half right:
 
-Consequence: every demo opens on the **director's screen** (at-risk triage), never the student app.
+| | Verdict |
+|---|---|
+| Using an LLM to compute rolling accuracy | **Wrong then, wrong now.** Arithmetic over 24,000 rows — 12,480 API calls/day for a worse answer than a window function gives free. Stays deterministic. |
+| Treating diagnosis, causal analysis and planning as "narration" | **That was the error.** These are judgement tasks. An LLM is the right tool; a rules engine is dramatically worse. Calling them narration mis-sized the product. |
+| *"Distillation doesn't apply — labels are free"* | **Wrong.** True for knowledge tracing (right/wrong is ground truth). False for reasoning — there is no ground truth for *"what misconception does this pattern reveal?"* Gemini's traces **are** the signal. |
 
 ---
 
-## 2 · Core principle — the model narrates, it never computes
+## 2 · The blocker that gates everything
 
-Every number a student, mentor, or director sees is produced by deterministic code reading the feature store. Gemini receives those computed facts as a structured payload and turns them into sentences. It has:
+| We store | We do not store |
+|---|---|
+| Question **ID** (`Q17`) | Question **text** — 0 of 525 populated |
+| Right / wrong / blank / not-reached | **Which option the student chose** |
+| Topic mapping | The **options** themselves |
+| Time spent | The **solution** |
+| | What each **wrong option represents** |
 
-- no write path back into state
-- no authority to produce a figure of its own
-- no access to raw tables
+The richest prompt we can currently build is:
 
-**Why this matters more with a cheaper model, not less:**
+> *"Student 4471 answered Q17 incorrectly. Topic: Rotational Motion. Time: 145s."*
 
-1. **Explainability.** A director will eventually ask *"why did it flag this student?"* A system that answers with a rule and its evidence keeps the account.
-2. **Reproducibility.** The same input always produces the same flag, whatever the model does on a given day.
-3. **Cost.** Narration is cacheable. Identical state re-renders for free.
-4. **Model independence.** If Gemini's free tier changes terms tomorrow, you swap one layer. The product still works — it just stops writing sentences.
+No model produces a diagnosis from that. It produces *"focus more on Rotational Motion"* — unfalsifiable and worthless.
 
-See [`WORKFLOW.md` §2](WORKFLOW.md#2--the-trust-boundary--what-the-model-is-and-is-not-allowed-to-do).
+With content:
 
-### 2.1 What we train vs what we prompt
+> *"Aarav picked (C) on Q17 — the distractor for using the centre-of-mass axis when rotation is about the end. Same class of distractor on Q31 and Q44. On the two rotational questions where the axis was stated explicitly, he was correct. This is not 'weak at rotational motion'; it is a repeated failure to locate the axis when the problem doesn't state it."*
 
-A recurring temptation is to let the LLM make the actual decisions — judge mastery, decide who is at risk, choose what to study. It is worth being precise about why that is the wrong architecture, because the instinct behind it (wanting real intelligence in the product) is correct.
+**The ceiling is the input, not the model.**
 
-**The arithmetic case.** One institute, 312 students, ~40 topics each:
+---
 
-| | LLM decides | Deterministic engine decides |
-|---|---|---|
-| Calls/day for mastery alone | ~12,480 | 0 |
-| Gemini free tier allows | **500** | n/a |
-| Cost at Flash-Lite | ~$90/month | **₹0** |
-| Same input → same output? | No | Yes |
-| Can you explain a flag to a director? | "The AI decided" | Rule + evidence values |
-| Can you measure improvement? | No | AUC on held-out attempts |
+## 3 · Three tiers
 
-You would be 25× over the free tier on your first customer, paying for the privilege, and getting a worse answer. *"Rolling accuracy over the last 20 attempts, time-decayed"* is a window function — arithmetic, not reasoning, and arithmetic over many data points is what language models are worst at.
+```mermaid
+graph TD
+    subgraph A["TIER A — DETERMINISTIC"]
+        A1["Counting: accuracy, percentages,<br/>time, trends, marks-at-stake"]
+        A2["SQL window functions<br/>Exact · free · 24k rows in 0.5s"]
+    end
+    subgraph B["TIER B — LLM REASONING  ← the product"]
+        B1["diagnose_misconception"]
+        B2["analyse_decline"]
+        B3["plan_week"]
+        B4["read_paper"]
+        B5["answer_forensics"]
+        B6["generate_practice"]
+    end
+    subgraph C["TIER C — NARRATION"]
+        C1["Phrase for student / mentor / parent"]
+    end
+    subgraph T["TRAINING"]
+        T1[("ReasoningTrace")]
+        T2["Fine-tune our model"]
+    end
 
-**The strategic case, which matters more.** If Gemini makes the decisions, the product is a prompt — a competitor reproduces it in a weekend using the same Gemini. If your own models make the decisions, trained on accumulated student data, that is a moat which compounds with every month of operation.
+    A1 --> A2 --> B
+    B --> C
+    B -.every call logged.-> T1
+    T1 --> T2
 
-**The division of labour:**
+    style B fill:#eef2fb,stroke:#2B4A9B,stroke-width:3px
+    style T fill:#e8f5ee,stroke:#0E7C57
+```
+
+**The rule for deciding which tier something belongs to:**
+
+> If the answer is a **number that must be exactly right and is computable by counting** → Tier A.
+> If the answer is a **judgement a good teacher would make differently from a bad one** → Tier B.
+
+Accuracy percentage is Tier A. *"Is this carelessness or a real gap?"* is Tier B.
+
+**Tier A is not a constraint on Tier B — it is what makes Tier B credible.** The model reasons over exact numbers rather than inventing them, which is why its diagnoses can be checked against the record.
+
+---
+
+## 4 · Misconception taxonomy — the actual IP
+
+A **misconception** is a systematic wrong belief that produces *predictable* wrong answers. Not carelessness — a stable, wrong mental model.
+
+Every wrong option on every question is tagged with the misconception that produces it:
 
 ```
-Your models   →  DECIDE     mastery · risk · what to revise · what to study
-Gemini        →  DESCRIBE   turn those decisions into readable sentences
+Q17. A uniform rod of mass M, length L rotates about one end…
+  (A) ML²/3    ✓ correct
+  (B) ML²/12   ✗ MIS-ROT-AXIS   — used the centre-of-mass axis
+  (C) ML²/2    ✗ MIS-ROT-DISC   — applied the disc formula to a rod
+  (D) ML²      ✗ MIS-ROT-POINT  — treated it as a point mass
 ```
 
-**What "our own model" means here.** Not a language model — training one costs millions and buys nothing. It means the prediction models in §6:
+One student picking (B) once is noise. **The same student picking `MIS-ROT-AXIS` across four questions is a diagnosis** — evidenced, quantifiable in marks, and targetable with generated practice.
 
-| Model | Predicts | Trained on |
+It also makes the LLM's reasoning **falsifiable**: the claim *"he has an axis-identification problem"* can be checked against the distractor record.
+
+### Starter taxonomy
+
+| Code | Subject | The wrong belief |
 |---|---|---|
-| Knowledge tracing (BKT → IRT → DKT) | Will this student answer the next question on this topic correctly? | Your `attempts` |
-| Retention / decay | Recall probability on exam day | Your `revision_events` |
-| Risk | Will this student decline or disengage? | Your `flags` + outcomes |
+| `MIS-ROT-AXIS` | Physics | Uses centre-of-mass axis when rotation is about another point |
+| `MIS-SIGN-FIELD` | Physics | Sign errors on field / force direction |
+| `MIS-KIN-AVG` | Physics | Confuses average with instantaneous velocity |
+| `MIS-ORG-MARKOV` | Chemistry | Markovnikov vs anti-Markovnikov addition |
+| `MIS-EQM-CATALYST` | Chemistry | Believes a catalyst shifts equilibrium position |
+| `MIS-BOND-COUNT` | Chemistry | Miscounts σ vs π bonds |
+| `MIS-ALG-SQUARE` | Maths | Gains or loses roots when squaring both sides |
+| `MIS-TRIG-DOMAIN` | Maths | Ignores domain restrictions on inverse trig |
+| `MIS-CALC-CHAIN` | Maths | Drops the inner derivative in the chain rule |
 
-Small, cheap to run, evaluable, and entirely yours.
-
-**Where Gemini legitimately makes a decision.** Exactly one place: **question → topic mapping**. Reading question text and proposing "this is Coordination Compounds" is genuine language understanding, and it is the gate on all of P1. Note the shape — *LLM proposes, human confirms, result is stored permanently.* Never inferred at runtime.
-
-**Why distillation does not apply here.** The pattern of using a large model to label data while training a small one is worth it when labels are expensive. Here they are free: every attempt already carries ground truth — the student got it right or wrong. The data labels itself as it arrives.
+Extends as real papers are mapped. This is built from our own data and cannot be bought.
 
 ---
 
-## 3 · System layers
+## 5 · Tier B reasoning tasks
 
-| Layer | Responsibility | Contents |
-|---|---|---|
-| **L0** Sources | External data | Mock result files, roster, chapter completion, student app |
-| **L1** Ingestion | Get it in cleanly | Parser, column mapper, identity resolver, question→topic tagger, validator |
-| **L2** Canonical store | Append-only truth | `attempts`, `study_logs`, `confidence`, `revision_events`, `topics` |
-| **L3** Feature store | Derived, rebuildable | `topic_state`, `student_state` |
-| **L4** Engines | Deterministic computation | Mastery, retention, detectors, mock analyzer, planner |
-| **L5** Insight objects | The contract | `risk_flag`, `weak_topic`, `marks_lost_attribution`, `plan_block` |
-| **L6** Narration | Prose only | Context builder, PII stripper, Gemini, claim validator, cache |
-| **L7** Surfaces | Presentation | Director dashboard, mentor console, student app, parent report |
+Each is a defined job with **structured JSON output** — not an open chat prompt. Structure is what makes output checkable, storable, and usable as training data.
 
-**Cross-cutting:** auth/RBAC · multi-tenancy · job queue · audit trail · consent & retention.
+| Task | Input | Output | Why an LLM |
+|---|---|---|---|
+| `diagnose_misconception` | Distractor choices on a topic + misconception tags | Ranked hypotheses, evidence, confidence | Pattern inference over sparse noisy evidence |
+| `analyse_decline` | Timeline: scores, time allocation, revision gaps, confidence | Causal narrative + the single highest-value intervention | Weighing competing explanations |
+| `plan_week` | Gaps, exam date, hours, class schedule, topic weights | Ordered plan, each block justified | Constrained planning with trade-offs |
+| `read_paper` | Raw paper (PDF/text) | Per question: topic, difficulty, what each distractor tests | Language + domain understanding |
+| `answer_forensics` | Question + student's working | Where the reasoning broke; which misconception | Reading mathematical reasoning |
+| `generate_practice` | A confirmed misconception + difficulty | Questions whose distractors target that exact error | Grounded generation |
+| `weekly_summary` | All of the above | Mentor- and parent-facing prose | Tier C |
 
-Data moves strictly downward. No layer reaches past the one below it — which is what makes each independently testable and replaceable.
+### Privacy — non-negotiable
+
+Users are minors, and Gemini's free tier may use submitted content for training, with human review. **PII is stripped before every call** and re-attached locally afterwards:
+
+```json
+{ "student_ref": "S-4471", "exam": "JEE Main", "weeks_to_exam": 34,
+  "distractors": [{"q": "Q17", "chose": "C", "misconception": "MIS-ROT-AXIS"}] }
+```
+
+No name, roll number, phone, DOB or institute name ever leaves our system.
 
 ---
 
-## 4 · Data model
+## 6 · Training our own model
 
-> Summary only. Full table definitions, indexes, constraints and open design questions are in [`SYSTEM_DESIGN.md`](SYSTEM_DESIGN.md) §3.
+```mermaid
+graph LR
+    CTX["Student context<br/>(de-identified)"] --> G["Gemini"]
+    G --> OUT["Structured output<br/>+ reasoning chain"]
+    OUT --> TR[("ReasoningTrace")]
+    OUT --> UI["Mentor sees it"]
+    UI -->|confirms / rejects| TR
+    TR --> FT["Fine-tune<br/>Qwen / Llama 8B"]
+    FT --> EVAL{"Agrees with<br/>Gemini?<br/>Agrees with<br/>mentors?"}
+    EVAL -->|yes| ROUTE["Serve common cases"]
+    EVAL -->|no| TR
+
+    style TR fill:#e8f5ee,stroke:#0E7C57,stroke-width:2px
+```
+
+**`ReasoningTrace`** records per call: task type, exact input context, model + prompt version, structured output, reasoning chain, latency, cost, and **whether a human later agreed**.
+
+That last field is what makes the corpus worth more than raw Gemini output. A mentor confirming a diagnosis converts a *teacher-model guess* into a *human-validated example*.
+
+| Stage | Traces | What happens | Cost |
+|---|---|---|---|
+| 1 · Collect | 0 → 5,000 | Gemini does everything; all logged | Free tier |
+| 2 · Distil narrow | ~5,000 | Fine-tune on **one** task (`diagnose_misconception`) — short, structured output | ~$10–50 GPU |
+| 3 · Evaluate | — | Agreement with Gemini on held-out cases, then with mentors (the real metric) | Free |
+| 4 · Route | ~20,000 | Ours handles common cases; Gemini handles hard ones and keeps teaching | Lower |
+| 5 · Widen | 50,000+ | More tasks, hardest last | — |
+
+**Not** training from scratch. Fine-tuning an existing open model on domain traces — a different and entirely achievable thing.
+
+---
+
+## 7 · Data model
 
 ### The spine
+`Exam → Subject → Unit → Topic`, **versioned per institute** (two centres split chapters differently; a global tree does not survive the second customer). Every event references a `topic_id`.
 
-`Exam → Subject → Unit → Topic`, **versioned per institute**. Every event references a `topic_id`. An attempt not mapped to a topic is a number with no meaning.
+### Current tables — 21, built and working
 
-Two coaching centres teaching the same exam split, sequence, and name chapters differently. A single global tree will not survive your second customer.
-
-### Tables
-
-**Tenancy & people**
-```
-institute (tenant root) → batch → student
-                                → mentor (owns N students)
-```
-
-**Events — append-only, keyed `(student_id, topic_id, ts)`**
-
-| Table | Key fields |
+| Group | Tables |
 |---|---|
-| `attempts` | `question_id`, `correct`, `time_spent`, `source` |
-| `study_logs` | `minutes`, `mode: learn\|practice\|revise` |
-| `confidence` | `self_rating 1-5`, `rated_at` |
-| `revision_events` | `cycle`, `scheduled_for`, `done_at` |
-| `chapter_status` | `taught_at`, `completed_at` |
-| `question_topic_map` | **the gate** — `question_id → topic_id`, human-confirmed |
+| Tenancy | `institute` · `batch` · `student` · `mentor` · `user` |
+| Syllabus | `exam` · `syllabus_version` · `topic` |
+| Events *(append-only)* | `attempt` · `study_log` · `confidence_rating` · `revision_event` · `chapter_status` |
+| Ingestion | `test_paper` · `ingest_batch` · `column_mapping_profile` · `question_topic_map` |
+| Derived *(disposable)* | `topic_state` · `student_state` · `flag` · `intervention` · `plan_block` |
 
-**Derived — recomputed, never hand-edited**
+### To add — gates the reasoning layer
 
-| Table | Contents |
+| Table / field | Purpose |
 |---|---|
-| `topic_state` | `mastery`, `retention`, `exposure`, `last_seen`, `last_revised`, `accuracy_30` |
-| `student_state` | `consistency`, `load_index`, `balance_index`, `revision_debt`, `risk_score` |
-| `flags` | `type`, `severity`, `evidence[]`, `raised_at`, `resolved_at`, `rule_version` |
-| `plan_blocks` | `date`, `topic`, `mode`, `minutes`, `reason_code` |
+| `Question` — text, options, correct option, solution, difficulty | Content to reason about |
+| `QuestionOption` — label, text, `is_correct`, **`misconception` FK** | What each wrong answer means |
+| `Misconception` — code, subject, description | The diagnostic vocabulary |
+| **`Attempt.chosen_option`** | Without it, distractor analysis is impossible |
+| `ReasoningTrace` | The training corpus |
 
 ### Invariants
 
-1. **Event tables are append-only.** Corrections arrive as new rows, never updates.
-2. **Derived state is always rebuildable from events alone.** This lets you change the mastery model and replay history to see what it *would* have flagged — which is how you justify a model upgrade, and how you backfill a new detector without waiting weeks for data.
-3. **Syllabus tree is versioned.** Historical events stay bound to the version current when recorded.
+1. **Event tables are append-only.** Corrections arrive as new rows. This is what lets us change the mastery model in month six and replay two years of history to see what it *would* have flagged.
+2. **Derived state is always rebuildable from events alone.**
+3. **Syllabus versions are immutable** once events reference them.
 
----
+### Tenant isolation — live and verified
 
-## 5 · Flows
+PostgreSQL row-level security, enforced by a non-superuser role (`student_ai_rls`) that `TenantMiddleware` switches into per request.
 
-All six flows are diagrammed in [`WORKFLOW.md`](WORKFLOW.md). Summary:
-
-| Flow | What it does | Critical detail |
-|---|---|---|
-| **A** Ingestion | Mock file → insight | Step 5 (question→topic) is the gate; one-time cost per paper, stored permanently |
-| **B** Planning | Four queues → day plan | Greedy scorer first; reason code on every block |
-| **C** Risk loop | Detection → mentor → outcome | The return arrow is the product |
-| **D** Narration | Insight → prose | PII stripped before the call; claims validated after |
-| — Tier split | What works without student data | Tier 0 needs zero behaviour change |
-| — Build order | Dependency DAG | P3 reachable without P4 |
-
----
-
-## 6 · Engines
-
-Each engine has a ladder of increasingly sophisticated implementations. **Ship the lowest rung, instrument it, and climb only when you can show the current rung failing on real data.**
-
-### 6.1 Mastery — knowledge tracing
-
-| Rung | Method | Needs | Buys you |
-|---|---|---|---|
-| **0** | Time-decayed rolling accuracy | ~10 attempts/topic | A working product. Ship this. |
-| 1 | Bayesian Knowledge Tracing (`pyBKT`) | ~50 attempts/topic | Separates guessing from knowing |
-| 2 | Elo / IRT (`py-irt`, or ~50 lines for Elo) | Cohort-wide data | Question difficulty for free |
-| 3 | DKT / SAKT (PyTorch) | 100k+ attempts | Order effects, topic transfer |
-
-Rung 0 is a **Postgres window function**, not a machine-learning library:
-```sql
-AVG(correct::int) OVER (
-  PARTITION BY student_id, topic_id
-  ORDER BY ts
-  ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-)
+```
+institute 1 → 24,000 attempts        institute 2 → 0
+unset setting → 0 rows (fails closed)
+cross-tenant INSERT → refused
 ```
 
-**Evaluate every rung identically:** hold out the next attempt, measure whether the model predicted it (AUC). A rung that does not beat the one below it does not ship, however sophisticated.
+> ⚠ **Two traps, both live.** The `sai` role in `DATABASE_URL` is SUPERUSER/BYPASSRLS, so `FORCE ROW LEVEL SECURITY` alone is insufficient and a naive RLS test **passes vacuously**. And `TenantMiddleware` reads `request.user` — if JWT/token auth is ever added, it silently stops scoping and must move into a DRF authentication class.
 
-### 6.2 Retention — spaced repetition against a deadline
+---
 
-Standard SM-2 and FSRS optimise for *indefinite retention at minimum review cost*. Exam preparation has a different objective function:
+## 8 · Ingestion — mock file to insight
 
-> **Maximise recall probability on one specific date**, with the syllabus frozen and time strictly finite.
+```mermaid
+graph TD
+    S1["1 · Institute uploads file<br/>xlsx / csv / OMR export"] --> S2["2 · Parse"]
+    S2 --> S3["3 · Apply saved column mapping"]
+    S3 --> S4["4 · Resolve student<br/>roll no → name fuzzy → human queue"]
+    S4 --> S5{"5 · Question mapped<br/>to topic + options?"}
+    S5 -->|yes| S6["6 · Emit attempts<br/>append-only, idempotent"]
+    S5 -->|no| R1["Review queue<br/>Django admin"]
+    R1 --> R2["Gemini proposes, human confirms"]
+    R2 -->|stored permanently| S6
+    S6 --> S7["7 · Update counts — Tier A"]
+    S7 --> S8["8 · Reason — Tier B"]
+    S8 --> S9["9 · Surface to mentor"]
 
-Practically: intervals compress as the exam approaches, and topics whose forecast recall on exam day is already sufficient get **deprioritised** in favour of ones that will have decayed by then.
+    style S5 fill:#eef2fb,stroke:#2B4A9B,stroke-width:2px
+    style S8 fill:#eef2fb,stroke:#2B4A9B,stroke-width:2px
+```
 
-There is no off-the-shelf implementation. Start from `py-fsrs` and expect to fork it. Budget research time, not install time.
+**Step 5 is the gate.** An unmapped question is a number with no meaning. Mapping is a one-time cost per paper that pays out on every future student who sits it — so it is stored permanently with human confirmation, **never inferred at runtime**.
 
-### 6.3 Mock analyzer — marks-lost attribution
+Mapping ladder, cheapest first: institute already tags by chapter → paper blueprint → **Gemini proposes, human confirms**.
 
-"You scored 134" is not actionable. "98 of your 166 lost marks needed no new learning" is.
+---
 
-Partition every lost mark by cause, inferred from time-per-question against the student's own baseline, correctness, and prior mastery:
+## 9 · The risk loop must close
 
-| Cause | Signature |
-|---|---|
-| **Conceptual gap** | Wrong, and mastery on that topic was already low |
-| **Execution error** | Wrong, but mastery high and time normal |
-| **Time exhaustion** | Unattempted, clock ran out before reaching it |
-| **Avoidable skip** | Unattempted despite demonstrated competence |
+```mermaid
+graph LR
+    A["Counts + reasoning"] --> B["Flag<br/>severity + evidence"]
+    B --> C["Mentor console<br/>routed to a named human"]
+    C --> D["Intervention logged"]
+    D --> E["Outcome recorded<br/>recovered / declined"]
+    E -->|tunes thresholds + trains risk model| A
 
-### 6.4 Detector catalogue
+    style E fill:#e8f5ee,stroke:#0E7C57,stroke-width:2px
+```
 
-| Detector | Reads | Fires when | Tier |
-|---|---|---|---|
-| `weak_topic` | mastery, attempt count | Below floor with sufficient evidence | 0 |
-| `over_attempting` | attempts vs accuracy curve | Negative marking exceeds gain | 0 |
-| `plateau` | mastery slope across mocks | Flat despite exposure | 0 |
-| `subject_imbalance` | time share vs marks-lost share | Gap exceeds threshold | 1 |
-| `confidence_mismatch` | self-rating vs mastery | Rates strong, scores weak, repeatedly | 1 |
-| `revision_overdue` | retention, days since revise | Below recall floor | 1 |
-| `disengagement` | log frequency vs personal baseline | Drops sharply, stays down | 1 |
-| `overload` | hours trend × accuracy trend | Hours rising, accuracy falling | 1 |
+Detection is the easy half. The return arrow is the product — it produces the only number that renews a contract: *"of 23 students flagged last term, 17 recovered after mentor contact."*
 
-**Alert hygiene — without all three, mentors stop reading by week three:**
-
+**Alert hygiene**, all three mandatory or mentors stop reading by week three:
 1. **Minimum evidence** — never fire on fewer than N observations
-2. **Personal baseline** — compare a student to their own history, not the cohort
-3. **Cooldown** — one flag per type per student per window
+2. **Personal baseline** — compare a student to their own history, never the cohort
+3. **Cooldown** — one flag per (student, type, **topic**) per window
 
-Plus: a flag never closed is a bug in the detector, not a stubborn student.
+> A bug found and fixed on 25 Sep: nothing could *resolve* a flag, and the cooldown keyed on `(student, type)` only — so one open `weak_topic` silenced that detector on every other chapter, permanently. Seven of eight detectors had gone mute. `POST /api/flags/{id}/resolve/` now exists; the cooldown includes `topic_id`. Raisable flags went 5 → 43.
 
----
-
-## 7 · Data strategy — where it comes from, how it's processed, how it's used
-
-Models are only as good as what they train on, and this product needs a lot of data to learn patterns, strengths, weaknesses and lags. The good news: three of the four sources cost nothing, and the most valuable one arrives before you write a line of the model.
-
-### 7.1 Four sources, in the order you get them
-
-| # | Source | When | Volume | Cost |
-|---|---|---|---|---|
-| 1 | **Public research datasets** | Today, before any customer | 0.5M – 131M interactions | Free |
-| 2 | **Pilot institute's historical files** | Week the pilot signs | ~1M attempts per institute | Free — you ask for it |
-| 3 | **Live operation** | Continuously, from P1 | ~45k attempts/institute/month | Free — it's the product |
-| 4 | **Synthetic** | For testing only | Unlimited | Free |
+**`intervene` deliberately does not auto-resolve.** Contacting a student is not the same event as the student recovering, and `Flag.outcome` is a training label for the risk model — it must record what happened weeks later, not the phone call. `outcome` is required, not defaulted: an honest `declined` is worth more than a polite blank.
 
 ---
 
-### 7.2 Source 1 — Public datasets (learn the modelling before you have users)
+## 10 · Tech stack
 
-Knowledge tracing is an established academic field with standard public benchmarks. You can build and evaluate your models today, against published baselines, with no customers.
-
-| Dataset | Domain | Approx size | Why it's useful here |
+| Layer | Choice | Why | Alternatives |
 |---|---|---|---|
-| **EdNet** (KAIST / Riiid) | TOEIC **test prep** | ~131M interactions, 780k students | **Closest match to your domain** — test prep, not K-12. Four nested levels of detail (KT1–KT4) |
-| **Riiid AIEd Challenge** (Kaggle 2020) | EdNet-derived | ~100M rows | Public solutions and notebooks to learn from |
-| **ASSISTments** (2009–2017) | US middle-school maths | ~0.5–1M per release | The classic KT benchmark — nearly every paper reports on it |
-| **Junyi Academy** | Taiwanese maths | ~16M | Ships with a topic knowledge graph, like your syllabus tree |
-| **Eedi** (NeurIPS 2020) | UK maths diagnostics | ~20M answers | Labels *which misconception* each wrong option represents |
-| **KDD Cup 2010** | Algebra tutoring | ~9–20M steps | Older, still widely cited |
+| Language | Python 3.14 | ML/data tooling is Python-native | Node, Java — split codebase for no gain |
+| Backend | Django 6.1 + DRF | Admin gives the mapping review queue, syllabus editor and tenant onboarding free — a large share of this product's internal tooling | FastAPI — hand-build all of that |
+| Database | PostgreSQL 16 | Window functions *are* the Tier-A engine; JSONB, RLS, partitioning all load-bearing | None; not a preference |
+| Tenancy | Shared schema + `tenant_id` + RLS | Enforced in the DB, not in code someone forgets | Schema-per-tenant (migration pain ~20 customers) |
+| Jobs | django-q2, ORM broker | Uses existing Postgres — no Redis service | Celery + Redis when outgrown |
+| Contract | OpenAPI via drf-spectacular | Frontend and backend can't drift silently; breaks the build instead | Informal agreement — always drifts |
+| Console | React + Vite + shadcn/ui | Pre-built accessible components | Vue, Angular, HTMX |
+| **Reasoning** | **Google Gemini** | Usable free tier at our scale | GPT, Claude — swappable, see below |
+| **Our model** | Qwen / Llama 8B, fine-tuned | Free to run, domain-specific, ours | From scratch — millions, no benefit |
+| Hosting | Docker, India region | DPDP residency (users are minors) | Cloud later; no rebuild needed |
 
-**What these give you:** working KT models, published baselines so you know whether your AUC is actually good, and a proper education in the field — all before your first customer.
-
-**What they do not give you:** Indian competitive-exam structure (negative marking, JEE/NEET topic trees), study logs, or any behavioural signal. Public data teaches you the modelling. It does not give you the product.
-
-> ⚠️ **Check the licence before commercial use.** Several of these are research-use or non-commercial licences. Prototyping and learning are fine; shipping a model trained on them inside a paid product may not be. Verify per dataset.
+**Gemini is swappable.** Because reasoning is a bounded layer with structured inputs and outputs, replacing the provider touches one module and no arithmetic. Its terms changed twice in 2026 — keep it that way.
 
 ---
 
-### 7.3 Source 2 — The pilot institute's history (your single best source)
+## 11 · Build order
 
-This is the one most people miss, and it is the strongest argument for the Tier-0 strategy.
+| # | Build | Gate it removes |
+|---|---|---|
+| 1 | `Question`, `QuestionOption`, `Misconception` | Nothing works without content |
+| 2 | `Attempt.chosen_option` | No distractor analysis |
+| 3 | Seed real JEE papers with tagged distractors | Something to reason about |
+| 4 | **Regenerate answers with consistent error patterns** | Random wrongness has no pattern to find |
+| 5 | `ReasoningTrace` | Traces not captured are gone |
+| 6 | Gemini client + `diagnose_misconception` | First real reasoning |
+| 7 | Remaining Tier-B tasks | The product |
+| 8 | Fine-tune harness | Our own model |
 
-**Every coaching institute has years of mock test results sitting in spreadsheets.** They are not using them for anything beyond printing rank lists. You ask for them as part of the pilot.
+> **Step 4 is the one most likely to be underestimated.** The current seed ranks questions by a latent ability score and marks the top *c* correct — producing students at a flat 0% and wrong answers with no structure. Run a diagnosis engine over that and it finds nothing, because nothing is there. **The fake data must contain the patterns we intend to detect**, or Tier B has no way to prove it works.
 
-**The volume, for one mid-size institute:**
+---
+
+## 12 · Known defects
+
+| Severity | Defect | Owner |
+|---|---|---|
+| **High** | Mock analyzer books *"mastery unknown"* as *"conceptual gap"*. `analyse_mock` filters `mastery__isnull=False`, so chapters withheld by the 4-attempt evidence floor arrive as `None` and are routed to `CONCEPTUAL_GAP`. **10,705 marks rest on a NULL**; 270 (student, topic) pairs with `attempts_n = 0` have blanks booked as proven gaps. Since `recoverable = total − conceptual_gap`, this understates the headline the product sells on. Needs a fifth bucket, and changes the contract | backend |
+| Medium | `weak_topic` marks gate is a *lifetime* total shown next to a 20-attempt decayed mastery — "costing 42 marks" is a career figure | backend |
+| Medium | `accuracy_30d` is null for 86% of rows; degenerate 0/1 where present | backend |
+| Medium | Seed realism — 41 of 75 `weak_topic` flags read "0% over N attempts" | data |
+| Low | Neglect chart: value labels detach from short bars | frontend |
+| — | Console has **never** been pointed at the live API — MSW mocks only | frontend |
+
+---
+
+## 13 · Open problems
+
+1. **Question→topic mapping at scale.** One-time cost per paper, reused forever — Gemini proposes, human confirms, result stored. Never runtime inference.
+2. **Cold start.** A new student has no history. Week one must still be useful: diagnostic test, imported past mocks, or an explicit provisional mode that says *"still learning your pattern"* rather than inventing confidence.
+3. **Self-reported data is unreliable.** Students forget, log optimistically, bulk-enter a week on Sunday. Never let a detector depend solely on it.
+4. **Attribution.** Proving an intervention *caused* an improvement needs staggered rollout designed into the pilot up front, not reconstructed after.
+5. **Deadline-aware spaced repetition.** No library optimises for recall on a fixed date with a frozen syllabus. Research-flavoured work.
+6. **Gemini free-tier dependency.** 500 requests/day; Pro left the free tier Apr 2026. Keep the layer swappable.
+
+---
+
+## 14 · Current state
 
 ```
-300 students × 75 questions × 2 mocks/month × 24 months
-= 1,080,000 attempts
+✅ 21 tables · RLS verified · 24,000 seeded attempts
+✅ Tier A counting engine · 8 detectors · alert hygiene
+✅ 25 API endpoints · OpenAPI contract in sync
+✅ React console (on mock data) · 68 tests passing
+❌ Tier B reasoning — not started
+❌ Question content — the blocker
+❌ Training pipeline — not started
 ```
-
-That is **DKT-range data from a single institute, on day one of the pilot**, in your exact domain, with your exact exam structure — and it costs you nothing but the asking.
-
-It also means your P3 demo runs on *their own students*, which is far more persuasive than any synthetic dataset.
-
-> **Put data rights in the pilot agreement.** You need the written right to use anonymised data to improve the system. Retrofitting this later is close to impossible, and it is a normal, reasonable clause that nobody objects to when raised up front.
-
----
-
-### 7.4 Source 3 — Live operation (the compounding moat)
-
-Once running, each institute generates continuously:
-
-| Institutes | Attempts/month | Attempts/year |
-|---|---|---|
-| 1 | 45,000 | 540,000 |
-| 5 | 225,000 | 2.7M |
-| 20 | 900,000 | 10.8M |
-
-Tier-1 study logs are much lower volume — roughly 9,000/month per institute — and considerably less reliable, since students forget, log optimistically, and bulk-enter a week on Sunday. Weight them accordingly.
-
-**This is the asset that compounds.** Every month of operation widens a gap a competitor cannot close by buying an API key.
-
----
-
-### 7.5 Source 4 — Synthetic data (testing, never training)
-
-Generate fake students with *known* parameters — student X has mastery 0.3 on Rotational Motion — then check whether your detector finds it.
-
-**This validates the pipeline. It must never train a model.** A model trained on synthetic data learns your assumptions and nothing about students.
-
----
-
-### 7.6 How much data each model actually needs
-
-| Model | Minimum | Comfortable | Reachable when |
-|---|---|---|---|
-| Rolling accuracy (rung 0) | 10 attempts/topic | 20+ | Day 1 |
-| BKT (rung 1) | ~50 attempts/topic | 200+ | First institute's history |
-| Elo / IRT (rung 2) | 30+ attempts per *question* | 100+ | First institute's history |
-| DKT / SAKT (rung 3) | ~100k interactions total | 1M+ | First institute's history, or public data |
-
-Note that rows 2–4 are all reachable from **one pilot institute's back catalogue**. This is why §7.3 matters so much.
-
----
-
-### 7.7 Processing — raw to training set
-
-```
-Raw files  →  Canonical events  →  Features  →  Training sets
-  (P1)           (attempts)         (P2)         (model work)
-```
-
-1. **Ingest** — parse, map columns, resolve identity, map question→topic (Flow A)
-2. **Canonicalise** — every institute's format becomes identical `attempts` rows
-3. **Engineer features** — per `(student, topic, time)`: rolling accuracy, time-since-last-touch, attempt count, time-per-question vs personal baseline
-4. **Construct training sets** — the step people get wrong
-
-#### The split trap — read this twice
-
-Knowledge tracing data is **sequential**. If you shuffle attempts randomly and split 80/20, you will train on a student's March attempt and test on their February attempt. The model has seen the future. Your AUC looks excellent and deployment fails.
-
-**Split by time or by student, never randomly:**
-
-| Split | Tests | Use for |
-|---|---|---|
-| **By time** — train before date D, test after | Real deployment conditions | The honest number. Report this one. |
-| **By student** — train on 80% of students, test on unseen 20% | Generalisation to new students | Cold-start behaviour |
-
-Use both. Quote the time-split number when you report to yourself.
-
-**Standard formulation:**
-- *Input:* a student's sequence of `(topic_id, correct)` up to time *t*
-- *Predict:* will they answer the next question on topic X correctly?
-- *Metric:* AUC on held-out next attempts
-
----
-
-### 7.8 Data quality problems you will definitely hit
-
-| Problem | Handling |
-|---|---|
-| Unmapped questions | The review queue (Flow A, step 5). Blocks everything until cleared |
-| Students in one mock, gone the next | Sequence models need minimum-length filters |
-| Duplicate imports | Idempotency keys on ingest — the same file twice must change nothing |
-| A mock where everyone scored near zero | Technical failure, not knowledge. Detect and quarantine outlier papers |
-| Topic imbalance | 500 attempts on Kinematics, 12 on Semiconductors. Never report a mastery estimate below the evidence floor |
-| Cold-start students | See §16.2 — diagnostic test, imported history, or an explicit provisional mode |
-| Bulk-logged study data | A week entered on Sunday is one signal, not seven. Detect and down-weight |
-
----
-
-### 7.9 Three distinct uses for the data
-
-**1 · Train the models** — the ladder in §6.1. Straightforward.
-
-**2 · Tune detector thresholds — the underrated one.**
-
-Right now a detector says *"flag if mastery < 0.4."* Where did 0.4 come from? You guessed.
-
-Once you have outcome data, you can learn it. Take students who genuinely declined, look at what their mastery was four weeks earlier, and choose the threshold that maximises early detection minus false alarms. Same for every detector.
-
-This converts your hand-tuned rules into calibrated ones, and it is the difference between a console mentors trust and one they mute.
-
-**3 · Validate retrospectively.**
-
-Replay an institute's history and ask: *would we have caught the students who actually failed?* This is the single most convincing number you can put in front of a director — and it is computable on their historical files **before** they have paid you anything.
-
----
-
-### 7.10 Privacy, consent and contracts
-
-| Concern | Position |
-|---|---|
-| **Minors** | Most users are under 18. Guardian consent, stated retention period, export and deletion paths |
-| **DPDP Act** | India data residency; documented lawful basis for processing |
-| **Model training rights** | Explicit clause in the pilot agreement. Ask up front — it is uncontroversial then, and near-impossible later |
-| **Anonymisation for training** | Strip name, roll number, phone, DOB. Keep the behavioural signal — models need the pattern, never the identity |
-| **Cross-institute training** | Institute A may object to its data improving a model that serves competitor B. Your answer: aggregated model weights, never raw data. Be ready for this conversation before it happens |
-| **Gemini payloads** | Separate matter — see §11.2. PII never leaves your system |
-
----
-
-## 8 · Tier 0 / Tier 1 — the data-entry answer
-
-*"Who is actually going to enter all this data?"* is the question that kills ed-tech pilots. The architecture answers it structurally.
-
-| | Tier 0 — institute already has | Tier 1 — needs student behaviour |
-|---|---|---|
-| **Inputs** | Mock files, roster, chapter completion | Daily study logs, confidence ratings |
-| **Unlocks** | Marks-lost attribution, weak topics, at-risk triage, over-attempting, cohort analytics | Revision scheduling, daily planning, confidence mismatch, disengagement, overload |
-| **Surface** | **Director + mentor console — the sellable wedge** | Student app — all adoption risk |
-| **Behaviour change** | **Zero** | Substantial |
-
-Tier 0 capabilities never read a study log. They can be built, demoed, and sold on files the institute already owns — so the pilot starts the week it is signed, and the student app arrives somewhere the system has already earned credibility.
-
-**If student adoption is mediocre, the business still works.** That is the point.
-
----
-
-## 9 · Tech stack — free or near-free
-
-Everything below is free at the scale of a pilot. Costs are called out where they eventually appear.
-
-### 9.1 Core
-
-| Concern | Choice | Cost | Notes |
-|---|---|---|---|
-| Language | Python 3.12+ | Free | ML libraries are Python-native |
-| Framework | **Django 5 + DRF** | Free | Admin gives you the review queue, tree editor, tenant management for free |
-| Database | **PostgreSQL 16+** | Free | Window functions *are* the rung-0 feature store |
-| Tenancy | Shared schema + `tenant_id` + RLS | Free | Enforced in the DB, not a manager someone forgets |
-| Background jobs | **django-q2**, ORM broker | Free | **Replaces Celery + Redis entirely** — one less service, no Redis bill |
-| Ingestion | pandas · openpyxl · rapidfuzz | Free | |
-| Console UI | HTMX + Alpine.js (CDN) | Free | Server-rendered; no build step, no API layer |
-| Charts | Chart.js or ECharts (CDN) | Free | |
-| Student app | PWA (vanilla or Svelte) | Free | No app-store fee, no review delay |
-| Errors | Sentry free tier | Free | 5k events/month |
-| Object storage | Cloudflare R2 free tier | Free | 10 GB, no egress charges |
-
-> **Why django-q2 over Celery:** Celery needs Redis, which needs either a paid instance or a free tier with a request ceiling. `django-q2` uses your existing Postgres as the broker and ships a scheduler. At pilot scale the performance difference is irrelevant and the operational saving is real. Swap to Celery + Redis if you outgrow it — the job interfaces are similar.
-
-### 9.2 Hosting — the honest comparison
-
-| Option | Free allowance | The catch |
-|---|---|---|
-| **Oracle Cloud Always Free** | 4 ARM cores, 24 GB RAM, permanent | Finicky signup; some regions reclaim idle instances. **Best free option by a wide margin** |
-| Render free | 750 hrs/month | **Spins down after 15 min idle → 30–50 s cold start.** Fatal for a live demo |
-| Fly.io | Limited allowance | Fine for small services |
-| Supabase (Postgres) | 500 MB | **Pauses after 1 week inactivity** |
-| Neon (Postgres) | 0.5 GB | Autosuspends, but resumes fast |
-| **Netlify / Vercel / GitHub Pages** | Static hosting | **Never sleeps. Use this for the prototype** |
-
-**Recommendation:**
-- **Prototype now** → Netlify or GitHub Pages. Zero cost, zero cold start, zero risk.
-- **Pilot backend later** → Oracle Always Free, or Render + a cron ping if you accept the cold start.
-- **Local development** → Postgres in Docker. Free and fastest.
-
-### 9.3 Costs that eventually appear
-
-| Item | When | Approx |
-|---|---|---|
-| Domain name | Before the first demo | ~₹800/year |
-| Gemini paid tier | Past ~500 students, or when PII matters | See §11 |
-| Managed Postgres | When free-tier storage runs out | ~$0–25/month |
-| WhatsApp Business API | P8, parent reports | Per-conversation, via Gupshup/AiSensy |
-
----
-
-## 10 · Deployment topology
-
-```
-┌─────────────────── ONE MACHINE ───────────────────┐
-│                                                   │
-│  nginx ──→ Django/gunicorn ──┐                    │
-│                              ├──→ PostgreSQL      │
-│  django-q2 workers ──────────┘    (events,        │
-│  (ingestion, nightly            features, RLS)    │
-│   recompute, planning)                            │
-│                                                   │
-└───────────────────────┬───────────────────────────┘
-                        │
-        ┌───────────────┼───────────────┐
-        ▼               ▼               ▼
-   Gemini API    Cloudflare R2      Sentry
-   (narration)   (files, PDFs)     (errors)
-```
-
-Two paths on one machine: the **synchronous path** serves pages, the **asynchronous path** does everything expensive. Splitting them from day one is what lets a single box carry the first fifty institutes.
-
-**Not serverless:** ingestion runs for minutes and nightly recompute touches every student — both hostile to function timeouts and cold starts. **Not Kubernetes:** unjustifiable at this scale.
-
-**Region:** India (`ap-south-1` / Mumbai equivalent). Most users are minors; DPDP data residency is a requirement an institute's lawyer will ask about, not a latency preference.
-
----
-
-## 11 · LLM layer — Gemini
-
-### 11.1 Free tier reality
-
-| Fact | Detail |
-|---|---|
-| Pro models | **Not available on the free tier** since 1 Apr 2026 — Flash and Flash-Lite only |
-| Gemini 2.5 Flash limits | 10 RPM · 250,000 TPM · **500 requests/day** |
-| Gemini 3 Flash / 3.1 Flash-Lite | 10–15 RPM |
-| Google Cloud $300 trial | **No longer applies to Gemini API** since Mar 2026 |
-| Data usage | **Free-tier content may be used to improve Google products, including human review** |
-
-### 11.2 The privacy problem, and the fix
-
-Google's terms for non-paid services state that submitted content and generated responses may be used to develop Google products, that human reviewers may process that material, and that you should **not submit sensitive, confidential, or personal information**.
-
-Your users are minors. Their academic performance data is exactly what those terms warn against sending.
-
-**The fix costs nothing: strip PII before the call.**
-
-The narration payload is already a bounded structured object, so removing identity is trivial:
-
-```json
-{
-  "student_ref": "S-4471",
-  "exam": "JEE Main",
-  "weeks_to_exam": 34,
-  "subjects": [
-    {"name": "Physics",   "time_share_pct": 52, "marks_lost_share_pct": 29, "trend": "flat"},
-    {"name": "Chemistry", "time_share_pct": 11, "marks_lost_share_pct": 46, "trend": "declining"},
-    {"name": "Maths",     "time_share_pct": 37, "marks_lost_share_pct": 25, "trend": "flat"}
-  ],
-  "flags": [
-    {"type": "subject_imbalance", "severity": "high",
-     "evidence": {"time_share_pct": 11, "marks_lost_share_pct": 46}}
-  ]
-}
-```
-
-No name. No roll number. No phone, DOB, institute name, or mentor name. `S-4471` is an opaque local reference that means nothing outside your database.
-
-**Re-identification happens locally, after generation.** The model never sees a real name.
-
-Document this in your DPDP notice. It is also a genuinely good answer when a director asks what you send to Google.
-
-### 11.3 Capacity — when the free tier runs out
-
-500 requests/day ÷ 1 daily nudge per student = **~500 students maximum** on the free tier.
-
-| Stage | Students | Free tier? |
-|---|---|---|
-| Prototype | 0 (pre-written text) | N/A — no calls at all |
-| Pilot, one batch | ~40 | Comfortably yes |
-| One full institute | ~300 | Yes, with headroom for weekly summaries |
-| Two institutes | ~600 | **No — upgrade** |
-
-### 11.4 Paid pricing, when you get there
-
-| Model | Input /1M | Output /1M |
-|---|---|---|
-| Gemini 2.5 Flash-Lite | $0.10 | $0.40 |
-| Gemini 3.5 Flash | $1.50 | $9.00 |
-
-Daily nudge at ~1,500 input + ~200 output tokens:
-
-| Config | 1,000 students | 10,000 students |
-|---|---|---|
-| Flash-Lite | ~$7/month | ~$69/month |
-| Flash-Lite + batch (50% off) | ~$3.50/month | ~$35/month |
-| Gemini 3.5 Flash | ~$122/month | ~$1,215/month |
-| 3.5 Flash + batch | ~$61/month | ~$608/month |
-
-**Recommendation:** narration from a structured payload is a constrained task — Flash-Lite is very likely sufficient. Validate on real payloads before assuming you need more. Reserve the larger model for weekly summaries and parent reports, where the writing carries more weight.
-
-**Cost levers, in order:** context caching (up to 90% off input) → batch processing (50% off) → state-hash caching (unchanged state never regenerates) → model choice last.
-
-### 11.5 Implementation notes
-
-- **Claim validation is mandatory.** Extract every number and proper noun from the generated text and assert each appears in the payload. A string scan, not a second model call — costs nothing, prevents the one failure mode that would destroy trust.
-- **Cache on a state hash.** If `topic_state` and `student_state` are unchanged, do not regenerate. This is the single largest cost lever and it is entirely in your control.
-- **Degrade gracefully.** If the API is unavailable or rate-limited, surfaces fall back to insight objects rendered as structured text. The product must never be blocked on narration.
-- **SDK:** `google-genai` (Python).
-
----
-
-## 12 · The prototype
-
-### 12.1 Scope
-
-A **static frontend**. No backend, no database, no live model calls, no auth.
-
-Its job is to make a director believe the system works — not to be the system.
-
-### 12.2 Stack
-
-| Piece | Choice | Cost |
-|---|---|---|
-| Markup | Plain HTML | Free |
-| Styling | Plain CSS (no framework) | Free |
-| Interactivity | Vanilla JS | Free |
-| Charts | Chart.js from CDN | Free |
-| Data | One hardcoded `data.js` | Free |
-| Hosting | Netlify / GitHub Pages | Free |
-
-### 12.3 File layout
-
-```
-prototype/
-├── index.html          # 1. Director command center
-├── student.html        # 2. Student 360
-├── mock.html           # 3. Mock test intelligence
-├── app.html            # 4. Student phone view
-├── pilot.html          # 5. The pilot ask
-└── assets/
-    ├── style.css
-    ├── data.js         # all demo data, one file
-    └── charts.js
-```
-
-### 12.4 Do not call Gemini live in the demo
-
-Three reasons, any one sufficient:
-
-1. **An API key in client-side JavaScript is exposed** to anyone who opens devtools.
-2. **Latency in front of a buyer** is dead air you cannot fill.
-3. **A weird generation mid-pitch** costs you the room, and you cannot retry gracefully.
-
-Pre-write the narration text into `data.js`. Demo reliability beats live-ness, every time.
-
-### 12.5 Demo dataset — internally consistent seed
-
-Credibility lives here. Fake data that looks fake kills the room; real chapter names and plausible score ranges make a director lean in.
-
-**Institute:** Aarambh Classes, Kota · 312 students · 4 batches
-
-**Hero student:** Aarav Mehta · JEE 2027 · Alpha batch · Target AIR < 5000 · Mentor: Dr. S. Bhatia
-
-**Mock scores (each subject out of 100):**
-
-| Mock | Physics | Chemistry | Maths | Total /300 |
-|---|---|---|---|---|
-| 8 | 62 | 41 | 68 | 171 |
-| 9 | 58 | 38 | 64 | 160 |
-| 10 | 65 | 34 | 66 | 165 |
-| 11 | 61 | 31 | 60 | 152 |
-| 12 | 57 | 28 | 63 | 148 |
-| 13 | 54 | 26 | 58 | 138 |
-| 14 | 52 | 24 | 58 | 134 |
-
-Net: **−37 marks across 7 mocks.** Chemistry alone accounts for 17 of it.
-
-**The neglect chart — the single most persuasive visual:**
-
-| Subject | Share of study hours | Share of marks lost |
-|---|---|---|
-| Physics | 52% | 29% |
-| Chemistry | **11%** | **46%** |
-| Maths | 37% | 25% |
-
-**Mock 14 marks-lost attribution** (166 lost of 300):
-
-| Cause | Marks |
-|---|---|
-| Conceptual gap | 68 |
-| Execution error | 38 |
-| Time exhaustion | 34 |
-| Avoidable skip | 26 |
-
-> **The line that sells the product:** *"Only 68 of 166 lost marks were things he genuinely doesn't know. 98 are recoverable without learning anything new."*
-
-**Mock 14 detail:** 75 questions · 66 attempted · 40 correct · 26 wrong · 9 blank · (40×4) − 26 = **134**
-
-**Triage list for the director view** — include one recovered student; it proves the loop closes, which is what actually renews a contract:
-
-| Student | Batch | Status | Signal |
-|---|---|---|---|
-| Aarav Mehta | Alpha | **Critical** | −37 marks over 7 mocks; Chemistry 11% of study time |
-| Ishita Rao | Dropper | **Critical** | Hours up 31%, accuracy down 11 pts — overload signature |
-| Md. Faizan Ali | Beta | Watch | Attendance fine, zero practice logs in 9 days |
-| Kunal Deshpande | Alpha | Watch | Rates Rotational Motion 4/5; scores 31% on it |
-| Tanvi Shah | Dropper | Watch | Attempts 82, needs 75 — over-attempting |
-| Priya Nair | Beta | **Improving** | Flagged 3 weeks ago; Maths 44% → 67% after mentor contact |
-
----
-
-## 13 · Build stages
-
-Solo, full-time. Double the estimates if part-time.
-
-| Stage | What | Weeks | Cumulative |
-|---|---|---|---|
-| **P0** | Syllabus tree, canonical schema, multi-tenant skeleton | 1–2 | 2 |
-| **P1** | Roster + mock ingestion, column mapping, identity resolution, question→topic queue | 4–6 | 8 |
-| **P2** | Feature store, rung-0 mastery, mock analyzer | 2–3 | 11 |
-| **P3** | **Detectors, mentor console, director dashboard — FIRST SELLABLE** | 3–4 | **15** |
-| **P4** | Student PWA, study logging | 3–4 | 19 |
-| **P5** | Retention model, revision scheduler | 2–3 | 22 |
-| **P6** | Daily planner | 2–3 | 25 |
-| **P7** | Gemini narration layer | 2–3 | 28 |
-| **P8** | Parent reports, cohort analytics, mastery rungs 1–2, partitioning | ongoing | — |
-
-### Per-stage traps
-
-| Stage | Trap |
-|---|---|
-| P0 | A single global syllabus tree. Version per institute or your second customer forces a rewrite. |
-| P1 | Building OMR **scanning**. Institutes already have OMR vendors that export CSV. Build the importer. Saves a month. |
-| P2 | Skipping the rebuild-from-events command. Without it you cannot safely change the mastery model later. |
-| P3 | Firing flags on thin evidence. A console that cries wolf in week one is ignored by week three. |
-| P4 | A log form that takes three minutes. Median capture must be under 40 seconds or you collect nothing. |
-| P5 | Adopting FSRS unmodified. The objective function genuinely differs. |
-| P6 | Rolling missed work forward indefinitely. A student who skips two days must not face a 14-hour plan — that's the uninstall moment. |
-| P7 | Sending PII to the free tier. See §11.2. |
-
-**The only date that matters is week 15.** Everything before it is unpaid build; everything after can be funded by and validated against a live pilot.
-
----
-
-## 14 · Testing
-
-Three test types carry this system:
-
-| Type | What it does | Why it matters most here |
-|---|---|---|
-| **Ingestion golden files** | Real (anonymised) institute exports in → expected canonical events out | Every new institute is a new format. Your regression net against the messiest surface. |
-| **Detector replay** | Known event stream in → assert a specific flag fires or does not | **Highest-value tests you will write.** A detector that silently stops firing is invisible until a customer asks why nobody was flagged. |
-| **Rebuild equivalence** | Drop derived state, replay events, assert identical output | Proves the append-only invariant holds — what makes model upgrades and backfills safe. |
-
-**Tooling:** `pytest` + `pytest-django` + `factory_boy` + `freezegun` (for decay and cooldown logic). All free.
-
-Skip browser end-to-end tests until P4.
-
----
-
-## 15 · What not to build
-
-| Don't build | Why |
-|---|---|
-| **OMR sheet scanning** | Institutes have OMR vendors that export CSV. Import their output. Saves ~1 month, zero differentiation lost. |
-| **Your own test platform** | You integrate with what they run. Replacing it makes you a competitor to their existing vendor and doubles the sale. |
-| **Question banks / content** | Explicit positioning: not a content play. Commodity market, entrenched incumbents, ongoing production cost. |
-| **Rank prediction** | Institutes have been burned by vendors selling confident numbers. **Refusing to predict rank is a credibility asset** — say so in the pitch. |
-| **Native mobile apps** | Not before a PWA proves students will log at all. |
-| **A feature-store product** (Feast etc.) | Your feature store is two Postgres tables and a nightly job. |
-| **Kubernetes / microservices** | One machine carries the first fifty institutes. |
-| **Deep learning early** | DKT needs six figures of attempts. You will have four. |
-
----
-
-## 16 · Open problems
-
-Listed honestly — each will consume more time than the feature it sits under.
-
-1. **Question→topic mapping at scale.** Every new paper needs mapping before its results mean anything. Economics only work if it is done once per paper and reused, with LLM-proposed tags **confirmed by a human** rather than trusted.
-2. **Cold start.** Weakness detection needs history; a new student has none. Week one must be useful anyway — diagnostic test, imported past mocks, or an explicit provisional mode that says *"still learning your pattern"* rather than inventing confidence.
-3. **Self-reported data is unreliable.** Students forget, log optimistically, and bulk-log a week on Sunday. Degrade gracefully on sparse logs; cross-check against attempt data; never let a detector depend solely on self-reporting.
-4. **Attribution.** Proving your intervention caused an improvement is genuinely hard — students improve on their own, coaching runs in parallel, everyone regresses to the mean. Staggered rollout across comparable batches is the only honest answer, and it must be **designed into the pilot up front**, not reconstructed after.
-5. **Deadline-aware spaced repetition.** No library optimises for recall on a fixed future date with a frozen syllabus. Research-flavoured work.
-6. **Institute syllabus divergence.** Per-institute versioned trees with a canonical mapping underneath.
-7. **Gemini free-tier dependency.** Terms and limits have changed twice in 2026 (Pro removed from free tier in April; Cloud trial credit withdrawn in March). Keep the narration layer swappable — §2 is what makes that cheap.
-
----
-
-## 17 · Immediate next step
-
-**Stage 1 of the prototype plan: target and ask.**
-
-Two things block the demo build:
-
-1. **Who are you pitching?** A specific institute, or a generic first meeting? Size and exam mix change every number in `data.js`.
-2. **What are you asking for at the end?** Recommended: a **free 6-week pilot with one batch** — not a sale. Low bar, gets you real data, and P3 makes it deliverable the week it is signed.
-
-Once those are set, the build order is: demo dataset (§12.5, mostly done) → director view → student 360 → mock analysis → phone view → pilot page.

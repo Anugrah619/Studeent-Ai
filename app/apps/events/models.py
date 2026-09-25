@@ -46,6 +46,13 @@ class Attempt(tenancy.TenantScoped):
     )
     question_id = models.CharField(max_length=100)
     status = models.CharField(max_length=12, choices=STATUS)
+
+    # Which option they actually picked — "A".."D", or blank if unattempted.
+    #
+    # This one field is the difference between "Aarav got it wrong" and
+    # "Aarav chose the option that a specific wrong belief produces, on four
+    # separate questions". Without it no diagnosis is possible, only a score.
+    chosen_option = models.CharField(max_length=2, blank=True)
     time_spent = models.IntegerField(null=True, blank=True)      # seconds; often absent
     marks = models.FloatField(default=0)                         # after negative marking
     source = models.CharField(max_length=10, choices=SOURCE, default=MOCK)

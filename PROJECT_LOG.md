@@ -24,7 +24,13 @@ Source doc: `Ai Student Performance System Concept Note.pdf`
 
 ---
 
-> **This file is backward-looking** (decisions + why). For what to do next, see [`TASKS.md`](TASKS.md).
+> **This file is backward-looking** (decisions + why). Start at [`README.md`](README.md); for what to do next see [`TASKS.md`](TASKS.md); for the spec see [`TECHNICAL_DOC.md`](TECHNICAL_DOC.md).
+
+## 🔄 GOAL RESTATED — 25 Sep 2026
+
+The product is **a domain LLM for exam preparation**, not a dashboard with AI-generated captions. It works out *what a student misunderstands*, and Gemini's reasoning transcripts train our own model alongside.
+
+**Three earlier positions are now reversed (decisions 41–43 below).** Docs consolidated from 8 files to 5 on the same date — `LLM_ARCHITECTURE.md`, `SYSTEM_DESIGN.md`, `WORKFLOW.md`, `AGENT_HANDOFF.md`, `architecture.html` and `build-plan.html` were deleted after folding their content into `TECHNICAL_DOC.md` v2.0. All recoverable from git history.
 >
 > **Canonical docs (v0.2):** [`TASKS.md`](TASKS.md) (task tracker) · [`TECHNICAL_DOC.md`](TECHNICAL_DOC.md) (full spec) · [`WORKFLOW.md`](WORKFLOW.md) (diagrams) · [`SYSTEM_DESIGN.md`](SYSTEM_DESIGN.md) (schema + system design, written for review). The earlier `architecture.html` / `build-plan.html` artifacts remain accurate on architecture and reasoning, but where they name Claude, Redis, or paid hosting they are **superseded**.
 
@@ -66,6 +72,14 @@ Next step: Stage 1 — name the target institute and the ask, then cut demo scop
 18. **Don't build:** OMR scanning (institutes have vendors — import their CSV), own test platform, content/question banks, rank prediction, native apps pre-PWA, a real feature-store product, k8s/microservices, deep learning before ~100k attempts.
 19. **~15 weeks solo full-time to first sellable unit (P0–P3).** Everything after P4 is better built against a paying pilot's data than against assumptions.
 
+### Reversals 2026-09-25 (v2.0) — these override decisions 5, 28, 29 and 30
+41. **Gemini does the reasoning, not just the phrasing.** Decision 5 ("the LLM narrates, it never computes") was half right. Correct half: computing rolling accuracy with an LLM is bad engineering — arithmetic over 24k rows, 12,480 calls/day for a worse answer than a window function gives free. **Wrong half:** treating diagnosis, causal analysis and planning as "narration". Those are judgement tasks where an LLM is the right tool and a rules engine is far worse. The rule is now: *a number that must be exact and is computable by counting* → deterministic; *a judgement a good teacher makes differently from a bad one* → LLM.
+42. **Distillation does apply — decision 30 was wrong.** "Labels are free" holds for knowledge tracing (right/wrong is ground truth). It does **not** hold for reasoning: there is no ground truth for *"what misconception does this pattern reveal?"* Gemini's traces are the training signal. `ReasoningTrace` captures every call, and a mentor confirming a diagnosis converts a teacher-model guess into a human-validated example — which is what makes the corpus worth more than raw Gemini output.
+43. **The blocker is content, not architecture.** `Attempt` records right/wrong but **not which option the student chose**; `question_text` is populated on 0 of 525 rows; options and solutions don't exist. The richest prompt constructible today is *"got Q17 wrong, topic Rotational Motion"* — from which no model produces a diagnosis. The apparent ceiling was never the model; it was the input.
+44. **Misconception taxonomy is the IP.** Every wrong option tagged with the specific mistake that produces it (`MIS-ROT-AXIS` = used the centre-of-mass axis). One student picking a distractor once is noise; the same misconception across four questions is an evidenced, falsifiable, marks-quantified diagnosis. Built from our own data; an API key doesn't buy it.
+45. **Fake data must contain the patterns we intend to detect.** The current seeder ranks questions by latent ability and marks the top *c* correct, producing flat-0% students and structureless wrong answers. A diagnosis engine over that finds nothing because nothing is there. Regenerating answers with *consistent per-student misconception patterns* is the most underestimated task in the plan.
+46. **Fine-tune, never train from scratch.** Qwen/Llama 8B on accumulated traces. From-scratch training costs millions and buys nothing.
+
 ### Revisions 2026-09-17 (v0.2) — these override 12–19 where they conflict
 20. **LLM is Gemini, not Claude.** Cost-driven. Free tier caps at **500 requests/day** (~500 students at one nudge each) and Pro models left the free tier on 1 Apr 2026 — Flash/Flash-Lite only. Paid: Flash-Lite $0.10/$0.40 per 1M (~$69/mo at 10k students, ~$35 batched); 3.5 Flash $1.50/$9.00.
 21. **PII must be stripped before every Gemini call.** Google's free-tier terms allow submitted content to train their products *with human review*, and tell users not to send personal information. Users here are minors. Send opaque refs (`S-4471`) + topic names + numbers only; re-identify locally after generation. Costs nothing — the payload is already structured.
@@ -105,6 +119,15 @@ Next step: Stage 1 — name the target institute and the ask, then cut demo scop
 ---
 
 ## Session Log
+
+### 2026-09-25 — content agent: question bank + misconception taxonomy (branch `agent/content`)
+- **Question bank 15 → 46**, so "Mock 15 — Diagnostic" reads as a paper rather than a sample. Split Physics 15 / Chemistry 16 / Maths 15 (Chemistry carries the extra because two hero signatures live there). Every key verified by hand; every chapter checked against the seeded syllabus tree.
+- **Taxonomy 6 → 15 misconceptions**, taking in the rest of `TECHNICAL_DOC.md` §4's starter list: field/force sign errors, average vs instantaneous velocity, relative-velocity frame, catalyst-shifts-equilibrium, σ/π miscount, hybridisation-from-formula, roots kept after squaring, inverse-trig range, modulus sign cases. `description` is now written **in the student's voice as the belief they hold**, and `remedy` as a lesson a teacher can actually run — both fields go straight into the model's prompt, so they are what let it explain *why*.
+- **Counter-evidence is now a designed feature, not an accident.** Questions carry `counter_to`: same chapter, trigger removed (directing group stated, axis is the tabulated one, alkene symmetric, substitution handed over), and **no option tagged with that code**. The seeder makes the hero answer those correctly. That is what produces "on the two questions where the directing group was stated, he was correct — this is a specific trigger, not a topic gap". The seeder refuses to run if a question claims to be counter-evidence for a code it also baits.
+- **Signature strength made deterministic.** The old per-question hit-rate coin flip left only a ~14% chance all four heroes cleared five-of-six, so a later bank edit could silently produce a demo with no detectable pattern. Replaced with a fixed miss count (drawn from the *easiest* baited questions, since a hero who gets the hard one right and the easy ones wrong invites the obvious objection).
+- **New `manage.py verify_signatures`** proves the pattern from the database with raw SQL, not from the generator. Per hero: bait-take rate vs the cohort rate on the same questions, exact binomial p-value, lift, share of wrong answers, counter-evidence hits. Also measures the *adversarially chosen* control — the non-hero whose errors clump hardest across all 280 student × misconception cells. Exits non-zero on failure and runs automatically at the end of `seed_questions`, so "seeded" and "provable" are one step.
+- Also fixed: `--reset` crashed on `Attempt.test_paper` being PROTECT; option labels are now shuffled at seed time (the bank is written correct-answer-first for readability, but a paper where every answer is (A) is not believable); question ids zero-padded so `ordering` sorts them as a paper.
+- Result: Aarav 5/6 EAS (21% cohort, p=0.0018), Kunal 5/6 axis (17%, p=0.0008), Tanvi 5/6 chain (21%, p=0.0018), Ishita 4/5 Markovnikov (13%, p=0.0013); all 2/2 on counter-evidence. Strongest control 2/3 at p=0.051 with errors spread over four unrelated beliefs. 89 tests green.
 
 ### 2026-09-16
 - Read and summarized `Ai Student Performance System Concept Note.pdf`.

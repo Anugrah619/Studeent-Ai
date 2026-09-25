@@ -47,6 +47,7 @@ LOCAL_APPS = [
     "apps.events",
     "apps.ingestion",
     "apps.derived",
+    "apps.reasoning",
     "apps.api",
 ]
 
@@ -155,6 +156,16 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=["http://localhost:5173", "http://127.0.0.1:5173"],
 )
 CORS_ALLOW_CREDENTIALS = True
+
+
+# ------------------------------------------------------- reasoning layer
+
+# Google AI Studio key. Absent is a supported state: the reasoning layer
+# replays cached traces and otherwise reports that it cannot run. It never
+# fabricates a diagnosis — a made-up finding presented as the model's is
+# the one failure this product could not survive.
+GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
+GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-2.5-flash")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
