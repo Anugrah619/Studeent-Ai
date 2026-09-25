@@ -38,7 +38,14 @@ const common = {
   packages: "external",
   alias: { "@": resolve(root, "src") },
   define: {
+    // Keep in step with `src/vite-env.d.ts`. esbuild substitutes these by exact
+    // text, so a key the app reads and this block omits survives into the
+    // bundle as a literal `import.meta.env.X` — and `import.meta` has no `env`
+    // under plain Node, so the suite throws on import rather than failing an
+    // assertion, which reads like a broken module and not a missing define.
+    "import.meta.env.VITE_USE_MOCKS": '"true"',
     "import.meta.env.VITE_API_MOCK": '"true"',
+    "import.meta.env.VITE_API_BASE": '""',
     "import.meta.env.BASE_URL": '"/"',
     "import.meta.env.DEV": "false",
     "import.meta.env.PROD": "true",

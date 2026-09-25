@@ -121,14 +121,36 @@ test("mock intelligence renders the attribution and the recoverable line", async
     body.includes("Recoverable without learning anything new"),
     "hero label",
   );
-  assert.ok(body.includes("98"), "recoverable marks");
-  assert.ok(body.includes("166"), "total lost");
+  // The denominator is the point. 61 is quoted against the 90 marks the engine
+  // will explain, not against all 166 lost — quoting it against 166 would
+  // silently assert that the other 76 were understood.
+  assert.ok(body.includes("61"), "recoverable marks");
+  assert.ok(
+    body.includes("of the 90 marks we can explain"),
+    "the hero names the attributed denominator",
+  );
+  assert.ok(body.includes("166"), "total lost is still shown");
+  assert.match(body, /68%/, "the rate is the server's, over what we can explain");
+  assert.ok(
+    !body.includes("37%"),
+    "the old total_lost denominator appears nowhere",
+  );
+
+  // The unattributed bucket is shown and explained, never folded into the gap.
+  assert.ok(body.includes("Not enough evidence"), "the fifth bucket is named");
+  assert.ok(body.includes("No call made yet"), "and is neither teach nor drill");
+  assert.ok(
+    body.includes("are not attributed to any cause"),
+    "the honest sentence is on screen",
+  );
+  assert.ok(body.includes("76"), "the unattributed marks are counted in public");
 
   for (const cause of [
     "Conceptual gap",
     "Execution error",
     "Time exhaustion",
     "Avoidable skip",
+    "Not enough evidence",
   ]) {
     assert.ok(body.includes(cause), `cause card: ${cause}`);
   }
@@ -136,11 +158,16 @@ test("mock intelligence renders the attribution and the recoverable line", async
   const segments = Array.from(
     document.querySelectorAll("button[aria-label*='marks,']"),
   );
-  assert.equal(segments.length, 4, "four stacked segments");
+  assert.equal(segments.length, 5, "five stacked segments");
   assert.match(
     segments[0].getAttribute("aria-label") ?? "",
-    /^Conceptual gap: 68 marks/,
+    /^Conceptual gap: 29 marks/,
     "each segment speaks its own value",
+  );
+  assert.match(
+    segments[4].getAttribute("aria-label") ?? "",
+    /^Not enough evidence: 76 marks/,
+    "the bucket the engine declines to call is last, and speaks too",
   );
 
   await act(async () => root.unmount());
@@ -156,6 +183,197 @@ test("every chart offers a table view", async () => {
   await click(toggles[0]);
   await waitFor(() => text().includes("AIT Mock 08"));
   assert.ok(text().includes("171"), "values reachable without the chart");
+
+  await act(async () => root.unmount());
+});
+
+/* ------------------------------------------------------------------ *
+ * The AI diagnosis card
+ *
+ * The one panel whose failure modes are load-bearing: 503 and 422 are as much
+ * a part of the demo as the diagnosis itself, and `pattern_found: false` is an
+ * answer rather than an empty state. Each gets its own assertion.
+ * ------------------------------------------------------------------ */
+
+function diagnosisCard(): string {
+  const el = document.querySelector("section[aria-labelledby='diagnosis-eyebrow']");
+  assert.ok(el, "the diagnosis card is on the page");
+  return el!.textContent ?? "";
+}
+
+test("the diagnosis card leads with the headline and shows its evidence", async () => {
+  const root = await renderAt("/students/1");
+  await waitFor(() => diagnosisCard().includes("directing-effects"), {
+    timeout: 8000,
+  });
+
+  const card = diagnosisCard();
+
+  // The claim, in one sentence, at the top.
+  assert.match(card, /one rule backwards/, "the headline is the hero");
+  assert.ok(card.includes("AIT Mock 14"), "the paper being diagnosed");
+
+  // The evidence is visible, not buried: code, confidence, question ids, marks.
+  assert.ok(card.includes("MIS-ORG-EAS"), "misconception code");
+  assert.ok(card.includes("High confidence"), "confidence is spoken, not colour");
+  assert.ok(card.includes("Medium confidence"), "the weaker hypothesis too");
+  for (const q of ["D1", "D2", "D3", "D4"]) {
+    assert.ok(card.includes(q), `evidence question ${q}`);
+  }
+  assert.match(card, /20\s*marks at stake/, "marks at stake on the hypothesis");
+  assert.match(
+    card,
+    /28 marks\s*at stake across 2 findings/,
+    "the total is named as a total, not left to contradict the headline",
+  );
+
+  // The line the whole pitch rests on, at body size and with its own heading.
+  assert.ok(
+    card.includes("Why this is a trigger, not a topic gap"),
+    "counter-evidence has its own block",
+  );
+  assert.ok(
+    card.includes("he was correct both times"),
+    "counter-evidence text is rendered",
+  );
+
+  assert.ok(card.includes("Do this week"), "recommended action");
+  assert.ok(card.includes("one 40-minute sitting"), "time to fix");
+  assert.ok(card.includes("rsn_"), "the trace id is on screen");
+
+  await act(async () => root.unmount());
+});
+
+test("agreeing with a diagnosis records the verdict", async () => {
+  const root = await renderAt("/students/2");
+  await waitFor(() => diagnosisCard().includes("limiting reagent"), {
+    timeout: 8000,
+  });
+
+  assert.ok(
+    diagnosisCard().includes("Does this match what you see in class?"),
+    "the question is asked before an answer exists",
+  );
+  assert.ok(
+    diagnosisCard().includes("trains the system"),
+    "the card says what the verdict does",
+  );
+
+  const agree = buttons().find((b) => b.textContent?.trim() === "Agree");
+  assert.ok(agree, "an Agree button exists");
+  await click(agree!);
+
+  // The POST carries the CSRF header or the mock answers 403 — so reaching the
+  // recorded state is also the assertion that the client sent it.
+  await waitFor(() => diagnosisCard().includes("You agreed with this diagnosis"), {
+    timeout: 8000,
+  });
+
+  await act(async () => root.unmount());
+});
+
+test("no systematic pattern renders as an answer, not an empty card", async () => {
+  const root = await renderAt("/students/3");
+  await waitFor(() => diagnosisCard().includes("No systematic pattern"), {
+    timeout: 8000,
+  });
+
+  const card = diagnosisCard();
+  assert.ok(card.includes("scattered carelessness"), "the honest reading");
+  assert.ok(
+    card.includes("invent a misconception"),
+    "the card says why it is empty of hypotheses",
+  );
+  assert.ok(card.includes("Do this week"), "there is still an action");
+  assert.ok(!card.includes("Rests on"), "no hypotheses are shown");
+
+  await act(async () => root.unmount());
+});
+
+test("503 and 422 are told apart and neither reads as a crash", async () => {
+  // 503 — the reasoning layer is not configured on this deployment.
+  let root = await renderAt("/students/5");
+  await waitFor(() => diagnosisCard().includes("reasoning layer"), {
+    timeout: 8000,
+  });
+  let card = diagnosisCard();
+  assert.ok(
+    card.includes("The reasoning layer is not connected yet"),
+    "503 explains itself",
+  );
+  assert.ok(
+    card.includes("instead of a number it made up"),
+    "503 is calm, not an error",
+  );
+  assert.ok(!card.includes("Could not load this panel"), "not the red error state");
+  await act(async () => root.unmount());
+
+  // 422 — it is connected, and honestly has too little to reason over.
+  root = await renderAt("/students/4");
+  await waitFor(() => diagnosisCard().includes("tagged evidence"), {
+    timeout: 8000,
+  });
+  card = diagnosisCard();
+  assert.ok(
+    card.includes("Not enough tagged evidence on this paper"),
+    "422 is its own state",
+  );
+  assert.ok(
+    !card.includes("reasoning layer is not connected"),
+    "422 does not borrow the 503 copy",
+  );
+  await act(async () => root.unmount());
+});
+
+test("neglect-chart value labels stay attached to short bars", async () => {
+  const root = await renderAt("/students/1");
+  await waitFor(() => text().includes("Where the time goes"));
+
+  const labels = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-label-placement]"),
+  );
+  assert.equal(labels.length, 6, "two labels per subject row");
+
+  const by = (value: string) =>
+    labels.find((el) => el.textContent?.trim() === value);
+
+  // Chemistry's 11% time share is the case that broke: at this width the bar
+  // is too short to hold a number, so the label moves outside it.
+  const chemTime = by("11%");
+  assert.ok(chemTime, "the 11% label is rendered");
+  assert.equal(
+    chemTime!.getAttribute("data-label-placement"),
+    "outside",
+    "a short bar puts its label outside",
+  );
+  // And takes the ink for the surface it is now on, not the bar's.
+  assert.equal(
+    chemTime!.style.color,
+    "var(--foreground)",
+    "an outside label is inked for the card, not the fill",
+  );
+
+  // Its long neighbour keeps its label inside, in the ink verified for that
+  // fill — which is the whole reason the flip has to exist.
+  const chemLost = by("46%");
+  assert.ok(chemLost, "the 46% label is rendered");
+  assert.equal(chemLost!.getAttribute("data-label-placement"), "inside");
+  assert.equal(chemLost!.style.color, "var(--subject-chemistry-ink)");
+
+  // Whichever side it lands on, a label is a sibling of its own bar — never
+  // parked at the column edge with white space between it and the mark.
+  for (const label of labels) {
+    const placement = label.getAttribute("data-label-placement");
+    if (placement === "inside") {
+      assert.ok(
+        (label.parentElement?.style.width ?? "").endsWith("%"),
+        "an inside label's parent is the bar itself",
+      );
+    } else {
+      const siblings = Array.from(label.parentElement?.children ?? []);
+      assert.equal(siblings.length, 2, "outside label sits next to its bar alone");
+    }
+  }
 
   await act(async () => root.unmount());
 });

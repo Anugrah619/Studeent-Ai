@@ -39,7 +39,7 @@ export function DirectorConsole() {
   const closedFlags = useFlags(false);
 
   const studentById = useMemo(
-    () => new Map((students.data?.results ?? []).map((s) => [s.id, s])),
+    () => new Map((students.data ?? []).map((s) => [s.id, s])),
     [students.data],
   );
 
@@ -95,7 +95,7 @@ export function DirectorConsole() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All batches</SelectItem>
-                {(batches.data?.results ?? []).map((item) => (
+                {(batches.data ?? []).map((item) => (
                   <SelectItem key={item.id} value={String(item.id)}>
                     {item.name} · {item.exam_code} {item.year} ({item.student_count})
                   </SelectItem>

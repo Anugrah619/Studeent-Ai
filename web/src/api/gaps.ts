@@ -26,6 +26,34 @@ export const API_GAPS = {
   NO_SESSION_ENDPOINT: "No /api/me/ or /api/institute/ endpoint",
   /** Intervention requires a mentor id but no mentor list endpoint exists. */
   NO_MENTOR_LIST: "InterventionRequest.mentor has no source endpoint",
+  /**
+   * The two reasoning-layer routes are live in the API but absent from the copy
+   * of `openapi.yaml` this worktree generates from, so `Diagnosis` and its
+   * verdict body are hand-written in `api/diagnosis.ts` instead of generated.
+   */
+  DIAGNOSIS_NOT_IN_CONTRACT:
+    "GET /api/students/{id}/diagnosis/ is not in openapi.yaml",
+  DIAGNOSIS_VERDICT_NOT_IN_CONTRACT:
+    "POST /api/students/{id}/diagnosis/verdict/ is not in openapi.yaml",
+  /** Nothing says whether a question id is an int pk or a paper label ("D3"). */
+  DIAGNOSIS_EVIDENCE_ID_TYPE:
+    "Diagnosis.hypotheses[].evidence_questions has no documented element type",
+  /** No documented link from a question id to anything the UI can open. */
+  DIAGNOSIS_EVIDENCE_NOT_LINKABLE:
+    "Diagnosis evidence question ids have no lookup endpoint",
+  /**
+   * `MarksLost` gained `insufficient_evidence`, `attributed_lost` and
+   * `recoverable_pct`, and `CauseEnum` gained a fifth member, after this
+   * worktree's `openapi.yaml` was generated. Patched in `api/types.ts`.
+   */
+  MARKS_LOST_FIFTH_CAUSE:
+    "openapi.yaml here predates MarksLost.insufficient_evidence / attributed_lost / recoverable_pct",
+  /** `TopicState.accuracy_30d` was dropped; this stale copy still declares it. */
+  TOPIC_STATE_ACCURACY_30D_REMOVED:
+    "openapi.yaml here still declares the removed TopicState.accuracy_30d",
+  /** Nothing says which denominator `MarksLostCause.share_pct` now divides by. */
+  MARKS_LOST_CAUSE_SHARE_DENOMINATOR:
+    "MarksLostCause.share_pct does not say whether it is of total_lost or attributed_lost",
 } as const;
 
 export type ApiGap = keyof typeof API_GAPS;

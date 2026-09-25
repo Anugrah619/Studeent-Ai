@@ -26,5 +26,8 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["test"]
+  // `src/vite-env.d.ts` carries the `ImportMetaEnv` augmentation. The suite
+  // pulls `src/**` in transitively through `test/smoke.test.tsx`, so without
+  // it every `import.meta.env.X` in the app is an error in this project only.
+  "include": ["test", "src/vite-env.d.ts"]
 }
