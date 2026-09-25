@@ -82,9 +82,21 @@ export function subjectBreakdownFor(studentId: number): SubjectBreakdown[] {
  * Marks-lost attribution
  * ------------------------------------------------------------------ */
 
-/** Mock 14, Aarav: 68 conceptual of 166 lost — 98 recoverable. */
-const PINNED_MARKS_LOST: Record<string, [number, number, number, number]> = {
-  "1:14": [68, 38, 34, 26],
+/**
+ * Mock 14, Aarav — the worked example the pitch quotes.
+ *
+ * 166 lost. 76 of them sit in `insufficient_evidence`: chapters he has barely
+ * attempted, where calling the loss a proven conceptual gap would be a guess.
+ * That leaves 90 the engine will actually explain, of which 61 are recoverable
+ * — "61 of the 90 we can explain", not "61 of your 166 marks".
+ *
+ * The order is [conceptual, execution, time, skip, insufficient].
+ */
+const PINNED_MARKS_LOST: Record<
+  string,
+  [number, number, number, number, number]
+> = {
+  "1:14": [29, 24, 21, 16, 76],
 };
 
 export function marksLostFor(studentId: number, paperId: number): MarksLost | undefined {
@@ -94,21 +106,28 @@ export function marksLostFor(studentId: number, paperId: number): MarksLost | un
   const total = MAX_MARKS - row.total;
   const pinned = PINNED_MARKS_LOST[`${studentId}:${paperId}`];
   const rand = mulberry32(hashSeed("lost", studentId, paperId));
-  const [conceptual, execution, time, skip] =
+  const [conceptual, execution, time, skip, insufficient] =
     pinned ??
     splitInteger(total, [
-      0.40 + (rand() - 0.5) * 0.1,
-      0.24 + (rand() - 0.5) * 0.08,
-      0.21 + (rand() - 0.5) * 0.08,
+      0.18 + (rand() - 0.5) * 0.06,
       0.15 + (rand() - 0.5) * 0.06,
+      0.13 + (rand() - 0.5) * 0.05,
+      0.10 + (rand() - 0.5) * 0.04,
+      // The unattributed bucket is the largest on most papers, because most
+      // students have barely touched most chapters. The engine saying so is
+      // the point of the field.
+      0.44 + (rand() - 0.5) * 0.08,
     ]);
 
-  const totalLost = conceptual + execution + time + skip;
+  const totalLost = conceptual + execution + time + skip + insufficient;
+  const attributedLost = conceptual + execution + time + skip;
+  const recoverable = execution + time + skip;
   const causes: [MarksLost["causes"][number]["cause"], number][] = [
     ["conceptual_gap", conceptual],
     ["execution_error", execution],
     ["time_exhaustion", time],
     ["avoidable_skip", skip],
+    ["insufficient_evidence", insufficient],
   ];
 
   return {
@@ -127,9 +146,18 @@ export function marksLostFor(studentId: number, paperId: number): MarksLost | un
     execution_error: execution,
     time_exhaustion: time,
     avoidable_skip: skip,
+    // Counted in the total, deliberately absent from `attributed_lost`.
+    insufficient_evidence: insufficient,
     total_lost: totalLost,
+    attributed_lost: attributedLost,
     // Everything except a genuine conceptual gap needs no new learning.
-    recoverable: execution + time + skip,
+    recoverable,
+    // The server publishes this rather than leaving the UI to pick a
+    // denominator, because the UI picked the wrong one. Share of what we can
+    // explain, not of everything that went missing.
+    recoverable_pct: attributedLost
+      ? round((recoverable / attributedLost) * 100, 1)
+      : null,
 
     // The student's own median seconds-per-correct-answer. The backend uses
     // it as the pace baseline that separates "wrong but knew it" from
@@ -137,7 +165,7 @@ export function marksLostFor(studentId: number, paperId: number): MarksLost | un
     // answers to trust, in which case the time rule was not applied.
     time_baseline_sec: 94.5,
 
-    // Chart-ready form of the same four numbers.
+    // Chart-ready form of the same five numbers.
     causes: causes.map(([cause, marks]) => ({
       cause,
       marks,
@@ -213,7 +241,9 @@ export function topicStatesFor(studentId: number): TopicState[] {
       retention,
       attempts_n: attempts,
       correct_n: correct,
-      accuracy_30d: round(clamp(mastery * 100 + (rand() - 0.5) * 16, 4, 98), 1),
+      // `accuracy_30d` used to sit here. It left the contract — see
+      // API_GAPS.TOPIC_STATE_ACCURACY_30D_REMOVED — so the fixture must stop
+      // serving it too, or the mocks would keep a dead field alive.
       exposure_min: Math.round(40 + rand() * 520),
       avg_time_spent: round(70 + rand() * 130, 1),
       self_rating: selfRating,

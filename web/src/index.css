@@ -147,6 +147,11 @@
     --cause-execution: #5b3aa8;
     --cause-time: #8267cc;
     --cause-skip: #b4a3e3;
+    /* NOT a step on the ramp. The bucket the engine declines to attribute is
+       achromatic so it reads as "no claim made" rather than as a fifth,
+       lightest cause — and so it can never be read as a severity. Takes
+       near-black ink (#0f0f0f) at 6.0:1. */
+    --cause-unattributed: #8e8e8e;
 
     --status-good: #0e7c57;
     --status-warn: #9a6b12;
@@ -174,6 +179,10 @@
     --cause-execution: #9a7fe0;
     --cause-time: #b8a2ea;
     --cause-skip: #d6c9f3;
+    /* Lighter than the light-theme value so it separates from the dark card,
+       and still plainly achromatic beside the lavender end of the ramp. Same
+       near-black ink, 8.3:1. */
+    --cause-unattributed: #a8a8a8;
 
     --status-good: #35c295;
     --status-warn: #e0b14a;

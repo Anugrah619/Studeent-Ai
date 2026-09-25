@@ -121,14 +121,36 @@ test("mock intelligence renders the attribution and the recoverable line", async
     body.includes("Recoverable without learning anything new"),
     "hero label",
   );
-  assert.ok(body.includes("98"), "recoverable marks");
-  assert.ok(body.includes("166"), "total lost");
+  // The denominator is the point. 61 is quoted against the 90 marks the engine
+  // will explain, not against all 166 lost — quoting it against 166 would
+  // silently assert that the other 76 were understood.
+  assert.ok(body.includes("61"), "recoverable marks");
+  assert.ok(
+    body.includes("of the 90 marks we can explain"),
+    "the hero names the attributed denominator",
+  );
+  assert.ok(body.includes("166"), "total lost is still shown");
+  assert.match(body, /68%/, "the rate is the server's, over what we can explain");
+  assert.ok(
+    !body.includes("37%"),
+    "the old total_lost denominator appears nowhere",
+  );
+
+  // The unattributed bucket is shown and explained, never folded into the gap.
+  assert.ok(body.includes("Not enough evidence"), "the fifth bucket is named");
+  assert.ok(body.includes("No call made yet"), "and is neither teach nor drill");
+  assert.ok(
+    body.includes("are not attributed to any cause"),
+    "the honest sentence is on screen",
+  );
+  assert.ok(body.includes("76"), "the unattributed marks are counted in public");
 
   for (const cause of [
     "Conceptual gap",
     "Execution error",
     "Time exhaustion",
     "Avoidable skip",
+    "Not enough evidence",
   ]) {
     assert.ok(body.includes(cause), `cause card: ${cause}`);
   }
@@ -136,11 +158,16 @@ test("mock intelligence renders the attribution and the recoverable line", async
   const segments = Array.from(
     document.querySelectorAll("button[aria-label*='marks,']"),
   );
-  assert.equal(segments.length, 4, "four stacked segments");
+  assert.equal(segments.length, 5, "five stacked segments");
   assert.match(
     segments[0].getAttribute("aria-label") ?? "",
-    /^Conceptual gap: 68 marks/,
+    /^Conceptual gap: 29 marks/,
     "each segment speaks its own value",
+  );
+  assert.match(
+    segments[4].getAttribute("aria-label") ?? "",
+    /^Not enough evidence: 76 marks/,
+    "the bucket the engine declines to call is last, and speaks too",
   );
 
   await act(async () => root.unmount());

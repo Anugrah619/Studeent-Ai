@@ -14,6 +14,7 @@ import {
   type DiagnosisVerdictBody,
 } from "./diagnosis";
 import { API_GAPS } from "./gaps";
+import { coerceMarksLost } from "./marksLost";
 import type {
   Batch,
   DashboardSummary,
@@ -135,14 +136,21 @@ export function useTopicStates(id: number) {
   });
 }
 
+/**
+ * `coerceMarksLost` is not decoration. The generated row is a version behind on
+ * the three fields that decide the denominator every rate on the mock screen is
+ * quoted against — see `api/marksLost.ts`.
+ */
 export function useMarksLost(id: number, paper: number) {
   return useQuery<MarksLost, Error>({
     queryKey: qk.marksLost(id, paper),
-    queryFn: () =>
-      apiGet("/api/students/{id}/marks-lost/", {
-        path: { id },
-        query: { paper },
-      }),
+    queryFn: async () =>
+      coerceMarksLost(
+        await apiGet("/api/students/{id}/marks-lost/", {
+          path: { id },
+          query: { paper },
+        }),
+      ),
     enabled: Number.isFinite(id) && Number.isFinite(paper),
   });
 }

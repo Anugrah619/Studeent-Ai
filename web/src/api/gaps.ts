@@ -41,6 +41,19 @@ export const API_GAPS = {
   /** No documented link from a question id to anything the UI can open. */
   DIAGNOSIS_EVIDENCE_NOT_LINKABLE:
     "Diagnosis evidence question ids have no lookup endpoint",
+  /**
+   * `MarksLost` gained `insufficient_evidence`, `attributed_lost` and
+   * `recoverable_pct`, and `CauseEnum` gained a fifth member, after this
+   * worktree's `openapi.yaml` was generated. Patched in `api/types.ts`.
+   */
+  MARKS_LOST_FIFTH_CAUSE:
+    "openapi.yaml here predates MarksLost.insufficient_evidence / attributed_lost / recoverable_pct",
+  /** `TopicState.accuracy_30d` was dropped; this stale copy still declares it. */
+  TOPIC_STATE_ACCURACY_30D_REMOVED:
+    "openapi.yaml here still declares the removed TopicState.accuracy_30d",
+  /** Nothing says which denominator `MarksLostCause.share_pct` now divides by. */
+  MARKS_LOST_CAUSE_SHARE_DENOMINATOR:
+    "MarksLostCause.share_pct does not say whether it is of total_lost or attributed_lost",
 } as const;
 
 export type ApiGap = keyof typeof API_GAPS;

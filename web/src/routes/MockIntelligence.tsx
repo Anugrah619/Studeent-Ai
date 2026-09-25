@@ -4,7 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { useMarksLost, useMockScores, useStudent } from "@/api/queries";
 import { MarksLostBar } from "@/components/charts/MarksLostBar";
 import { ErrorState, PanelSkeleton } from "@/components/common/States";
-import { causeSlices } from "@/lib/causes";
+import { causeSlices, marksLostTotals } from "@/lib/causes";
 import { longDate, num, pct } from "@/lib/format";
 import { SUBJECT_LIST } from "@/lib/subjects";
 import {
@@ -36,6 +36,12 @@ export function MockIntelligence() {
   );
 
   const error = student.error ?? marksLost.error;
+
+  /**
+   * The denominators, resolved once. Null until the data lands, which is also
+   * what narrows both to non-null inside the loaded branch below.
+   */
+  const totals = marksLost.data ? marksLostTotals(marksLost.data) : null;
 
   return (
     <div className="space-y-6 py-6">
@@ -115,14 +121,19 @@ export function MockIntelligence() {
         </section>
       ) : null}
 
-      {marksLost.isPending || !marksLost.data ? (
+      {marksLost.isPending || !marksLost.data || !totals ? (
         <>
           <Skeleton className="h-28 rounded-xl" />
           <PanelSkeleton lines={4} />
         </>
       ) : (
         <>
-          {/* The one hero figure on this view. */}
+          {/* The one hero figure on this view.
+              The denominator here is `attributed_lost`, never `total_lost`.
+              "61 of the 90 we can explain" is a claim the engine can defend;
+              "61 of your 166 marks" quietly asserts that the other 105 were
+              also understood, which is the thing it was just changed to stop
+              doing. */}
           <section className="rounded-xl border border-border bg-card px-6 py-5">
             <p className="text-xs font-medium text-muted-foreground">
               Recoverable without learning anything new
@@ -132,7 +143,7 @@ export function MockIntelligence() {
                 {num(marksLost.data.recoverable)}
               </span>
               <span className="text-lg text-muted-foreground">
-                of {num(marksLost.data.total_lost)} marks lost
+                of the {num(totals.attributed)} marks we can explain
               </span>
             </p>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -142,12 +153,32 @@ export function MockIntelligence() {
               </strong>{" "}
               went to things this student genuinely does not know. The rest went
               to execution, the clock, and questions he could have answered and
-              did not — {pct(
-                (marksLost.data.recoverable / (marksLost.data.total_lost || 1)) * 100,
-              )}{" "}
-              of the loss, addressable with drilling and paper strategy rather
-              than more teaching.
+              did not
+              {totals.recoverablePct === null
+                ? ""
+                : ` — ${pct(totals.recoverablePct)} of the explained loss`}
+              , addressable with drilling and paper strategy rather than more
+              teaching.
             </p>
+            {totals.unattributed > 0 ? (
+              <p className="mt-2.5 flex max-w-2xl gap-2.5 text-sm leading-relaxed text-muted-foreground">
+                <span
+                  aria-hidden
+                  className="mt-[7px] h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                  style={{ background: "var(--cause-unattributed)" }}
+                />
+                <span>
+                  A further{" "}
+                  <strong className="font-semibold text-foreground">
+                    {num(totals.unattributed)} marks
+                  </strong>{" "}
+                  of the {num(totals.totalLost)} lost are not attributed to any
+                  cause. Those questions come from chapters he has barely
+                  attempted, so calling them a proven gap would be a guess. They
+                  are counted, shown, and left uncalled.
+                </span>
+              </p>
+            ) : null}
           </section>
 
           <MarksLostBar
@@ -156,7 +187,7 @@ export function MockIntelligence() {
             scored={row?.total}
           />
 
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {causeSlices(marksLost.data).map((slice) => (
               <article
                 key={slice.key}
@@ -181,8 +212,16 @@ export function MockIntelligence() {
                 <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
                   {slice.meaning}.
                 </p>
+                {/* Three outcomes, not two. The unattributed bucket is neither
+                    a teaching job nor a drilling job — it is a question the
+                    engine has not earned the right to answer yet, and saying
+                    so is more useful than filing it under either. */}
                 <p className="mt-2 text-[11px] font-medium">
-                  {slice.needsNewLearning ? (
+                  {!slice.attributed ? (
+                    <span className="text-muted-foreground">
+                      No call made yet
+                    </span>
+                  ) : slice.needsNewLearning ? (
                     <span className="text-status-warn">Needs teaching</span>
                   ) : (
                     <span className="text-status-good">Needs drilling</span>
