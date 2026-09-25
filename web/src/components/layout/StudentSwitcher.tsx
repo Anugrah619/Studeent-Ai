@@ -14,9 +14,9 @@ export function StudentSwitcher() {
   const { data } = useStudents();
   const current = params.id;
 
-  if (!data?.results.length) return null;
+  if (!data?.length) return null;
 
-  const currentName = data.results.find(
+  const currentName = data.find(
     (student) => String(student.id) === current,
   )?.name;
 
@@ -39,7 +39,7 @@ export function StudentSwitcher() {
         </span>
       </SelectTrigger>
       <SelectContent>
-        {data.results.map((student) => (
+        {data.map((student) => (
           <SelectItem key={student.id} value={String(student.id)}>
             {student.name}
           </SelectItem>

@@ -134,6 +134,15 @@
     --subject-chemistry: #d2691e;
     --subject-maths: #0e9469;
 
+    /* Ink that reads ON each subject's fill, for a value label placed inside
+       its own bar. Hand-picked per hue and per theme rather than derived,
+       because CSS cannot branch on a colour's lightness — and the one pair
+       that needs light ink (physics in this theme) is exactly the pair a
+       single formula would get wrong. Every pair is >= 4.5:1. */
+    --subject-physics-ink: #ffffff;   /* on #2b4a9b -- 8.9:1 */
+    --subject-chemistry-ink: #2a1403; /* on #d2691e -- 5.0:1 */
+    --subject-maths-ink: #03201a;     /* on #0e9469 -- 5.2:1 */
+
     --cause-conceptual: #3b1e6e;
     --cause-execution: #5b3aa8;
     --cause-time: #8267cc;
@@ -155,6 +164,11 @@
     --subject-physics: #5b82dc;
     --subject-chemistry: #ce7538;
     --subject-maths: #17a177;
+
+    /* All three dark-theme fills are light enough to take dark ink. */
+    --subject-physics-ink: #0b1430;   /* on #5b82dc -- 5.3:1 */
+    --subject-chemistry-ink: #2a1403; /* on #ce7538 -- 5.8:1 */
+    --subject-maths-ink: #03201a;     /* on #17a177 -- 5.9:1 */
 
     --cause-conceptual: #7c5cd6;
     --cause-execution: #9a7fe0;

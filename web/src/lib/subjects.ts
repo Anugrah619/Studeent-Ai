@@ -14,6 +14,13 @@ export interface SubjectToken {
   short: string;
   /** CSS colour for marks (line, bar, swatch). */
   color: string;
+  /**
+   * Ink that clears 4.5:1 *on this subject's fill*, for a value label placed
+   * inside its own bar. Hand-picked per hue and per theme in `index.css`;
+   * `undefined` means "this fill has no verified ink", and a label on it must
+   * be placed outside the mark rather than guessed at.
+   */
+  ink?: string;
   /** Tailwind class for a text-token-safe swatch background. */
   swatch: string;
 }
@@ -24,6 +31,7 @@ export const SUBJECTS: Record<SubjectKey, SubjectToken> = {
     label: "Physics",
     short: "Phy",
     color: "var(--subject-physics)",
+    ink: "var(--subject-physics-ink)",
     swatch: "bg-subject-physics",
   },
   chemistry: {
@@ -31,6 +39,7 @@ export const SUBJECTS: Record<SubjectKey, SubjectToken> = {
     label: "Chemistry",
     short: "Chem",
     color: "var(--subject-chemistry)",
+    ink: "var(--subject-chemistry-ink)",
     swatch: "bg-subject-chemistry",
   },
   maths: {
@@ -38,6 +47,7 @@ export const SUBJECTS: Record<SubjectKey, SubjectToken> = {
     label: "Maths",
     short: "Math",
     color: "var(--subject-maths)",
+    ink: "var(--subject-maths-ink)",
     swatch: "bg-subject-maths",
   },
 };
@@ -68,6 +78,10 @@ export function resolveSubject(raw: string): SubjectToken {
         label: raw,
         short: raw.slice(0, 4),
         color: "var(--status-neutral)",
+        // A near-black that clears 5.5:1 on `--status-neutral` in the light
+        // theme and 9.4:1 in the dark one — the neutral fill is mid-scale in
+        // both, which is the one case a single ink can serve.
+        ink: "#0a0a0a",
         swatch: "bg-status-neutral",
       };
 }

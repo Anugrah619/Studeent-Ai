@@ -11,6 +11,7 @@ import {
   useTopicStates,
 } from "@/api/queries";
 import { HealthHeader } from "@/components/student/HealthHeader";
+import { DiagnosisCard } from "@/components/student/DiagnosisCard";
 import { TopicMasteryGrid } from "@/components/student/TopicMasteryGrid";
 import { StudentFlagsPanel } from "@/components/student/StudentFlagsPanel";
 import { DayPlanPanel } from "@/components/student/DayPlanPanel";
@@ -38,6 +39,14 @@ export function Student360() {
     () => (flags.data ?? []).filter((flag) => flag.student_id === id),
     [flags.data, id],
   );
+
+  /**
+   * The diagnosis is per-paper, and the paper a director cares about is the
+   * one just sat. `useMockScores` already sorts by `held_on`, so the last row
+   * is the latest mock — the same paper the "Where the marks went" screen
+   * opens on.
+   */
+  const latestMock = scores.data?.at(-1);
 
   if (student.error) {
     return (
@@ -69,6 +78,17 @@ export function Student360() {
       ) : (
         <HealthHeader student={student.data} scores={scores.data ?? []} />
       )}
+
+      {/* Directly under the header, above every chart. Everything below this
+          card reports what happened; this is the only thing on the page that
+          says what the student misunderstands, and it earns the position. */}
+      <DiagnosisCard
+        studentId={id}
+        studentName={student.data?.name ?? "this student"}
+        paperId={latestMock?.paper_id}
+        paperName={latestMock?.paper_name}
+        paperPending={scores.isPending || student.isPending}
+      />
 
       <section className="grid gap-4 xl:grid-cols-2">
         {scores.isPending ? (
