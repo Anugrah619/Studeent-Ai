@@ -5,6 +5,7 @@ from . import auth, views
 
 router = DefaultRouter()
 router.register("batches", views.BatchViewSet, basename="batch")
+router.register("mentors", views.MentorViewSet, basename="mentor")
 router.register("students", views.StudentViewSet, basename="student")
 router.register("flags", views.FlagViewSet, basename="flag")
 router.register("papers", views.TestPaperViewSet, basename="paper")
