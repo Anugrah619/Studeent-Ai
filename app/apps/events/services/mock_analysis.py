@@ -12,18 +12,65 @@ WHY THIS IS THE ENDPOINT THAT SELLS THE PRODUCT
     never got there — which is exactly what `Attempt.status` and the
     feature store carry. (TECHNICAL_DOC.md §6.3.)
 
-THE FOUR CAUSES, AND WHAT SEPARATES THEM
+THE FIVE CAUSES, AND WHAT SEPARATES THEM
 
-    conceptual gap    Wrong, and mastery on that chapter was already low.
-                      Also: wrong on a chapter they *do* know but only
-                      after burning far more time than they normally need
-                      — see the note below.
+    conceptual gap    Wrong or skipped, and mastery on that chapter was
+                      measured and *low*. Also: wrong on a chapter they
+                      *do* know but only after burning far more time than
+                      they normally need — see the note below.
     execution error   Wrong, mastery high, time within their normal range.
                       Careless. Fixable this week.
     time exhaustion   `not_reached`. The clock ran out before they saw it.
                       A pacing problem, not a knowledge problem.
     avoidable skip    `blank` on a chapter they have demonstrated they can
                       do. They looked at it and walked past marks.
+    insufficient      Wrong or skipped on a chapter whose mastery the
+    evidence          feature store **declined to report**. Not a cause at
+                      all — the honest absence of one.
+
+THE FIFTH BUCKET, AND WHY IT HAD TO EXIST
+    `TopicState.mastery` is null below the four-attempt evidence floor
+    (features.EVIDENCE_FLOOR). That null is a deliberate refusal: three
+    data points do not license a claim about whether a student knows a
+    chapter, and the feature store says so rather than printing a
+    confident-looking 0.33.
+
+    This module used to throw that refusal away. `known` was
+    `mastery is not None and mastery >= KNOWN_MASTERY`, so an unmeasured
+    chapter was `not known`, and both `not known` branches fell through to
+    CONCEPTUAL_GAP. A null — "we do not know" — was silently promoted to
+    the most pessimistic of four causes and then printed to a mentor as an
+    integer number of marks.
+
+    On the seeded cohort that was **10,960 of 32,729 conceptual-gap marks
+    resting on a null**, a third of the headline. 270 (student, topic)
+    pairs carried `attempts_n = 0` — the student has never once attempted
+    that chapter — and their 1,222 blanks were booked as *proven* gaps.
+
+    So: `mastery is None` now routes to INSUFFICIENT_EVIDENCE, which is a
+    reported bucket like any other and keeps the partition exact. It is
+    neither a gap nor a recoverable mark; it is the count of marks the
+    system is not entitled to attribute yet, and the fix for it is more
+    practice on that chapter, not a diagnosis.
+
+    `not_reached` is deliberately still TIME_EXHAUSTION whatever mastery
+    says. The clock running out is evidenced by the status alone and needs
+    no knowledge of the chapter.
+
+WHAT `recoverable` MEANS AFTER THE FIFTH BUCKET
+    It is the sum of the three *evidenced* recoverable causes, not
+    `total - conceptual_gap`. Those were the same number while the four
+    buckets partitioned the loss; they are not the same number now, and
+    the difference is the whole point. Counting insufficient-evidence
+    marks as recoverable would assert "these need no new learning" on
+    exactly the evidence the floor exists to reject — the same
+    unsupported claim as before, pointed the other way.
+
+    What *was* understated is the share. `recoverable_pct` is computed
+    over `attributed_lost` (total minus the unattributable), because "98
+    of your 166 lost marks needed no new learning" is a claim about the
+    marks we can actually explain. Dropping unattributable marks into the
+    denominator quietly dilutes the one sentence the product sells on.
 
 THE TIME RULE, WHICH IS THE PART WORTH ARGUING ABOUT
     Baseline is the student's own median seconds on a question they got
@@ -64,8 +111,25 @@ CONCEPTUAL_GAP = "conceptual_gap"
 EXECUTION_ERROR = "execution_error"
 TIME_EXHAUSTION = "time_exhaustion"
 AVOIDABLE_SKIP = "avoidable_skip"
+INSUFFICIENT_EVIDENCE = "insufficient_evidence"
 
-CAUSES = [CONCEPTUAL_GAP, EXECUTION_ERROR, TIME_EXHAUSTION, AVOIDABLE_SKIP]
+#: Order matters: it is the order of the `causes` array and of the stacked
+#: bar built from it. The new bucket is appended rather than inserted, so a
+#: client reading `causes[i]` positionally keeps reading the same cause.
+CAUSES = [
+    CONCEPTUAL_GAP,
+    EXECUTION_ERROR,
+    TIME_EXHAUSTION,
+    AVOIDABLE_SKIP,
+    INSUFFICIENT_EVIDENCE,
+]
+
+#: The causes that mean "these marks needed no new learning" — and each of
+#: which is a *positive* finding, not the residue of subtracting the gap.
+#: INSUFFICIENT_EVIDENCE is pointedly not here: an unmeasured chapter has
+#: not been shown to be recoverable any more than it has been shown to be a
+#: gap.
+RECOVERABLE_CAUSES = [EXECUTION_ERROR, TIME_EXHAUSTION, AVOIDABLE_SKIP]
 
 #: Mastery at or above which we treat the chapter as "they know this".
 #: Below it, a wrong answer is a gap rather than a slip.
@@ -91,6 +155,10 @@ class QuestionCause:
     marks_lost: float
     cause: str
     mastery: float | None
+    #: Attempted questions behind `mastery`. The reader of a
+    #: `insufficient_evidence` row needs to know whether it means "three
+    #: attempts, nearly there" or "never touched this chapter".
+    topic_attempts_n: int
     time_spent: int | None
     time_vs_baseline: float | None
 
@@ -142,11 +210,27 @@ def classify(
     time_spent: int | None,
     baseline: float | None,
 ) -> str:
-    """The cause rules, isolated so they can be unit-tested directly."""
+    """The cause rules, isolated so they can be unit-tested directly.
+
+    `mastery is None` is its own answer and is checked before anything
+    that reads its value. Every other branch below asks "is this number
+    above or below KNOWN_MASTERY", and there is no third answer that a
+    missing number can honestly be folded into.
+    """
     if status == Attempt.NOT_REACHED:
+        # Evidenced by the status alone: the clock ran out. Whether they
+        # knew the chapter is irrelevant and is not consulted.
         return TIME_EXHAUSTION
 
-    known = mastery is not None and mastery >= KNOWN_MASTERY
+    if status not in (Attempt.BLANK, Attempt.WRONG):
+        return ""  # correct — nothing lost
+
+    if mastery is None:
+        # Below the evidence floor. Not a gap, not a slip, not a skip —
+        # the feature store declined to say, and so do we.
+        return INSUFFICIENT_EVIDENCE
+
+    known = mastery >= KNOWN_MASTERY
 
     if status == Attempt.BLANK:
         # They saw it and walked past it. Only "avoidable" if they had the
@@ -154,16 +238,14 @@ def classify(
         # exam technique, and the marks are still lost to the gap.
         return AVOIDABLE_SKIP if known else CONCEPTUAL_GAP
 
-    if status == Attempt.WRONG:
-        if not known:
-            return CONCEPTUAL_GAP
-        if baseline and time_spent and time_spent > baseline * SLOW_FACTOR:
-            # Knew the chapter, spent double their normal time, still got
-            # it wrong. That is not carelessness. See the module docstring.
-            return CONCEPTUAL_GAP
-        return EXECUTION_ERROR
-
-    return ""  # correct — nothing lost
+    # status == Attempt.WRONG
+    if not known:
+        return CONCEPTUAL_GAP
+    if baseline and time_spent and time_spent > baseline * SLOW_FACTOR:
+        # Knew the chapter, spent double their normal time, still got it
+        # wrong. That is not carelessness. See the module docstring.
+        return CONCEPTUAL_GAP
+    return EXECUTION_ERROR
 
 
 def analyse_mock(
@@ -205,11 +287,18 @@ def analyse_mock(
     if not attempts:
         return None
 
-    mastery = dict(
-        TopicState.objects.filter(
-            institute_id=institute_id, student_id=student_id, mastery__isnull=False
-        ).values_list("topic_id", "mastery")
-    )
+    # No `mastery__isnull=False` filter. It used to be here, and it was
+    # half of the bug: filtering the nulls out made a withheld mastery
+    # indistinguishable from a chapter with no row at all, and `classify`
+    # then had nothing left to tell it that the silence was deliberate.
+    # `attempts_n` comes back in the same pass so the per-question detail
+    # can say *how* thin the evidence was.
+    states = {
+        topic_id: (m, n)
+        for topic_id, m, n in TopicState.objects.filter(
+            institute_id=institute_id, student_id=student_id
+        ).values_list("topic_id", "mastery", "attempts_n")
+    }
     baseline = time_baseline(institute_id, student_id)
     topics = _topic_cache(institute_id)
 
@@ -229,7 +318,7 @@ def analyse_mock(
         if a["status"] == Attempt.CORRECT:
             continue
 
-        m = mastery.get(a["topic_id"])
+        m, attempts_n = states.get(a["topic_id"], (None, 0))
         cause = classify(a["status"], m, a["time_spent"], baseline)
         lost = wrong_cost if a["status"] == Attempt.WRONG else skip_cost
         buckets[cause] += lost
@@ -251,6 +340,7 @@ def analyse_mock(
                     marks_lost=lost,
                     cause=cause,
                     mastery=m,
+                    topic_attempts_n=attempts_n,
                     time_spent=a["time_spent"],
                     time_vs_baseline=(
                         round(a["time_spent"] / baseline, 2)
@@ -261,6 +351,10 @@ def analyse_mock(
             )
 
     total = sum(buckets.values())
+    unattributable = buckets[INSUFFICIENT_EVIDENCE]
+    attributed = total - unattributable
+    recoverable = sum(buckets[c] for c in RECOVERABLE_CAUSES)
+
     top_topics = sorted(
         (
             {
@@ -283,22 +377,39 @@ def analyse_mock(
         "questions": len(attempts),
         "attempted": attempted,
         "score": round(score, 1),
-        # The four flat buckets are the original contract and stay ints:
-        # every marking scheme in use here is whole-numbered.
+        # The flat buckets stay ints: every marking scheme in use here is
+        # whole-numbered. The five of them partition `total_lost` exactly,
+        # which is the invariant the tests assert.
         CONCEPTUAL_GAP: int(round(buckets[CONCEPTUAL_GAP])),
         EXECUTION_ERROR: int(round(buckets[EXECUTION_ERROR])),
         TIME_EXHAUSTION: int(round(buckets[TIME_EXHAUSTION])),
         AVOIDABLE_SKIP: int(round(buckets[AVOIDABLE_SKIP])),
+        INSUFFICIENT_EVIDENCE: int(round(unattributable)),
         "total_lost": int(round(total)),
-        # Everything except the conceptual gap needs no new learning —
-        # that is the whole pitch, so it is computed rather than narrated.
-        "recoverable": int(round(total - buckets[CONCEPTUAL_GAP])),
+        # Marks the analysis is entitled to explain. The denominator for
+        # every claim made about *why* the student lost marks.
+        "attributed_lost": int(round(attributed)),
+        # Summed from the three evidenced recoverable causes, NOT from
+        # `total - conceptual_gap`. See the module docstring: those two
+        # agreed while four buckets partitioned the loss, and the
+        # difference between them now is precisely the marks nobody has
+        # earned the right to call recoverable.
+        "recoverable": int(round(recoverable)),
+        # The headline share, over what we can explain. Null rather than
+        # zero when nothing could be attributed at all — a paper on
+        # chapters the student has never practised has no honest
+        # percentage, and 0% would read as "nothing is recoverable".
+        "recoverable_pct": (
+            round(recoverable / attributed * 100, 1) if attributed else None
+        ),
         "time_baseline_sec": baseline,
         "causes": [
             {
                 "cause": c,
                 "marks": int(round(buckets[c])),
                 "questions": counts[c],
+                # Share of the whole loss, so the five bars still add to
+                # 100% and the chart remains a partition of the paper.
                 "share_pct": round(buckets[c] / total * 100, 1) if total else 0.0,
             }
             for c in CAUSES

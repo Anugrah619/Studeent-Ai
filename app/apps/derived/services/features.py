@@ -106,8 +106,18 @@ MASTERY_HALF_LIFE_DAYS = 30.0
 #: docstring — this is the single most important number in the file.
 EVIDENCE_FLOOR = 4
 
-#: `accuracy_30d` is a descriptive stat, but it is still a percentage shown
-#: to a human, so it gets its own (lower) floor rather than none at all.
+#: `accuracy_30d` is an **internal diagnostic only** as of v0.3 — still
+#: computed, still stored, still on the admin, and no longer in the
+#: published API contract (see `api.serializers.TopicStateSerializer`).
+#:
+#: The floor stays at 3 rather than being raised to `EVIDENCE_FLOOR`
+#: precisely because it is no longer shown to a mentor. Raising it would
+#: have halved an internal signal (490 -> 253 populated pairs on the
+#: seeded data) while still leaving 45% of the survivors at exactly 0 or
+#: exactly 1, since four questions can only produce {0, ¼, ½, ¾, 1}. The
+#: defect was never the constant; it was publishing a wall-clock-anchored
+#: raw percentage next to `mastery`, which answers the same question with
+#: a window, a decay and a defensible floor.
 RECENT_WINDOW_DAYS = 30
 RECENT_FLOOR = 3
 
@@ -222,6 +232,51 @@ def marks_lost_by_topic(
     `weak_topic`, `subject_imbalance` and the student-detail chart all read
     this, because a flag that disagrees with the chart it points at is
     worse than no flag at all.
+
+    THE HORIZON, WHICH CALLERS MUST PUBLISH
+        This is **cumulative over every paper the student has sat** — not
+        a window — and that is deliberate. A cost is a total: a chapter
+        that cost 40 marks across three mocks and has been avoided since
+        is still 40 marks gone, and a windowed version would price it at
+        zero exactly when a mentor most needs to see it. `mastery`
+        answers "do they know it now", which is a level and is rightly
+        recency-weighted; this answers "what has it cost", which is a
+        sum. Two questions, two horizons, both correct.
+
+        What is *not* correct is printing the two side by side without
+        saying so, which is what `weak_topic`'s headline used to do:
+        "32% over 11 attempts, costing 42 marks" reads as one period and
+        is two. So every caller that shows this number to a human must
+        also show the span it covers — `weak_topic` carries
+        `papers_covered` / `first_paper` / `last_paper` in its evidence
+        and says "across N mocks" in the headline for exactly that
+        reason.
+
+        There is no `since=` argument here on purpose. Matching
+        `mastery`'s horizon is not possible: mastery's window is the last
+        20 *attempted* questions **per (student, topic) pair**, decayed
+        against that pair's own newest attempt rather than the wall clock
+        (see decision 2 in the module docstring). Different chapters for
+        the same student therefore span different date ranges, and no
+        single cutoff date reproduces it. A `since` defaulted to some
+        stand-in month would be an approximation presented as the
+        matching quantity — the same class of mistake as the one being
+        fixed, dressed as its solution.
+
+    OPEN QUESTION, DELIBERATELY NOT DECIDED HERE
+        This counts **every** attempt, including `source='practice'` rows
+        that belong to no `TestPaper`. Whether a practice question can
+        cost "marks" at all is a real product question — it has no
+        marking scheme of its own, and pricing it at the mock's +4/-1 is
+        an assumption — but today every recorded attempt is mock-sourced,
+        so the question is not yet forced, and answering it by quietly
+        changing this filter would move `balance_index`, `risk_score`,
+        two detectors and the neglect chart at once. It belongs in its
+        own change, with its own before/after.
+
+        Until then, callers should read `papers_covered` as the *period*
+        the figure spans, not as an assertion that every mark in it came
+        off a mock paper.
     """
     correct_marks, wrong_marks = scheme or marking_scheme(institute_id)
     wrong_cost = correct_marks + abs(wrong_marks)
