@@ -45,7 +45,12 @@ from apps.events.models import (
     RevisionEvent,
     StudyLog,
 )
-from apps.ingestion.models import TestPaper
+from apps.ingestion.models import (
+    Misconception,
+    QuestionOption,
+    QuestionTopicMap,
+    TestPaper,
+)
 from apps.syllabus.models import Exam, SyllabusVersion, Topic
 from apps.tenancy.models import Batch, Institute, Mentor, Student, User
 
@@ -439,6 +444,122 @@ def study_daily(
                 )
             )
     StudyLog.objects.bulk_create(rows)
+
+
+# ------------------------------------------------ question content + options
+#
+# `record()` above writes an attempt with a status and nothing else, which is
+# all the Tier-A counting engine ever needed. The reasoning layer needs the
+# other half: the question, its options, and which option the student picked.
+#
+#     eas = misconception("MIS-ORG-EAS")
+#     q1  = ask(paper, chapter("Hydrocarbons"), "Q1",
+#               "Nitration of toluene gives...", correct="A", baits={"B": eas})
+#     answer(student, q1, "B")          # wrong, and we know why
+#     answer(student, q3, "C")          # correct — status inferred from `correct`
+#
+# The label→misconception mapping is the whole point. A question that offers
+# no option tagged X cannot reveal whether the student holds X, which is
+# exactly what makes it usable as counter-evidence.
+
+
+def misconception(
+    code: str,
+    *,
+    subject: str = "Chemistry",
+    name: str | None = None,
+    description: str | None = None,
+    remedy: str = "",
+) -> Misconception:
+    """One entry in the taxonomy. Global, not tenant-scoped."""
+    return Misconception.objects.create(
+        code=code,
+        subject=subject,
+        name=name or f"Belief behind {code}",
+        description=description or f"The student believes what {code} describes.",
+        remedy=remedy,
+    )
+
+
+def ask(
+    paper: TestPaper,
+    topic: Topic,
+    question_id: str,
+    stem: str = "",
+    *,
+    correct: str = "A",
+    baits: dict[str, Misconception] | None = None,
+    labels: str = "ABCD",
+    solution: str = "",
+) -> QuestionTopicMap:
+    """One mapped question with a full set of lettered options.
+
+    `correct` is the label of the right answer; `baits` tags the wrong
+    options that a named misconception produces. Untagged wrong options are
+    a gap in the taxonomy, not a bug — they are how a real paper arrives.
+    """
+    baits = baits or {}
+    question = QuestionTopicMap.objects.create(
+        institute_id=paper.institute_id,
+        test_paper=paper,
+        question_id=question_id,
+        topic=topic,
+        question_text=stem or f"{question_id}. Untitled stem.",
+        solution=solution,
+        proposed_by=QuestionTopicMap.MANUAL,
+        confirmed_at=timezone.now(),
+    )
+    QuestionOption.objects.bulk_create(
+        [
+            QuestionOption(
+                question=question,
+                label=label,
+                text=f"({label}) option text for {question_id}",
+                is_correct=(label == correct),
+                misconception=baits.get(label),
+            )
+            for label in labels
+        ]
+    )
+    question._correct_label = correct          # convenience for `answer()`
+    return question
+
+
+def answer(
+    student: Student,
+    question: QuestionTopicMap,
+    chose: str,
+    *,
+    status: str | None = None,
+    time_spent: int | None = 90,
+    ts: dt.datetime = AS_OF,
+) -> Attempt:
+    """Record which option the student picked.
+
+    `status` is inferred from whether `chose` is the correct label, so a
+    test says what the student did and never has to keep the two in sync.
+    Pass `status` explicitly only to build a deliberately inconsistent row.
+    """
+    if status is None:
+        correct_label = getattr(question, "_correct_label", None)
+        if correct_label is None:
+            opt = question.options.filter(is_correct=True).first()
+            correct_label = opt.label if opt else None
+        status = Attempt.CORRECT if chose == correct_label else Attempt.WRONG
+    paper = question.test_paper
+    return Attempt.objects.create(
+        institute_id=student.institute_id,
+        student=student,
+        topic=question.topic,
+        test_paper=paper,
+        question_id=question.question_id,
+        status=status,
+        chosen_option=chose,
+        time_spent=time_spent,
+        marks=_marks_for(status, paper),
+        source=Attempt.MOCK,
+        ts=ts,
+    )
 
 
 def rate(student: Student, topic: Topic, value: int, ts: dt.datetime = AS_OF):
