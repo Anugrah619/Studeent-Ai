@@ -196,3 +196,45 @@ Four contract gaps the frontend hit while building the AI Diagnosis card, all of
 ### 2026-09-18
 - **P0 Day 1 built.** Scaffold complete at `app/`. Environment realities found on this machine: **Python 3.14.3** (→ forces Django 6.x, not the 5.x in the docs), Docker Desktop installed but daemon stopped (launched it), **port 5432 has a local Postgres and 5433 has a `stocks_db` container → our DB is on 5434**. Installed: Django 6.1.1, psycopg 3.3.6 (cp314 binary wheel exists, no compile), django-environ 0.14.0. Created `config/` + five apps (`syllabus`, `tenancy`, `events`, `ingestion`, `derived`) with explicit `name`/`label` in each `apps.py`. **`AUTH_USER_MODEL = "tenancy.User"` set before the first migration** — verified: table is `auth_user_custom`, not `auth_user`. Postgres 16 container healthy. `git init` done at repo root; `.env` ignored, `.env.example` tracked, no venv/pycache leakage. Dev superuser `admin` / `devadmin123` (local only).
 - **Created `SYSTEM_DESIGN.md`** for the user's collaborator to review — full Django schema with indexes/constraints, tenancy + RLS design, ingestion flow detail, volume estimates, what's deliberately not designed yet, and **8 open design questions** where review is most valuable (ltree vs adjacency, matview vs table, RLS belt-and-braces, partitioning key, `Attempt.correct` nullable vs enum, syllabus versioning granularity, mapping scope, under-designing check).
+
+### 2026-09-30 — the console meets the live API
+
+Three agents landed: backend (evidence linking), testing (58 reasoning tests),
+frontend (live-API wiring). Merged to `main`. 147 backend tests, 11 frontend,
+zero xfail.
+
+**Five bugs found on first live contact, all the same shape: the mocks agreed
+with the console instead of with the server.**
+
+1. **`risk_score` is 0–1, the console banded it 0–100.** Verified in the
+   database: max 0.696, so *zero* students banded as at-risk and the entire
+   institute chipped "On track" — on the one screen whose job is to say who is
+   not. Invisible because the fixtures shipped 0–100 values, so the console
+   agreed with itself perfectly. The worst bug of the session.
+2. Three hardcoded denominators ("of 300", "/100") against a paper out of 184.
+3. `human_verdict` sends the literal `"unreviewed"`, not null — read as truthy,
+   the card told teachers "You disagreed" about diagnoses they had never seen.
+4. `trace_id` is an integer; the hand-written type guessed string, so `String()`
+   gave `""` and the trace chip never rendered.
+5. The "Demo dataset · 14 of 312 seeded" badge showed against a live server
+   serving 46 real students — false in the direction that makes a real answer
+   look staged.
+
+**The `@action` routes flipped from bare arrays to paginated envelopes.** An
+assumption that has now been wrong in *both* directions, so the client accepts
+either rather than being hard-coded a third time.
+
+**Three bugs the testing agent documented as strict xfails, now fixed:**
+- The reasoning cache key ignored `prompt_version` — a v2 prompt would have kept
+  serving v1 answers with nothing on screen to say so. Today's three rounds of
+  prompt iteration only escaped it by passing `force=True` every time. `model` is
+  deliberately excluded: a capacity fallback is incidental, not a change of intent.
+- `from_cache` was always False (inferred from latency; a cache hit returns the
+  original trace carrying the live call's latency).
+- Wrong-answer stems matched on question label alone, so a diagnosis spanning two
+  papers quoted a question the student never sat and cited it as evidence.
+
+**Diagnosis verified on all four heroes: 4/4 correct misconception**, each with
+distinct, correct counter-evidence. For Ishita it independently rediscovered why
+a symmetric-alkene question was in the paper — the design intent, from the stem
+alone. `gaps.ts` went from 16 entries to 2.
