@@ -78,14 +78,40 @@ export const batches: Batch[] = [
 /** Mocks 08–14, a fortnight apart, the most recent one six days ago. */
 export const PAPER_IDS = [8, 9, 10, 11, 12, 13, 14] as const;
 
-export const papers: TestPaper[] = PAPER_IDS.map((id, index) => ({
-  id,
-  name: `AIT Mock ${String(id).padStart(2, "0")}`,
-  held_on: isoDate(6 + (PAPER_IDS.length - 1 - index) * 14),
-  total_questions: 75,
-  max_marks: 300,
-  duration_min: 180,
-}));
+/**
+ * The diagnostic paper, and the one every diagnosis in these fixtures is
+ * about. Named and sized to match the live server exactly — id 17,
+ * "Mock 15 — Diagnostic", 46 misconception-tagged questions out of 184.
+ *
+ * It was previously "AIT Mock 14" out of 300 here while the server called
+ * it "Mock 15 — Diagnostic" out of 184, so mock mode showed a paper that
+ * does not exist, with the wrong denominator. That is the sixth instance
+ * of the same bug: a fixture agreeing with the console instead of with the
+ * server. They are only caught by comparing against a live response, which
+ * is why these are transcripts now rather than inventions.
+ */
+export const DIAGNOSTIC_PAPER_ID = 17;
+export const DIAGNOSTIC_PAPER_NAME = "Mock 15 — Diagnostic";
+export const DIAGNOSTIC_MAX_MARKS = 184;
+
+export const papers: TestPaper[] = [
+  ...PAPER_IDS.map((id, index) => ({
+    id,
+    name: `AIT Mock ${String(id).padStart(2, "0")}`,
+    held_on: isoDate(6 + (PAPER_IDS.length - 1 - index) * 14),
+    total_questions: 75,
+    max_marks: 300,
+    duration_min: 180,
+  })),
+  {
+    id: DIAGNOSTIC_PAPER_ID,
+    name: DIAGNOSTIC_PAPER_NAME,
+    held_on: isoDate(4),
+    total_questions: 46,
+    max_marks: DIAGNOSTIC_MAX_MARKS,
+    duration_min: 60,
+  },
+];
 
 export const paperById = new Map(papers.map((p) => [p.id, p]));
 

@@ -238,3 +238,45 @@ either rather than being hard-coded a third time.
 distinct, correct counter-evidence. For Ishita it independently rediscovered why
 a symmetric-alkene question was in the paper — the design intent, from the stem
 alone. `gaps.ts` went from 16 entries to 2.
+
+### 2026-09-30 (later) — the loop closes
+
+Question detail panel landed: an evidence chip now opens the question behind
+the citation. Verified live end-to-end —
+
+```
+diagnosis -> chip "D16 chose C" -> question 923
+  "Nitration of toluene with a HNO3/H2SO4 mixture gives predominantly:"
+      (B) o- and p-nitrotoluene      <- correct
+      (C) m-nitrotoluene             <- he chose this   MIS-ORG-EAS
+  BELIEF: "An activating group sends the incoming group to meta; a
+           deactivating group sends it to ortho/para..."
+  REMEDY: "Twenty minutes at the board on nitration of toluene and of
+           nitrobenzene, drawing all three arenium-ion resonance structures"
+```
+
+That is the product: a claim, the evidence for it, the student's actual wrong
+belief stated as they hold it, and what fixes it.
+
+**A sixth mock-vs-server mismatch, same shape as the five before.** Fixtures
+named paper 17 "AIT Mock 14" out of 300; the server calls it "Mock 15 —
+Diagnostic" out of 184. Mock mode showed a paper that does not exist with the
+wrong denominator. Fixed, and the diagnostic paper is now a named constant in
+the fixtures so it cannot drift silently again.
+
+**I also gave an agent a wrong field name** (`stem` for `question_text`) and
+only caught it because my own verification script threw KeyError. The API was
+right; my description of it was wrong. Corrected mid-flight. This is the
+argument for the OpenAPI contract existing at all — prose descriptions of an
+API drift, generated types do not.
+
+Seven contract observations from building the panel, worth acting on:
+- `options[].chosen` has three meanings across two values: null = not asked,
+  false = either "not this option" or "no attempt exists". Only student_id +
+  status disentangle it.
+- 404 collapses "no such question" and "no such student in this institute".
+- No max_marks on QuestionDetail, so "-1 mark" cannot become "-1 of 4".
+- `remedy` optional while `description` is required — the actionable half is
+  the optional one.
+- `difficulty` unions BlankEnum.
+- blank / not_reached branches are unreachable from a chip and undemoable.

@@ -38,7 +38,7 @@ import type { Diagnosis as WireDiagnosis } from "@/api/types";
 const DIAGNOSES: Record<number, Diagnosis> = {
   1: {
     paper_id: 17,
-    paper_name: "AIT Mock 14",
+    paper_name: "Mock 15 — Diagnostic",
     headline:
       "Reverses electrophilic aromatic substitution directing effects across multiple functional groups, costing 25 marks.",
     pattern_found: true,
@@ -71,7 +71,7 @@ const DIAGNOSES: Record<number, Diagnosis> = {
   },
   2: {
     paper_id: 17,
-    paper_name: "AIT Mock 14",
+    paper_name: "Mock 15 — Diagnostic",
     headline:
       "Reverses Markovnikov and anti-Markovnikov rules on unsymmetrical alkenes — costing 20 marks.",
     pattern_found: true,
@@ -130,7 +130,7 @@ const DIAGNOSES: Record<number, Diagnosis> = {
   },
   3: {
     paper_id: 17,
-    paper_name: "AIT Mock 14",
+    paper_name: "Mock 15 — Diagnostic",
     headline:
       "No systematic misconception in Faizan's paper — the six wrong answers do not share a cause.",
     pattern_found: false,
@@ -148,7 +148,7 @@ const DIAGNOSES: Record<number, Diagnosis> = {
   },
   4: {
     paper_id: 17,
-    paper_name: "AIT Mock 14",
+    paper_name: "Mock 15 — Diagnostic",
     headline:
       "Defaults to standard central-axis formulas instead of applying parallel/perpendicular axis theorems — 25 marks.",
     pattern_found: true,
@@ -181,7 +181,7 @@ const DIAGNOSES: Record<number, Diagnosis> = {
   },
   5: {
     paper_id: 17,
-    paper_name: "AIT Mock 14",
+    paper_name: "Mock 15 — Diagnostic",
     headline:
       "Drops inner derivative factors in chain-rule differentiation and integration — 25 marks lost.",
     pattern_found: true,
