@@ -5,6 +5,7 @@ import type {
   Me,
   Paginated,
 } from "@/api/types";
+import { RISK_BANDS } from "@/lib/severity";
 import {
   attemptsFor,
   marksLostFor,
@@ -28,20 +29,26 @@ import {
  * The mock server exists to run the *same client code* the live API runs, so
  * every place it differs from Django is a bug this file is hiding.
  *
- * Two of those differences were found by reading `apps/api/views.py` and are
- * now reproduced faithfully:
+ * Three of those differences have been checked against a running server rather
+ * than inferred, and are reproduced faithfully:
  *
  *   1. `PAGE_SIZE` is 50, matching `REST_FRAMEWORK["PAGE_SIZE"]` — not the 100
  *      this file used to invent. A page size the server does not have is a
- *      page-boundary bug you cannot reproduce until a demo.
+ *      page-boundary bug you cannot reproduce until a demo. Only `/api/flags/`
+ *      actually crosses it on the seeded institute: 81 rows, two pages.
  *
- *   2. The four `@action` routes return **bare arrays**. `mock_scores`,
- *      `subject_breakdown`, `topic_states` and `attempts` all end in
- *      `Response(Serializer(rows, many=True).data)` and never touch
- *      `paginate_queryset`. `openapi.yaml` claims otherwise — drf-spectacular
- *      infers pagination from the viewset — so the generated types are wrong
- *      about these four, and the mocks used to be wrong in the same direction.
- *      They are now right, which is what makes `apiGetRows` worth having.
+ *   2. The four `@action` routes DO return an envelope. They used to return
+ *      bare arrays and this file reproduced that, because the server was right
+ *      and drf-spectacular's inferred `Paginated…List` was wrong. That has
+ *      flipped: `mock-scores`, `subject-breakdown`, `topic-states` and
+ *      `attempts` each answer `{count, next, previous, results}` with every
+ *      row on one page — `count === results.length`, `next: null`, even at 56
+ *      topic states. `envelope()` reproduces that; `paginate()` is for the
+ *      router list routes that really do page. `rowsOf` still accepts both
+ *      shapes, which is what made the earlier disagreement survivable and
+ *      costs one `Array.isArray` to keep.
+ *
+ *   3. `?open=` on `/api/flags/` is a presence filter. See that handler.
  */
 const PAGE_SIZE = 50;
 
@@ -63,6 +70,17 @@ function paginate<T>(rows: T[], url: URL): Paginated<T> {
     previous: page > 1 ? pageUrl(page - 1) : null,
     results: slice,
   };
+}
+
+/**
+ * One page holding everything — what the `@action` detail routes return.
+ *
+ * Not `paginate()`: that would split 56 topic states across two pages and the
+ * live server does not, so the mock would be exercising a code path the
+ * console never actually meets on this data.
+ */
+function envelope<T>(rows: T[]): Paginated<T> {
+  return { count: rows.length, next: null, previous: null, results: rows };
 }
 
 /** A touch of latency so loading states are real rather than theoretical. */
@@ -219,9 +237,15 @@ export const handlers = [
 
     const rows = seeds
       .filter((s) => (batch ? s.batchId === Number(batch) : true))
-      // `at_risk` has no documented threshold in the contract; the backend owns
-      // it. 55 is the same boundary the UI uses for its "High" risk band.
-      .filter((s) => (atRisk === undefined ? true : s.risk_score >= 55 === atRisk))
+      // The contract documents this threshold now: `?at_risk=true` is
+      // `risk_score >= 0.55`, which is also `RISK_BANDS.high`. One constant,
+      // so a student the API calls at-risk and a student the console chips
+      // "High" are the same student by construction.
+      .filter((s) =>
+        atRisk === undefined
+          ? true
+          : s.risk_score >= RISK_BANDS.high === atRisk,
+      )
       .filter((s) => (active === undefined ? true : !s.exited_at === active))
       .map(studentListRow)
       .sort((a, b) => b.risk_score - a.risk_score);
@@ -240,13 +264,16 @@ export const handlers = [
   http.get("/api/flags/", async ({ request }) => {
     await settle();
     const url = new URL(request.url);
-    // `open` and `student` are not in the contract — see src/api/gaps.ts. The
-    // mock honours them so the client's belt-and-braces filtering matches.
-    const open = bool(url.searchParams.get("open"));
+    // `?open=` is a PRESENCE filter, not a boolean field: the contract says
+    // `true` narrows to unresolved and any other value, `false` included, is
+    // ignored and returns everything. Reproduced exactly, because a mock that
+    // helpfully honours `open=false` lets the client stop filtering for the
+    // closed-loop panel and the bug only appears against the real server.
+    const openOnly = url.searchParams.get("open") === "true";
     const student = url.searchParams.get("student");
 
     const rows = flags
-      .filter((f) => (open === undefined ? true : f.is_open === open))
+      .filter((f) => (openOnly ? f.is_open : true))
       .filter((f) => (student ? f.student_id === Number(student) : true))
       .sort((a, b) => Date.parse(b.raised_at) - Date.parse(a.raised_at));
 
@@ -271,26 +298,28 @@ export const handlers = [
     return guard(() => HttpResponse.json(paginate([], new URL(request.url))));
   }),
 
-  /* ------------------------------------ @action routes — BARE ARRAYS */
+  /* ------------------- @action detail routes — ENVELOPE, ONE PAGE (see 2.) */
 
   http.get("/api/students/:id/mock-scores/", async ({ params }) => {
     await settle();
-    return guard(() => HttpResponse.json(mockScoresFor(id(params))));
+    return guard(() => HttpResponse.json(envelope(mockScoresFor(id(params)))));
   }),
 
   http.get("/api/students/:id/subject-breakdown/", async ({ params }) => {
     await settle();
-    return guard(() => HttpResponse.json(subjectBreakdownFor(id(params))));
+    return guard(() =>
+      HttpResponse.json(envelope(subjectBreakdownFor(id(params)))),
+    );
   }),
 
   http.get("/api/students/:id/topic-states/", async ({ params }) => {
     await settle();
-    return guard(() => HttpResponse.json(topicStatesFor(id(params))));
+    return guard(() => HttpResponse.json(envelope(topicStatesFor(id(params)))));
   }),
 
   http.get("/api/students/:id/attempts/", async ({ params }) => {
     await settle();
-    return guard(() => HttpResponse.json(attemptsFor(id(params))));
+    return guard(() => HttpResponse.json(envelope(attemptsFor(id(params)))));
   }),
 
   /* -------------------------------- marks-lost: a single object, not a list */
@@ -315,14 +344,13 @@ export const handlers = [
 
   /* ------------------------------------------------- the reasoning layer
    *
-   * The only two routes in this file the console cannot be *type-checked*
-   * against, because they are not in `openapi.yaml` yet (see src/api/gaps.ts).
-   * That makes the mock's job bigger than usual: it is the only thing standing
-   * between the diagnosis card and a shape nobody has verified. So it serves
-   * all three of the endpoint's real answers, not just the happy one —
+   * Both routes are in `openapi.yaml` now and the fixtures are transcripts of
+   * real responses, so this mock's job is no longer to invent a shape — it is
+   * to reproduce one. It serves all three of the endpoint's real answers, not
+   * just the happy one —
    *
    *   200  a diagnosis (pattern found, or honestly not found)
-   *   422  wired up, but too little tagged evidence on this paper
+   *   422  wired up, but nothing on this paper it can reason over
    *   503  not wired up at all — no reasoning key on this deployment
    *
    * — and which one a student gets is fixed per student, so every state is one
@@ -371,21 +399,19 @@ export const handlers = [
       );
     }
 
-    if (!recordVerdict(id(params), body.verdict)) {
+    const updated = recordVerdict(id(params), body.verdict);
+    if (!updated) {
       return HttpResponse.json(
         { detail: "No diagnosis on file for that student." },
         { status: 404 },
       );
     }
 
-    return HttpResponse.json(
-      {
-        verdict: body.verdict,
-        note: body.note ?? null,
-        recorded_at: new Date().toISOString(),
-      },
-      { status: 201 },
-    );
+    // 200 with the whole diagnosis, `human_verdict` set — which is what the
+    // live route answers with. The old mock returned a 201 and a little
+    // `{verdict, note, recorded_at}` receipt of its own invention, so the
+    // client had no choice but to patch its cache from the request body.
+    return HttpResponse.json(updated);
   }),
 
   /* ------------------------------------------------------------ mutations */

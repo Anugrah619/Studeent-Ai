@@ -69,11 +69,24 @@ test("director console renders the KPI strip and the triage table", async () => 
 
 test("student 360 renders the header, both charts and the mastery grid", async () => {
   const root = await renderAt("/students/1");
-  // Six independent queries land in whatever order the mock latency gives them.
+  /**
+   * Six independent queries land in whatever order the mock latency gives them,
+   * so the wait has to name something from EVERY one this test asserts on —
+   * panel headings alone render from the page shell, not from the data. Waiting
+   * on the headings only made this test pass or fail on query ordering: the
+   * header is a skeleton until `useStudent` resolves, and "Alpha" comes from
+   * that query rather than from the four panels below it.
+   */
   await waitFor(() =>
-    ["Where the time goes", "Mock score trend", "Topic mastery", "Open flags"].every(
-      (needle) => text().includes(needle),
-    ),
+    [
+      "Where the time goes",
+      "Mock score trend",
+      "Topic mastery",
+      "Open flags",
+      // …and the header's own data, which arrives on a different request.
+      "Alpha",
+      "Coordination Compounds",
+    ].every((needle) => text().includes(needle)),
   );
 
   const body = text();
@@ -203,28 +216,31 @@ function diagnosisCard(): string {
 
 test("the diagnosis card leads with the headline and shows its evidence", async () => {
   const root = await renderAt("/students/1");
-  await waitFor(() => diagnosisCard().includes("directing-effects"), {
+  await waitFor(() => diagnosisCard().includes("MIS-ORG-EAS"), {
     timeout: 8000,
   });
 
   const card = diagnosisCard();
 
   // The claim, in one sentence, at the top.
-  assert.match(card, /one rule backwards/, "the headline is the hero");
+  assert.match(
+    card,
+    /Reverses electrophilic aromatic substitution directing effects/,
+    "the headline is the hero",
+  );
   assert.ok(card.includes("AIT Mock 14"), "the paper being diagnosed");
 
   // The evidence is visible, not buried: code, confidence, question ids, marks.
   assert.ok(card.includes("MIS-ORG-EAS"), "misconception code");
   assert.ok(card.includes("High confidence"), "confidence is spoken, not colour");
-  assert.ok(card.includes("Medium confidence"), "the weaker hypothesis too");
-  for (const q of ["D1", "D2", "D3", "D4"]) {
+  for (const q of ["D16", "D17", "D18", "D20", "D21"]) {
     assert.ok(card.includes(q), `evidence question ${q}`);
   }
-  assert.match(card, /20\s*marks at stake/, "marks at stake on the hypothesis");
+  assert.match(card, /25\s*marks at stake/, "marks at stake on the hypothesis");
   assert.match(
     card,
-    /28 marks\s*at stake across 2 findings/,
-    "the total is named as a total, not left to contradict the headline",
+    /25 marks\s*at stake/,
+    "the cost is on the line under the headline",
   );
 
   // The line the whole pitch rests on, at body size and with its own heading.
@@ -233,20 +249,60 @@ test("the diagnosis card leads with the headline and shows its evidence", async 
     "counter-evidence has its own block",
   );
   assert.ok(
-    card.includes("he was correct both times"),
+    card.includes("the student answered them correctly"),
     "counter-evidence text is rendered",
   );
 
   assert.ok(card.includes("Do this week"), "recommended action");
-  assert.ok(card.includes("one 40-minute sitting"), "time to fix");
-  assert.ok(card.includes("rsn_"), "the trace id is on screen");
+
+  // `time_to_fix` is a BAND. The enum came in because the model, asked for
+  // minutes, returned 40 / 20 / 45 for the same evidence — so the card must
+  // render the label and must not render a number of minutes anywhere near it.
+  assert.ok(card.includes("One focused sitting".toLowerCase()), "the band label");
+  assert.ok(
+    !/\d+[- ]?minute/i.test(card),
+    "no invented minute count survives into the card",
+  );
+
+  assert.ok(card.includes("trace #53"), "the trace id is on screen");
+
+  // Each chip carries the option this student picked, which is what makes the
+  // claim checkable against the paper in the teacher's hand.
+  assert.ok(card.includes("chose C"), "the chosen option travels with the chip");
+
+  await act(async () => root.unmount());
+});
+
+test("an unresolved citation renders as text, never as a link to nowhere", async () => {
+  // Tanvi's weakest hypothesis cites D12, which is not one of her wrong answers
+  // on this paper — `question_id: null`. It must still be shown (the model said
+  // it) and must visibly not be openable.
+  const root = await renderAt("/students/5");
+  await waitFor(() => diagnosisCard().includes("MIS-KIN-RELVEL"), {
+    timeout: 8000,
+  });
+
+  const card = diagnosisCard();
+  assert.ok(card.includes("D12"), "the unresolved citation is still shown");
+  assert.ok(
+    !/D12[^A-Za-z]*chose/.test(card),
+    "no chosen option is claimed for a citation that did not resolve",
+  );
+
+  // The total is the server's, over distinct questions — not a browser-side sum
+  // of the four hypotheses, which is the number that can quietly drift high.
+  assert.match(
+    card,
+    /40 marks\s*at stake across 4 findings/,
+    "the total comes from total_marks_at_stake",
+  );
 
   await act(async () => root.unmount());
 });
 
 test("agreeing with a diagnosis records the verdict", async () => {
   const root = await renderAt("/students/2");
-  await waitFor(() => diagnosisCard().includes("limiting reagent"), {
+  await waitFor(() => diagnosisCard().includes("MIS-ORG-MARKOV"), {
     timeout: 8000,
   });
 
@@ -292,7 +348,7 @@ test("no systematic pattern renders as an answer, not an empty card", async () =
 
 test("503 and 422 are told apart and neither reads as a crash", async () => {
   // 503 — the reasoning layer is not configured on this deployment.
-  let root = await renderAt("/students/5");
+  let root = await renderAt("/students/6");
   await waitFor(() => diagnosisCard().includes("reasoning layer"), {
     timeout: 8000,
   });
@@ -309,7 +365,7 @@ test("503 and 422 are told apart and neither reads as a crash", async () => {
   await act(async () => root.unmount());
 
   // 422 — it is connected, and honestly has too little to reason over.
-  root = await renderAt("/students/4");
+  root = await renderAt("/students/7");
   await waitFor(() => diagnosisCard().includes("tagged evidence"), {
     timeout: 8000,
   });

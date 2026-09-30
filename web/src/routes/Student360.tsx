@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import type { Flag } from "@/api/types";
@@ -31,14 +31,12 @@ export function Student360() {
   const breakdown = useSubjectBreakdown(id);
   const topics = useTopicStates(id);
   const plan = usePlan();
-  // `/api/flags/` takes no `student` filter, so the page fetches the open set
-  // and narrows it here (API_GAPS.FLAGS_STUDENT_FILTER).
-  const flags = useFlags(true);
-
-  const studentFlags = useMemo(
-    () => (flags.data ?? []).filter((flag) => flag.student_id === id),
-    [flags.data, id],
-  );
+  // `?student=` and `?open=` are both declared now, so this asks the server for
+  // one student's open flags instead of pulling all 81 in the institute and
+  // narrowing in the browser — which, past `PAGE_SIZE 50`, meant following a
+  // second page to find rows that were never going to be on this screen.
+  const flags = useFlags({ open: true, student: id });
+  const studentFlags = flags.data ?? [];
 
   /**
    * The diagnosis is per-paper, and the paper a director cares about is the

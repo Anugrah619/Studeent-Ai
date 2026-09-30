@@ -35,8 +35,11 @@ export function DirectorConsole() {
   // Keep the key identical to the switcher's when unfiltered, so the console
   // and the header share one cached roster rather than fetching it twice.
   const students = useStudents(batchId === undefined ? {} : { batch: batchId });
-  const openFlags = useFlags(true);
-  const closedFlags = useFlags(false);
+  const openFlags = useFlags({ open: true });
+  // `?open=` is a presence filter, so `false` is ignored by the server: this
+  // fetches every flag and `useFlags` keeps the resolved ones. On the seeded
+  // institute that is 81 rows over two pages, which `apiGetRows` follows.
+  const closedFlags = useFlags({ open: false });
 
   const studentById = useMemo(
     () => new Map((students.data ?? []).map((s) => [s.id, s])),

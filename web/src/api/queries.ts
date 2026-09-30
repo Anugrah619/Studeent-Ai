@@ -13,8 +13,6 @@ import {
   type Diagnosis,
   type DiagnosisVerdictBody,
 } from "./diagnosis";
-import { API_GAPS } from "./gaps";
-import { coerceMarksLost } from "./marksLost";
 import type {
   Batch,
   DashboardSummary,
@@ -35,11 +33,17 @@ import type {
  * Every list hook below returns a plain array, never a page envelope.
  *
  * That is not cosmetic. The contract promises `{count, next, previous,
- * results}` for all ten list routes; the server actually returns a bare array
- * from the four `@action` routes (see `pagination.ts`). Unwrapping inside
- * `apiGetRows` rather than in each `select` means exactly one place has to be
- * right about which shape arrived, and no component holds a value whose shape
- * depends on which endpoint filled it.
+ * results}` for every list route, and the live server now delivers it from all
+ * of them — including the four `@action` detail routes that used to answer
+ * with a bare array (see `pagination.ts`, which still accepts both). Unwrapping
+ * inside `apiGetRows` rather than in each `select` means exactly one place has
+ * to be right about which shape arrived, and no component holds a value whose
+ * shape depends on which endpoint filled it.
+ *
+ * Only `/api/flags/` actually pages on the seeded data — 81 rows at
+ * `PAGE_SIZE 50` — and `apiGetRows` follows `next` to the end. A triage table
+ * showing 50 of 81 open flags beside a dashboard count of 81 is the worst bug
+ * this console can have: wrong, and confident.
  */
 
 export const qk = {
@@ -54,7 +58,7 @@ export const qk = {
   topicStates: (id: number) => ["students", id, "topic-states"] as const,
   marksLost: (id: number, paper: number) =>
     ["students", id, "marks-lost", paper] as const,
-  flags: (open?: boolean) => ["flags", { open }] as const,
+  flags: (filters: FlagFilters) => ["flags", filters] as const,
   plan: ["my", "plan"] as const,
   diagnosis: (id: number, paper?: number) =>
     ["students", id, "diagnosis", paper ?? null] as const,
@@ -64,6 +68,17 @@ export interface StudentFilters {
   batch?: number;
   at_risk?: boolean;
   active?: boolean;
+}
+
+export interface FlagFilters {
+  /**
+   * `true` narrows to unresolved flags. **A presence filter, not a boolean
+   * field** — the contract says any other value, `false` included, is ignored
+   * and returns everything. So `open: false` means "I want the closed ones",
+   * the request goes out unfiltered, and the `select` below does the narrowing.
+   */
+  open?: boolean;
+  student?: number;
 }
 
 type ListOpts<T> = Omit<UseQueryOptions<T[], Error, T[]>, "queryKey" | "queryFn">;
@@ -137,36 +152,49 @@ export function useTopicStates(id: number) {
 }
 
 /**
- * `coerceMarksLost` is not decoration. The generated row is a version behind on
- * the three fields that decide the denominator every rate on the mock screen is
- * quoted against — see `api/marksLost.ts`.
+ * The mistake taxonomy for one paper, straight off the wire.
+ *
+ * There used to be a `coerceMarksLost` between the response and this hook,
+ * widening a generated row that predated the fifth bucket. The contract carries
+ * `insufficient_evidence`, `attributed_lost` and `recoverable_pct` now, so the
+ * coercion is deleted. `recoverable_pct` is still never recomputed here: the
+ * server divides by `attributed_lost`, and a client that divides by
+ * `total_lost` is wrong in a way nobody notices.
  */
 export function useMarksLost(id: number, paper: number) {
   return useQuery<MarksLost, Error>({
     queryKey: qk.marksLost(id, paper),
-    queryFn: async () =>
-      coerceMarksLost(
-        await apiGet("/api/students/{id}/marks-lost/", {
-          path: { id },
-          query: { paper },
-        }),
-      ),
+    queryFn: () =>
+      apiGet("/api/students/{id}/marks-lost/", {
+        path: { id },
+        query: { paper },
+      }),
     enabled: Number.isFinite(id) && Number.isFinite(paper),
   });
 }
 
 /**
- * `open` is not in the contract ({@link API_GAPS.FLAGS_OPEN_FILTER}), so it goes
- * through the undocumented-query escape hatch AND is re-applied client-side —
- * the view stays correct against a server that ignores the param.
+ * Flags, narrowed at the server where the contract lets us.
+ *
+ * `?open=` and `?student=` are declared now, so Student 360 asks for one
+ * student's flags instead of pulling all 81 in the institute and filtering in
+ * the browser. The client-side `filter` stays anyway, for one specific reason:
+ * `?open=` is documented as a **presence** filter, so `open=false` is ignored
+ * by the server and returns everything. The closed-loop panel depends on that
+ * narrowing happening somewhere, and here is the only place it can.
  */
-export function useFlags(open?: boolean) {
+export function useFlags(filters: FlagFilters = {}) {
+  const { open, student } = filters;
   return useQuery<Flag[], Error>({
-    queryKey: qk.flags(open),
-    queryFn: () => apiGetRows("/api/flags/", { undocumentedQuery: { open } }),
+    queryKey: qk.flags(filters),
+    queryFn: () =>
+      apiGetRows("/api/flags/", {
+        query: { open: open === true ? true : undefined, student },
+      }),
     select: (rows) =>
       rows
         .filter((flag) => (open === undefined ? true : flag.is_open === open))
+        .filter((flag) => (student === undefined ? true : flag.student_id === student))
         .sort((a, b) => Date.parse(b.raised_at) - Date.parse(a.raised_at)),
   });
 }
@@ -181,9 +209,8 @@ export function usePlan() {
 /* ------------------------------------------------------------------ *
  * The reasoning layer
  *
- * Both routes are ahead of the contract — see API_GAPS.DIAGNOSIS_*. The hooks
- * are otherwise ordinary; the only thing worth arguing about is the retry
- * policy below.
+ * Both routes are typed from the contract now. The hooks are ordinary; the
+ * only thing worth arguing about is the retry policy below.
  * ------------------------------------------------------------------ */
 
 /**
@@ -220,19 +247,23 @@ export function isNotEnoughEvidence(error: unknown): boolean {
 /**
  * Agree / disagree on a diagnosis.
  *
- * The cached diagnosis is patched from the *request* body rather than the
- * response, because nothing in the contract says what the response carries.
- * The one thing the UI must be right about — that this teacher has now
- * answered — is known before the request goes out.
+ * The contract says the 200 is the whole `Diagnosis` with `human_verdict` set,
+ * and the live server does exactly that — so the cache takes the response, and
+ * the card shows what the server recorded rather than what the browser asked
+ * for. The request body is the fallback for a server that answers 204 or with
+ * a body the parser cannot make a headline out of: the one thing the UI must
+ * be right about is that this teacher has now answered, and that much is known
+ * before the request goes out.
  */
 export function useDiagnosisVerdict(id: number, paper: number | undefined) {
   const queryClient = useQueryClient();
-  return useMutation<unknown, Error, DiagnosisVerdictBody>({
+  return useMutation<Diagnosis, Error, DiagnosisVerdictBody>({
     mutationFn: (body) => postDiagnosisVerdict(id, body),
-    onSuccess: (_result, body) => {
-      queryClient.setQueryData<Diagnosis>(qk.diagnosis(id, paper), (prev) =>
-        prev ? { ...prev, human_verdict: body.verdict } : prev,
-      );
+    onSuccess: (result, body) => {
+      queryClient.setQueryData<Diagnosis>(qk.diagnosis(id, paper), (prev) => {
+        if (result?.headline) return result;
+        return prev ? { ...prev, human_verdict: body.verdict } : prev;
+      });
     },
   });
 }

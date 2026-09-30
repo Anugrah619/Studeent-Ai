@@ -3,8 +3,12 @@
  * from `../../openapi.yaml` by `npm run gen:api`. Nothing here is hand-written —
  * if a shape is wrong, fix the contract and regenerate.
  *
- * The one exception is the "ahead of the contract" block at the bottom, which
- * exists only while this worktree's `openapi.yaml` is a version behind.
+ * There used to be an "ahead of the contract" block at the bottom holding a
+ * corrected `MarksLost`, `MarksLostCause` and `TopicState`, because the server
+ * had moved and the spec had not. It is gone. The contract now carries the
+ * fifth cause bucket, `attributed_lost`, `recoverable_pct`, and a `TopicState`
+ * with no `accuracy_30d` — so regenerating *deleted* the overrides rather than
+ * silently disagreeing with them, which is the property they were written for.
  */
 import type { components } from "./schema";
 
@@ -18,6 +22,8 @@ export type Institute = S["Institute"];
 export type Intervention = S["Intervention"];
 export type InterventionRequest = S["InterventionRequest"];
 export type LoginRequest = S["LoginRequest"];
+export type MarksLost = S["MarksLost"];
+export type MarksLostCause = S["MarksLostCause"];
 export type Me = S["Me"];
 export type Mentor = S["Mentor"];
 export type MockScore = S["MockScore"];
@@ -28,21 +34,57 @@ export type StudentState = S["StudentState"];
 export type SubjectBreakdown = S["SubjectBreakdown"];
 export type TestPaper = S["TestPaper"];
 export type Topic = S["Topic"];
+export type TopicState = S["TopicState"];
 
 export type Severity = S["SeverityEnum"];
-export type Outcome = S["OutcomeEnum"];
+/**
+ * How a closed flag turned out. Renamed from `OutcomeEnum` in the contract, and
+ * `Flag.outcome` unions it with `BlankEnum` (`""`) for a flag still open — so
+ * a reader must narrow before indexing a label table by it.
+ */
+export type Outcome = S["FlagOutcomeEnum"];
+export type ResolveOutcome = S["FlagResolveOutcomeEnum"];
 export type AttemptStatus = S["StatusEnum"];
 export type AttemptSource = S["SourceEnum"];
 export type TopicKind = S["KindEnum"];
 export type StudyMode = S["ModeEnum"];
 
 /**
+ * The mistake taxonomy, now five members.
+ *
+ * The fifth is not a cause in the sense the other four are. They say what went
+ * wrong; `insufficient_evidence` says the engine will not guess, because the
+ * chapter sits below the four-attempt evidence floor. `lib/causes.ts` carries
+ * that distinction all the way to the pixels.
+ */
+export type CauseName = S["CauseEnum"];
+
+/* ------------------------------------------------------------------ *
+ * The reasoning layer
+ *
+ * Generated, as of the 27-endpoint contract. These were hand-written in
+ * `api/diagnosis.ts` while the routes were live but unspecified; they are
+ * ordinary aliases now.
+ * ------------------------------------------------------------------ */
+
+export type Diagnosis = S["Diagnosis"];
+export type DiagnosisEvidence = S["DiagnosisEvidence"];
+export type DiagnosisHypothesis = S["DiagnosisHypothesis"];
+export type QuestionDetail = S["QuestionDetail"];
+export type QuestionOption = S["QuestionOption"];
+export type Misconception = S["Misconception"];
+export type DiagnosisVerdictRequest = S["DiagnosisVerdictRequest"];
+export type Confidence = S["ConfidenceEnum"];
+export type Verdict = S["VerdictEnum"];
+export type TimeToFix = S["TimeToFixEnum"];
+
+/**
  * The DRF `PageNumberPagination` envelope.
  *
- * The contract claims this for every list route. The server only delivers it
- * from the router-generated ones — the four `@action` routes return a bare
- * array. Nothing outside `api/pagination.ts` and `api/client.ts` should care;
- * see the note at the top of `pagination.ts` for why.
+ * Every list route the console reads now delivers this, including the four
+ * `@action` detail routes that once returned bare arrays. Nothing outside
+ * `api/pagination.ts` and `api/client.ts` should care which — see the note at
+ * the top of `pagination.ts` for why both are still accepted.
  */
 export interface Paginated<T> {
   count: number;
@@ -50,52 +92,3 @@ export interface Paginated<T> {
   previous?: string | null;
   results: T[];
 }
-
-/* ------------------------------------------------------------------ *
- * Ahead of the contract
- *
- * The three types below are generated ones with a correction applied on top,
- * because the API changed after this worktree's `openapi.yaml` was generated
- * and regenerating mid-task would drag in an unrelated, half-landed spec. Same
- * discipline as `api/diagnosis.ts`: each override is narrow, each is named in
- * `api/gaps.ts`, and each is written so that regenerating *deletes* it rather
- * than silently disagreeing with it.
- *
- * `MarksLost` is the one place in this client where being a version behind is
- * not a typing inconvenience but a wrong number in front of a buyer:
- * `recoverable` no longer means what its old denominator assumed.
- * ------------------------------------------------------------------ */
-
-/**
- * The taxonomy gained a fifth member.
- *
- * It is not a fifth *cause* in the sense the other four are. The four say what
- * went wrong; this one says the engine will not guess. `lib/causes.ts` carries
- * that distinction all the way to the pixels.
- */
-export type CauseName = S["CauseEnum"] | "insufficient_evidence";
-
-export type MarksLostCause = Omit<S["MarksLostCause"], "cause"> & {
-  cause: CauseName;
-};
-
-export type MarksLost = Omit<S["MarksLost"], "causes"> & {
-  causes: MarksLostCause[];
-  /**
-   * Marks the engine declines to attribute, because the student has barely
-   * attempted those chapters. Counted in `total_lost`, excluded from
-   * `attributed_lost`.
-   */
-  insufficient_evidence: number;
-  /** `total_lost` minus `insufficient_evidence` — the loss we can explain. */
-  attributed_lost: number;
-  /**
-   * `recoverable` as a share of `attributed_lost`, **not** of `total_lost`.
-   * Null when nothing is attributed. Always read from the server: recomputing
-   * it locally is exactly the bug this field exists to prevent.
-   */
-  recoverable_pct: number | null;
-};
-
-/** `accuracy_30d` left the contract, so nothing may bind to it. */
-export type TopicState = Omit<S["TopicState"], "accuracy_30d">;

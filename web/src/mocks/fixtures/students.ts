@@ -16,6 +16,13 @@ interface Seed {
   target: string;
   joined_at: string;
   exited_at?: string | null;
+  /**
+   * **0–1, like the API.** These were 0–100, and nothing caught it, because the
+   * console banded them at 75/55/35 and so agreed with itself perfectly — right
+   * up until it met a live server sending 0.696 and chipped a high-risk student
+   * "On track". A fixture on a different scale from the server is not a test
+   * double; it is a second implementation that happens to render.
+   */
   risk_score: number;
   /** Intent for the generated mock series; the real figures are derived. */
   avg: number;
@@ -38,7 +45,7 @@ export const seeds: Seed[] = [
     mentorId: 1,
     target: "AIR < 5000",
     joined_at: "2025-06-02",
-    risk_score: 86,
+    risk_score: 0.86,
     avg: 152.6,
     trend: -37,
     open_flags: 2,
@@ -58,7 +65,7 @@ export const seeds: Seed[] = [
     mentorId: 2,
     target: "AIR < 10000",
     joined_at: "2025-04-18",
-    risk_score: 81,
+    risk_score: 0.81,
     avg: 168,
     trend: -22,
     open_flags: 2,
@@ -78,7 +85,7 @@ export const seeds: Seed[] = [
     mentorId: 3,
     target: "NIT — CSE",
     joined_at: "2025-06-11",
-    risk_score: 62,
+    risk_score: 0.62,
     avg: 141,
     trend: -6,
     open_flags: 1,
@@ -98,7 +105,7 @@ export const seeds: Seed[] = [
     mentorId: 1,
     target: "AIR < 8000",
     joined_at: "2025-06-02",
-    risk_score: 58,
+    risk_score: 0.58,
     avg: 176,
     trend: 3,
     open_flags: 1,
@@ -118,7 +125,7 @@ export const seeds: Seed[] = [
     mentorId: 4,
     target: "AIR < 15000",
     joined_at: "2025-04-22",
-    risk_score: 55,
+    risk_score: 0.55,
     avg: 150,
     trend: -4,
     open_flags: 1,
@@ -138,7 +145,7 @@ export const seeds: Seed[] = [
     mentorId: 3,
     target: "NIT — ECE",
     joined_at: "2025-06-09",
-    risk_score: 34,
+    risk_score: 0.34,
     avg: 159,
     trend: 19,
     open_flags: 1,
@@ -158,7 +165,7 @@ export const seeds: Seed[] = [
     mentorId: 1,
     target: "AIR < 3000",
     joined_at: "2025-06-02",
-    risk_score: 41,
+    risk_score: 0.41,
     avg: 189,
     trend: 8,
     open_flags: 0,
@@ -172,7 +179,7 @@ export const seeds: Seed[] = [
     mentorId: 3,
     target: "NIT — Mech",
     joined_at: "2025-06-09",
-    risk_score: 28,
+    risk_score: 0.28,
     avg: 172,
     trend: 11,
     open_flags: 0,
@@ -186,7 +193,7 @@ export const seeds: Seed[] = [
     mentorId: 4,
     target: "AIR < 20000",
     joined_at: "2026-04-06",
-    risk_score: 47,
+    risk_score: 0.47,
     avg: 133,
     trend: -9,
     open_flags: 1,
@@ -200,7 +207,7 @@ export const seeds: Seed[] = [
     mentorId: 2,
     target: "AIR < 12000",
     joined_at: "2025-04-18",
-    risk_score: 30,
+    risk_score: 0.30,
     avg: 163,
     trend: 4,
     open_flags: 0,
@@ -214,7 +221,7 @@ export const seeds: Seed[] = [
     mentorId: 1,
     target: "AIR < 1500",
     joined_at: "2025-06-02",
-    risk_score: 22,
+    risk_score: 0.22,
     avg: 205,
     trend: 14,
     open_flags: 0,
@@ -228,7 +235,7 @@ export const seeds: Seed[] = [
     mentorId: 4,
     target: "AIR < 25000",
     joined_at: "2026-04-06",
-    risk_score: 51,
+    risk_score: 0.51,
     avg: 127,
     trend: -2,
     open_flags: 1,
@@ -242,7 +249,7 @@ export const seeds: Seed[] = [
     mentorId: 3,
     target: "NIT — EE",
     joined_at: "2025-06-09",
-    risk_score: 19,
+    risk_score: 0.19,
     avg: 182,
     trend: 6,
     open_flags: 0,
@@ -257,7 +264,7 @@ export const seeds: Seed[] = [
     target: "AIR < 20000",
     joined_at: "2025-04-18",
     exited_at: "2026-08-30",
-    risk_score: 72,
+    risk_score: 0.72,
     avg: 119,
     trend: -18,
     open_flags: 0,

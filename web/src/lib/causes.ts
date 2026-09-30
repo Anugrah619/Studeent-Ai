@@ -68,7 +68,7 @@ export const CAUSES: Record<CauseKey, CauseToken> = {
   time_exhaustion: {
     key: "time_exhaustion",
     label: "Time exhaustion",
-    meaning: "Unattempted — the clock ran out before he reached it",
+    meaning: "Unattempted — the clock ran out before they reached it",
     color: "var(--cause-time)",
     ink: "#ffffff",
     attributed: true,

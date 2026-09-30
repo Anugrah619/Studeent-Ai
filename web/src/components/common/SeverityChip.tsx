@@ -37,8 +37,8 @@ export function SeverityChip({
 }
 
 /**
- * The same chip driven by `risk_score`. The band boundaries are a UI decision —
- * the contract documents no scale (see API_GAPS.RISK_SCORE_BANDS).
+ * The same chip driven by `risk_score`, which is on a **0–1** scale. The band
+ * boundaries are the server's — see `RISK_BANDS` in `lib/severity.ts`.
  */
 export function RiskChip({
   score,

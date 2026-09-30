@@ -83,16 +83,33 @@ export const SEVERITY_FILTER_ORDER: (Severity | "ok")[] = [
 ];
 
 /**
- * `risk_score` arrives with no documented scale or thresholds
- * ({@link API_GAPS.RISK_SCORE_BANDS}). These bands assume 0–100 and are a UI
- * decision until the contract states otherwise — the detector tiers that
- * actually own them live in the backend.
+ * The band cut-offs for `risk_score`, and the scale they sit on.
+ *
+ * **0–1, not 0–100.** The contract says so now, and this function assumed
+ * otherwise: against the live server it banded 0.696 — a high-risk student —
+ * at `>= 75`, fell through every branch, and returned "On track". The whole
+ * institute rendered as healthy, on the one screen whose entire job is to say
+ * who is not. Nothing caught it because the mock fixtures shipped 0–100
+ * values, so the console agreed with itself right up to first contact.
+ *
+ * The four bands are the server's, not a UI decision: `?at_risk=true` keys off
+ * the same 0.55, so a student the API calls at-risk and a student this console
+ * chips "High" are the same student by construction rather than by luck.
  */
+export const RISK_BANDS = {
+  critical: 0.75,
+  high: 0.55,
+  watch: 0.35,
+} as const;
+
 export function riskBand(score: number | null | undefined): SeverityToken {
+  // Null means not enough signal to score them at all — unmeasured, not safe.
+  // It renders as `ok` because there is nothing to claim, but no *number* may
+  // arrive here by falling through the bands.
   if (score == null) return SEVERITY.ok;
-  if (score >= 75) return SEVERITY.critical;
-  if (score >= 55) return SEVERITY.high;
-  if (score >= 35) return SEVERITY.watch;
+  if (score >= RISK_BANDS.critical) return SEVERITY.critical;
+  if (score >= RISK_BANDS.high) return SEVERITY.high;
+  if (score >= RISK_BANDS.watch) return SEVERITY.watch;
   return SEVERITY.ok;
 }
 
