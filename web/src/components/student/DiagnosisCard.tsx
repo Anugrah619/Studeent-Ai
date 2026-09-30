@@ -27,6 +27,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/common/States";
+import { QuestionPanel } from "./QuestionPanel";
 import { num } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -255,7 +256,11 @@ function DiagnosisBody({
           <ul className="mt-3 space-y-3">
             {data.hypotheses.map((h) => (
               <li key={`${h.misconception_code}-${h.claim}`}>
-                <HypothesisBlock hypothesis={h} />
+                <HypothesisBlock
+                  hypothesis={h}
+                  studentId={studentId}
+                  studentName={studentName}
+                />
               </li>
             ))}
           </ul>
@@ -348,7 +353,15 @@ function NoPattern({ name }: { name: string }) {
  * One hypothesis
  * ------------------------------------------------------------------ */
 
-function HypothesisBlock({ hypothesis }: { hypothesis: Hypothesis }) {
+function HypothesisBlock({
+  hypothesis,
+  studentId,
+  studentName,
+}: {
+  hypothesis: Hypothesis;
+  studentId: number;
+  studentName: string;
+}) {
   // `evidence`, not `evidence_questions`. The latter is the labels the model
   // literally wrote and is display-only; this is the same list with each one
   // resolved against the student's own attempts.
@@ -393,9 +406,19 @@ function HypothesisBlock({ hypothesis }: { hypothesis: Hypothesis }) {
               plain text rather than as something that looks openable. The
               contract is explicit about that, and it is right: a chip that
               opens an empty panel is worse than a chip that visibly is not
-              one. */}
+              one.
+
+              A resolved chip is a button, and clicking it opens the question
+              itself. That click is the whole point of tagging distractors: it
+              turns "he chose C on D16" from a claim into the stem, the four
+              options and the belief that produced C. */}
           {evidence.map((cited) => (
-            <EvidenceChip key={cited.label} cited={cited} />
+            <EvidenceChip
+              key={cited.label}
+              cited={cited}
+              studentId={studentId}
+              studentName={studentName}
+            />
           ))}
           <span className="text-[11px] text-muted-foreground">
             {evidence.length === 1
@@ -416,12 +439,24 @@ function HypothesisBlock({ hypothesis }: { hypothesis: Hypothesis }) {
  * One cited question.
  *
  * Resolved citations show the label and the option this student picked, which
- * is what makes the claim checkable against the paper in the teacher's hand.
+ * is what makes the claim checkable against the paper in the teacher's hand —
+ * and, now, they *open* the question, which is what makes it checkable without
+ * the paper in the teacher's hand at all.
+ *
  * Unresolved ones — the model named a question that is not a wrong answer this
- * student gave on this paper — are deliberately duller and carry a title
- * saying so, rather than sitting in the row looking like the others.
+ * student gave on this paper — stay a dashed, inert span with a title saying
+ * so. They are deliberately not buttons: a chip that opens an empty panel is
+ * worse than a chip that visibly is not one.
  */
-function EvidenceChip({ cited }: { cited: Evidence }) {
+function EvidenceChip({
+  cited,
+  studentId,
+  studentName,
+}: {
+  cited: Evidence;
+  studentId: number;
+  studentName: string;
+}) {
   if (!isResolved(cited)) {
     return (
       <span
@@ -434,17 +469,27 @@ function EvidenceChip({ cited }: { cited: Evidence }) {
   }
 
   return (
-    <span
-      className="tnum inline-flex items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
-      title={`${cited.label}: chose ${cited.chose} · ${cited.marks_at_stake} marks`}
+    <QuestionPanel
+      questionId={cited.question_id}
+      studentId={studentId}
+      studentName={studentName}
     >
-      {cited.label}
-      {cited.chose ? (
-        <span className="font-normal text-muted-foreground">
-          chose {cited.chose}
+      <button
+        type="button"
+        className="tnum inline-flex cursor-pointer items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground underline decoration-dotted decoration-from-font underline-offset-[3px] transition-colors outline-none hover:border-foreground/40 hover:bg-accent focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        title={`${cited.label}: chose ${cited.chose} · ${cited.marks_at_stake} marks. Open the question.`}
+      >
+        {cited.label}
+        {cited.chose ? (
+          <span className="font-normal text-muted-foreground">
+            chose {cited.chose}
+          </span>
+        ) : null}
+        <span className="sr-only">
+          — open this question, the options and what that choice reveals
         </span>
-      ) : null}
-    </span>
+      </button>
+    </QuestionPanel>
   );
 }
 
