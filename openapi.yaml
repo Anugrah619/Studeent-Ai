@@ -812,6 +812,58 @@ paths:
               schema:
                 $ref: '#/components/schemas/TestPaper'
           description: ''
+  /api/questions/{id}/:
+    get:
+      operationId: questions_retrieve
+      description: |-
+        The stem, every option, which is correct, and what each wrong one means.
+
+        With `?student=`, also which option this student chose — which is
+        the pairing that makes the diagnosis checkable: the claim says
+        "reverses the directing-effect rule", and here is the option that
+        exactly that reversal produces, ticked.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this question topic map.
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      - in: query
+        name: student
+        schema:
+          type: integer
+        description: |-
+          Show this question **as one student answered it**: `options[].chosen`, plus `chosen_label`, `status`, `marks` and `time_spent`.
+
+          This is what `DiagnosisEvidence.question_id` is for — pair it with the student whose diagnosis cited it and the panel shows the stem, the option they reached for, and what reaching for it indicates.
+
+          Omit it and those fields are all null and `options[].chosen` is null too, which is 'not asked' rather than 'not chosen'. A student id from another institute is a 404, not a silently unanswered question.
+      tags:
+      - questions
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionDetail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: No such question, or no such student, in this institute.
   /api/students/:
     get:
       operationId: students_list
@@ -1000,6 +1052,13 @@ paths:
         only "got Q17 wrong, topic Rotational Motion" returns "revise
         Rotational Motion" — worse than an honest error, because it looks
         like an answer.
+
+        **Every error body here is prose, not a developer message.** This
+        panel is read over a mentor's shoulder by the person deciding
+        whether to buy the product, and "GEMINI_API_KEY is not set" in front
+        of them costs more than the outage does. The exception text is
+        logged; what is returned is a sentence that explains the situation
+        and says whether anything is actually wrong.
       parameters:
       - in: query
         name: force
@@ -1024,7 +1083,10 @@ paths:
         name: paper
         schema:
           type: integer
-        description: Restrict to one paper.
+        description: Restrict the diagnosis to one paper. Echoed back as `paper_id`
+          / `paper_name`, so the response says what it is about and can be cached
+          under its own key. Omit it and the diagnosis spans every paper the student
+          has sat, and both fields come back null.
       tags:
       - reasoning
       security:
@@ -1036,10 +1098,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/Diagnosis'
           description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: No such paper in this institute.
         '422':
-          description: Nothing to diagnose — see detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: 'Nothing to diagnose. A real state of the data, not a failure:
+            either no wrong answer here has its chosen option recorded, or none of
+            those options has been described yet. `detail` is a complete sentence
+            written for a coaching director and is safe to show verbatim.'
         '503':
-          description: Reasoning layer unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: The reasoning service could not be reached. `detail` is written
+            for a coaching director and is safe to show verbatim; the technical cause
+            is logged server-side rather than returned.
   /api/students/{id}/diagnosis/verdict/:
     post:
       operationId: students_diagnosis_verdict_create
@@ -1517,6 +1598,18 @@ components:
         different response, so the model is allowed to say so rather than being
         pushed into inventing a pattern.
       properties:
+        paper_id:
+          type: integer
+          nullable: true
+          description: |-
+            The paper this diagnosis is about, echoed back from `?paper=` so the payload says what it is about instead of the client having to remember what it asked for — which is also what makes it safe to cache under its own key.
+
+            Null means the diagnosis spans **every paper this student has sat**, which is what omitting `?paper=` asks for. Null is not 'unknown'.
+        paper_name:
+          type: string
+          nullable: true
+          description: Display name for `paper_id`. Null when the diagnosis spans
+            all papers.
         headline:
           type: string
         pattern_found:
@@ -1525,6 +1618,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DiagnosisHypothesis'
+        total_marks_at_stake:
+          type: integer
+          description: |-
+            Marks the whole diagnosis accounts for, computed server-side as `MARKS_PER_WRONG x` the number of **distinct** questions cited across all hypotheses.
+
+            **Hypotheses cannot overlap, so this is a clean total.** A student picks one option per question, and one option carries at most one misconception, so a wrong answer is evidence for exactly one finding. (Six of the forty tagged questions do *offer* two different misconceptions across their distractors — but only the one the student actually chose can fire.) The de-duplication above therefore guards against the model citing the same question twice rather than against real overlap, and on every trace recorded so far it has removed nothing.
+
+            **It will still differ from the number in `headline`, and that is not a contradiction.** The headline quotes the cost of the *leading* hypothesis; this is the cost of all of them. A card showing both should label this one as the total across findings.
+
+            It is also generally **less** than the marks the paper lost in total: wrong answers on untagged distractors, skips and unreached questions are all real losses that a misconception diagnosis has nothing to say about. For the full partition of a paper's lost marks use `/api/students/{id}/marks-lost/`.
         recommended_action:
           type: string
         time_to_fix:
@@ -1550,12 +1653,52 @@ components:
       - headline
       - human_verdict
       - hypotheses
+      - paper_id
+      - paper_name
       - pattern_found
       - recommended_action
       - time_to_fix
+      - total_marks_at_stake
       - trace_id
+    DiagnosisEvidence:
+      type: object
+      description: |-
+        One cited question, resolved so the console can actually open it.
+
+        `evidence_questions` carries bare labels like `"D16"`, and a label is
+        unique only *within one paper* — there is no URL a client can build
+        from it. That is why this exists: the server resolves every citation
+        against the student's own attempts and hands back the id that
+        `GET /api/questions/{id}/` answers on.
+      properties:
+        question_id:
+          type: integer
+          nullable: true
+          description: |-
+            `QuestionTopicMap.id` — pass it straight to `GET /api/questions/{id}/?student={student_id}` to get the stem, the options, which one is correct, which one this student chose and what that choice indicates. It is the same value as `QuestionDetail.id` on that endpoint.
+
+            **Null means the citation did not resolve**: the model named a question that is not a wrong answer this student gave on this paper, or the paper carries no mapped question by that label. Render those as plain text, never as a link to nowhere — a chip that opens an empty panel is worse than a chip that visibly is not one.
+        label:
+          type: string
+          description: The question as the paper prints it — `"D16"`. What the chip
+            shows, and the same string as `QuestionDetail.label`.
+        chose:
+          type: string
+          description: The option letter this student actually picked, e.g. `"C"`.
+            Blank when the citation did not resolve.
+        marks_at_stake:
+          type: integer
+          description: 'What this one question cost: 5 — the 4 marks forgone plus
+            the 1-mark penalty. 0 when the citation did not resolve, because no marks
+            can be claimed for a question we cannot tie to an answer.'
+      required:
+      - chose
+      - label
+      - marks_at_stake
+      - question_id
     DiagnosisHypothesis:
       type: object
+      description: One candidate explanation, with the questions it rests on.
       properties:
         misconception_code:
           type: string
@@ -1567,14 +1710,33 @@ components:
           type: array
           items:
             type: string
+          description: The labels the model cited, verbatim. **Display only.** It
+            is kept because it is what the model wrote, but it cannot be linked from
+            — use `evidence` instead, which is the same list with each label resolved
+            to a routable id.
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosisEvidence'
+          description: '`evidence_questions`, resolved. One entry per cited label,
+            in the order the model gave them.'
         counter_evidence:
           type: string
+          description: |-
+            The correct answers that narrow this finding — the strongest thing on the card, because it is what separates 'weak at this chapter' from 'fails only when the condition is implicit'.
+
+            **Never blank and never null.** The prompt already tells the model to say plainly that there is no counter-evidence on this paper when there is none; the server now guarantees it. If the model returns nothing, one of two sentences is substituted — 'no counter-evidence on this paper, the weakness may be chapter-wide' when none was available to it, or 'the model did not state the counter-evidence, treat this finding as un-narrowed' when some was. The second is deliberately not disguised as the first: they are different claims and only one of them is good news.
         marks_at_stake:
           type: integer
+          description: |-
+            `5 x` the number of citations in `evidence` that resolved. **Counted server-side, not taken from the model** — the model is asked for judgement, not arithmetic, and this is the arithmetic. Sum `evidence[].marks_at_stake` to check it.
+
+            Only the model's own figure survives if *no* citation resolved, in which case there is nothing better to offer and `evidence` will show why.
       required:
       - claim
       - confidence
       - counter_evidence
+      - evidence
       - evidence_questions
       - marks_at_stake
       - misconception_code
@@ -1593,6 +1755,16 @@ components:
           type: string
       required:
       - verdict
+    DifficultyEnum:
+      enum:
+      - easy
+      - medium
+      - hard
+      type: string
+      description: |-
+        * `easy` - Easy
+        * `medium` - Medium
+        * `hard` - Hard
     Flag:
       type: object
       description: |-
@@ -2059,6 +2231,35 @@ components:
       - id
       - name
       - student_count
+    Misconception:
+      type: object
+      description: |-
+        What a particular wrong answer means — the taxonomy, not the score.
+
+        Global rather than tenant-scoped: physics misconceptions are the same
+        in Kota and Jaipur. Institutes share the vocabulary; only their data
+        is separated.
+      properties:
+        code:
+          type: string
+          maxLength: 32
+        subject:
+          type: string
+          maxLength: 32
+        name:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          description: The wrong belief, stated as the student would hold it.
+        remedy:
+          type: string
+          description: What actually fixes it. Shown to the mentor.
+      required:
+      - code
+      - description
+      - name
+      - subject
     MockScore:
       type: object
       properties:
@@ -2399,6 +2600,153 @@ components:
       - start_time
       - subject
       - topic_name
+    QuestionDetail:
+      type: object
+      description: |-
+        One question, in full — what a director sees on clicking an evidence chip.
+
+        This is the endpoint that closes the loop the diagnosis card opens.
+        A finding cites `D16`; clicking it has to show the actual question,
+        the option the student reached for, and what reaching for it means.
+        Without that the evidence is an assertion the reader has no way to
+        check, and checkability is the entire argument for tagging distractors.
+
+        With `?student=`, three fields at the bottom and `options[].chosen`
+        describe what that one student did here. Without it the question comes
+        back on its own, which is what a client wants when it is showing the
+        paper rather than a person.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        label:
+          type: string
+          readOnly: true
+          description: The question as the paper prints it — `"D16"`. Unique within
+            a paper, **not** across papers, which is why `id` and not this is what
+            `DiagnosisEvidence.question_id` carries. Stored as `QuestionTopicMap.question_id`.
+        paper_id:
+          type: integer
+          readOnly: true
+        paper_name:
+          type: string
+          readOnly: true
+        topic:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Chapter. Null on a question nobody has mapped yet.
+        subject:
+          type: string
+          nullable: true
+          readOnly: true
+        difficulty:
+          oneOf:
+          - $ref: '#/components/schemas/DifficultyEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        question_text:
+          type: string
+        solution:
+          type: string
+          description: The worked method, not just the final answer.
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionOption'
+          readOnly: true
+        student_id:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Echo of `?student=`. Null when the question was fetched on
+            its own.
+        chosen_label:
+          type: string
+          readOnly: true
+          nullable: true
+          description: The option letter this student picked. Null when `?student=`
+            was not given, and also when it was but the student left this question
+            blank or never reached it — `status` distinguishes those.
+        status:
+          readOnly: true
+          nullable: true
+          description: |-
+            What became of this question for this student. A closed set, because `blank` and `not_reached` are the distinction the whole marks-lost taxonomy rests on — choosing to skip and running out of time need opposite advice. Null when `?student=` was not given, or when this student has no attempt recorded here.
+
+            * `correct` - Correct
+            * `wrong` - Wrong
+            * `blank` - Skipped deliberately
+            * `not_reached` - Ran out of time
+          oneOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        marks:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Marks scored on this question after negative marking. Null
+            as above.
+        time_spent:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Seconds spent. Often genuinely absent even when the attempt
+            exists.
+      required:
+      - chosen_label
+      - id
+      - label
+      - marks
+      - options
+      - paper_id
+      - paper_name
+      - status
+      - student_id
+      - subject
+      - time_spent
+      - topic
+    QuestionOption:
+      type: object
+      description: |-
+        One lettered option, and what choosing it would reveal.
+
+        `misconception` is populated on wrong options that have been
+        explained, which is the whole reason this endpoint is worth opening:
+        it answers *why the wrong option was tempting*, not just that it was
+        wrong. A wrong option with a null misconception is a gap in the
+        taxonomy rather than a bug — it simply cannot contribute to a
+        diagnosis.
+      properties:
+        label:
+          type: string
+          maxLength: 2
+        text:
+          type: string
+          maxLength: 500
+        is_correct:
+          type: boolean
+        chosen:
+          type: boolean
+          readOnly: true
+          nullable: true
+          description: Whether the student named by `?student=` picked this option.
+            **Null on every option when `?student=` was not given** — null is 'not
+            asked', which is a different thing from `false`, and a client that renders
+            null as 'not chosen' will show a question where the student appears to
+            have answered nothing.
+        misconception:
+          allOf:
+          - $ref: '#/components/schemas/Misconception'
+          readOnly: true
+          nullable: true
+          description: The wrong belief that produces this option. Always null on
+            the correct option, and null on wrong options nobody has explained yet.
+      required:
+      - chosen
+      - label
+      - misconception
+      - text
     RoleEnum:
       enum:
       - mentor

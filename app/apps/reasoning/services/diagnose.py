@@ -15,11 +15,62 @@ from __future__ import annotations
 from collections import defaultdict
 
 from apps.events.models import Attempt
-from apps.ingestion.models import QuestionOption
+from apps.ingestion.models import QuestionOption, QuestionTopicMap, TestPaper
 from apps.reasoning.models import ReasoningTrace
 from apps.reasoning.services import gemini
 
 PROMPT_VERSION = "diagnose-v1"
+
+#: What one wrong answer costs: the 4 marks forgone plus the 1-mark
+#: penalty. Extracted from the literal that used to sit inside
+#: `build_context` so the payload the model reads and the totals the API
+#: publishes cannot drift apart — they are now the same constant.
+#:
+#: Flat rather than read from `TestPaper.marks_correct / marks_wrong`
+#: because changing it would change every stored `context`, and the
+#: context hash is the reasoning cache key: a different number here
+#: silently re-reasons every student on the next page load. When papers
+#: with other marking schemes arrive this becomes a per-paper lookup, and
+#: that is a deliberate cache flush, not an accident.
+MARKS_PER_WRONG = 5
+
+#: Written when the model leaves `counter_evidence` empty AND the derived
+#: `counter_evidence_by_pattern` had nothing for that code either. The
+#: prompt (rule 2) already instructs the model to say exactly this; the
+#: contract now guarantees it rather than hoping.
+COUNTER_EVIDENCE_ABSENT = (
+    "No counter-evidence on this paper: the student was not asked a question "
+    "in these chapters where this belief could not have fired, so nothing "
+    "here narrows the weakness. It may be chapter-wide rather than specific "
+    "to one kind of question."
+)
+
+#: The other case, and a different claim: there WERE correct answers that
+#: could have narrowed this, and the model did not use them. Saying "no
+#: counter-evidence" here would be false, so it says what is true.
+COUNTER_EVIDENCE_UNSTATED = (
+    "The model did not state the counter-evidence for this finding, although "
+    "the student did answer related questions correctly. Treat this finding "
+    "as un-narrowed: it has not been shown where the error starts."
+)
+
+
+class NothingToDiagnose(ValueError):
+    """Not enough tagged evidence to reason over. A real state, not a crash.
+
+    Subclasses `ValueError` so existing handlers keep working, and splits
+    into two cases so the API can explain *which* one without matching on
+    the text of an exception message.
+    """
+
+
+class NoOptionsRecorded(NothingToDiagnose):
+    """The results carry right/wrong but not which option was chosen."""
+
+
+class NoMisconceptionTags(NothingToDiagnose):
+    """The options are recorded, but nobody has said what the wrong ones mean."""
+
 
 SYSTEM_PROMPT = """\
 You are an experienced JEE/NEET faculty member reviewing one student's answer
@@ -142,7 +193,14 @@ RESPONSE_SCHEMA = {
                     "evidence_questions": {"type": "array", "items": {"type": "string"}},
                     "counter_evidence": {
                         "type": "string",
-                        "description": "Correct answers that narrow or complicate this. Empty if none.",
+                        "description": (
+                            "Correct answers that narrow or complicate this, "
+                            "naming the question ids and what was different "
+                            "about them. Never empty: if there are none, say "
+                            "plainly that there is no counter-evidence on "
+                            "this paper and that the weakness may therefore "
+                            "be chapter-wide."
+                        ),
                     },
                     "marks_at_stake": {"type": "integer"},
                 },
@@ -235,10 +293,11 @@ def build_context(student, paper=None) -> dict:
             continue
 
         mis = opt.misconception
+        entry["_key"] = (a.test_paper_id, a.question_id)
         entry["option_text"] = opt.text
         if mis:
             entry["indicates"] = mis.code
-            marks_by_code[mis.code] += 5      # the 4 lost plus the 1 penalty
+            marks_by_code[mis.code] += MARKS_PER_WRONG
             chapters_by_code[mis.code].add(a.topic.name)
             seen_codes.setdefault(mis.code, {
                 "code": mis.code,
@@ -284,12 +343,19 @@ def build_context(student, paper=None) -> dict:
 
     # The wrong answers get their stems too, so the claim can name what the
     # student was actually asked rather than gesturing at a chapter.
+    # Key on (paper, question), not question alone. Every paper numbers its
+    # questions Q1..Q75, so matching on the label only meant a diagnosis
+    # spanning two mocks gave every same-numbered wrong answer whichever
+    # stem happened to be found first — and the model would then quote to a
+    # mentor, as evidence, a question the student never sat.
+    #
+    # The counter-evidence lookup twenty lines above always used the full
+    # key; this line simply did not. Only bites when `?paper=` is omitted,
+    # which is why it survived every single-paper test.
     for w in wrong:
-        key = next(
-            (k for k in stems if k[1] == w["q"]), None
-        )
-        if key:
-            w["stem"] = stems[key][:220]
+        stem = stems.get(w.pop("_key", None))
+        if stem:
+            w["stem"] = stem[:220]
 
     return {
         "student_ref": f"S-{student.id}",
@@ -319,19 +385,26 @@ def build_context(student, paper=None) -> dict:
 
 
 def diagnose(student, paper=None, force: bool = False) -> tuple[dict, ReasoningTrace]:
-    """Run the diagnosis. Raises if there is nothing to reason about."""
+    """Run the diagnosis. Raises `NothingToDiagnose` if there is no evidence.
+
+    Returns the **presented** output — the model's judgement plus the
+    derived fields in `present()`. The trace keeps the model's raw JSON
+    untouched, because that is the training example.
+    """
     context = build_context(student, paper)
 
     if context["totals"]["wrong"] == 0:
-        raise ValueError("No wrong answers with a recorded option — nothing to diagnose.")
+        raise NoOptionsRecorded(
+            "No wrong answers with a recorded option — nothing to diagnose."
+        )
     if context["totals"]["wrong_with_known_cause"] == 0:
-        raise ValueError(
+        raise NoMisconceptionTags(
             "This student's wrong answers are on questions whose distractors "
             "are not yet tagged with a misconception. Tag them first — "
             "without that the model can only repeat the chapter name back."
         )
 
-    return gemini.reason(
+    output, trace = gemini.reason(
         task=ReasoningTrace.DIAGNOSE,
         context=context,
         system_prompt=SYSTEM_PROMPT,
@@ -341,3 +414,148 @@ def diagnose(student, paper=None, force: bool = False) -> tuple[dict, ReasoningT
         prompt_version=PROMPT_VERSION,
         force=force,
     )
+    return present(output, context=context, student=student, paper=paper), trace
+
+
+# ----------------------------------------------------------- presentation
+
+
+def present(output: dict, *, context: dict, student, paper=None) -> dict:
+    """Turn the model's JSON into the payload the console can actually use.
+
+    Three things the model must not be trusted with, all of them Tier A:
+
+    1. **Linking.** The model cites `"D16"`, which is a label unique only
+       within one paper. A console cannot build a URL from it. Every
+       citation is resolved here against this student's own attempts, and
+       comes back with the `QuestionTopicMap.id` that
+       `GET /api/questions/{id}/` answers on — or with a null id if the
+       citation does not correspond to a wrong answer this student
+       actually gave, which the client must render as text rather than a
+       dead link.
+
+    2. **Arithmetic.** `marks_at_stake` is re-derived as
+       `MARKS_PER_WRONG x (distinct resolved citations)`, and
+       `total_marks_at_stake` as the same over the *union* across
+       hypotheses. On every trace recorded so far the model's own number
+       already equalled this; re-deriving it means a future drift shows
+       up as nothing at all instead of as a card whose chips and total
+       disagree in front of a director.
+
+    3. **Saying nothing.** A blank `counter_evidence` is replaced with the
+       sentence that is actually true for that hypothesis — see
+       `COUNTER_EVIDENCE_ABSENT` / `COUNTER_EVIDENCE_UNSTATED`.
+
+    The raw model output is *not* mutated: `ReasoningTrace.output` keeps
+    exactly what came back, because a training example that has been
+    quietly corrected is not a training example.
+    """
+    out = {
+        **output,
+        "hypotheses": [dict(h) for h in (output.get("hypotheses") or [])],
+    }
+
+    cited = {
+        q
+        for h in out["hypotheses"]
+        for q in (h.get("evidence_questions") or [])
+        if q
+    }
+    resolved = _resolve_evidence(student, paper, cited)
+    derived_counter = context.get("counter_evidence_by_pattern") or {}
+
+    accounted: set[str] = set()
+    for h in out["hypotheses"]:
+        labels = list(dict.fromkeys(h.get("evidence_questions") or []))
+        h["evidence"] = [
+            resolved.get(
+                label,
+                {"question_id": None, "label": label, "chose": "", "marks_at_stake": 0},
+            )
+            for label in labels
+        ]
+        hit = [label for label in labels if label in resolved]
+        if hit:
+            h["marks_at_stake"] = MARKS_PER_WRONG * len(hit)
+        accounted |= set(hit)
+
+        if not (h.get("counter_evidence") or "").strip():
+            code = h.get("misconception_code") or ""
+            h["counter_evidence"] = (
+                COUNTER_EVIDENCE_UNSTATED
+                if derived_counter.get(code)
+                else COUNTER_EVIDENCE_ABSENT
+            )
+
+    out["total_marks_at_stake"] = MARKS_PER_WRONG * len(accounted)
+    out["paper_id"] = paper.id if paper is not None else None
+    out["paper_name"] = paper.name if paper is not None else None
+    return out
+
+
+def _resolve_evidence(student, paper, labels: set[str]) -> dict[str, dict]:
+    """Map each cited label onto the attempt behind it, and a routable id.
+
+    Resolved against `Attempt` rather than `QuestionTopicMap` directly,
+    because the attempt is what says *which paper* a label like `"D16"`
+    belongs to — the label alone repeats across papers. It is also the
+    validation: a label that is not a wrong answer this student gave does
+    not resolve, and so cannot be linked or counted.
+    """
+    if not labels or student is None:
+        return {}
+
+    attempts = (
+        Attempt.objects
+        .filter(
+            student=student,
+            status=Attempt.WRONG,
+            chosen_option__gt="",
+            question_id__in=labels,
+        )
+        # Most recent first, so the `setdefault` below keeps the newest
+        # sitting when `paper` is None and a label repeats across papers.
+        .order_by("-ts", "-id")
+    )
+    if paper is not None:
+        attempts = attempts.filter(test_paper=paper)
+
+    by_label: dict[str, Attempt] = {}
+    for a in attempts:
+        by_label.setdefault(a.question_id, a)
+
+    pk_by = {
+        (q.test_paper_id, q.question_id): q.id
+        for q in QuestionTopicMap.objects.filter(
+            institute_id=student.institute_id,
+            test_paper_id__in={a.test_paper_id for a in by_label.values()},
+            question_id__in=set(by_label),
+        )
+    }
+    return {
+        label: {
+            "question_id": pk_by.get((a.test_paper_id, a.question_id)),
+            "label": label,
+            "chose": a.chosen_option,
+            "marks_at_stake": MARKS_PER_WRONG,
+        }
+        for label, a in by_label.items()
+    }
+
+
+def paper_for_trace(trace) -> TestPaper | None:
+    """Which paper a stored trace was run against.
+
+    Recovered from `context["paper"]`, which holds the name, because the
+    context is deliberately free of database ids — it is the de-identified
+    payload that leaves the building. Replaying a stored diagnosis needs
+    the paper back to resolve its evidence links, and looking the name up
+    inside the trace's own institute is the cheapest way that does not
+    change the payload (and therefore the cache key) to get it.
+    """
+    name = (trace.context or {}).get("paper")
+    if not name or name == "all papers":
+        return None
+    return TestPaper.objects.filter(
+        institute_id=trace.institute_id, name=name
+    ).first()
