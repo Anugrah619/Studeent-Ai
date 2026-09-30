@@ -16,6 +16,10 @@ export function dashboardSummary(): DashboardSummary {
   const recovered = closed.filter((f) => f.outcome === "recovered");
 
   return {
+    // The summary is institute-wide unless `?batch=` scopes it, and says which
+    // it is rather than leaving the reader to infer it from the filter chip.
+    batch_id: null,
+    batch_name: null,
     // Institute roster. Only 14 students are seeded in this fixture set.
     total_students: 312,
     active_students: 298,

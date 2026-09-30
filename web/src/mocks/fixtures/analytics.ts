@@ -131,9 +131,9 @@ export function marksLostFor(studentId: number, paperId: number): MarksLost | un
   ];
 
   return {
-    // Paper identity now travels with the attribution, so the UI can render
-    // "98 of 166" without a second request (this closed
-    // API_GAPS.MARKS_LOST_DENOMINATOR).
+    // Paper identity travels with the attribution, so the UI renders
+    // "134 of 184" from this row rather than from a constant. It used to read a
+    // constant, and quoted a 184-mark paper out of 300.
     paper_id: row.paper_id,
     paper_name: row.paper_name,
     held_on: row.held_on,
@@ -194,9 +194,10 @@ function topLossTopicsFor(studentId: number, paperId: number) {
  * ------------------------------------------------------------------ */
 
 /**
- * Mastery is reported on 0–1. The contract says `number, nullable` with no
- * documented range (see API_GAPS.RISK_SCORE_BANDS for the same problem on
- * risk_score), so the UI has to pick one; it renders as a percentage.
+ * Mastery is reported on 0–1, which the contract now states outright — as it
+ * does for `risk_score`, where the same ambiguity had the console banding a 0–1
+ * score at 0–100 cut-offs and calling the whole institute healthy. The UI
+ * renders mastery as a percentage.
  */
 const SUBJECT_FLOOR: Record<SubjectKey, [number, number]> = {
   physics: [0.38, 0.74],
@@ -241,9 +242,8 @@ export function topicStatesFor(studentId: number): TopicState[] {
       retention,
       attempts_n: attempts,
       correct_n: correct,
-      // `accuracy_30d` used to sit here. It left the contract — see
-      // API_GAPS.TOPIC_STATE_ACCURACY_30D_REMOVED — so the fixture must stop
-      // serving it too, or the mocks would keep a dead field alive.
+      // `accuracy_30d` used to sit here. It left the contract, so the fixture
+      // stops serving it too — otherwise the mocks keep a dead field alive.
       exposure_min: Math.round(40 + rand() * 520),
       avg_time_spent: round(70 + rand() * 130, 1),
       self_rating: selfRating,

@@ -5,55 +5,61 @@
  * the code that compensates for it imports from this file so the debt is
  * greppable. When the contract catches up, delete the entry and the call sites
  * stop compiling.
+ *
+ * MOST OF THIS FILE WAS DELETED against the 27-endpoint contract, which is what
+ * the file is for. Gone, and why:
+ *
+ *   FLAGS_OPEN_FILTER / FLAGS_STUDENT_FILTER   `?open=`, `?student=`,
+ *     `?severity=` and `?mentor=` are declared. Student 360 no longer pulls
+ *     every flag in the institute in order to find one student's.
+ *   STUDENTS_ORDERING                          `?ordering=` is declared, with
+ *     the sortable columns enumerated and `-risk_score,name` as the default.
+ *   DASHBOARD_BATCH_SCOPE                      `?batch=` is declared.
+ *   RISK_SCORE_BANDS                           the scale (0–1, **not** 0–100)
+ *     and the four band cut-offs are documented on `StudentList.risk_score`.
+ *     The console was banding a 0–1 score at 75/55/35, which rendered every
+ *     student on the live server as "On track".
+ *   MARKS_LOST_DENOMINATOR                     `MarksLost` carries `max_marks`
+ *     and `score`, so "X of Y" needs no second request.
+ *   MARKS_LOST_CAUSE_SHARE_DENOMINATOR         `share_pct` is documented as a
+ *     share of `total_lost`, with the five rows summing to 100%.
+ *   MARKS_LOST_FIFTH_CAUSE                     the fifth bucket,
+ *     `attributed_lost` and `recoverable_pct` are all in the schema, so
+ *     `api/marksLost.ts` and its widening cast are deleted.
+ *   TOPIC_STATE_ACCURACY_30D_REMOVED           the stale field is gone from
+ *     the contract, so the `Omit<>` that hid it is gone too.
+ *   NO_SESSION_ENDPOINT                        `/api/me/` is declared.
+ *   NO_MENTOR_LIST                             `/api/mentors/` is declared.
+ *   DIAGNOSIS_NOT_IN_CONTRACT / ..._VERDICT_   both reasoning routes are
+ *     declared, so `apiGetAhead`/`apiPostAhead` are deleted and
+ *     `api/diagnosis.ts` is generated types plus a parser.
+ *   DIAGNOSIS_EVIDENCE_ID_TYPE                 declared `string[]`, and the
+ *     live server returns paper labels (`"D16"`).
  */
 
 export const API_GAPS = {
-  /** `flags_list` declares only `page`. The triage view needs open flags only. */
-  FLAGS_OPEN_FILTER: "GET /api/flags/ has no `open` query param",
-  /** No `student` filter either, so Student 360 fetches all flags and filters. */
-  FLAGS_STUDENT_FILTER: "GET /api/flags/ has no `student` query param",
-  /** `students_list` has no ordering, so the triage table sorts client-side. */
-  STUDENTS_ORDERING: "GET /api/students/ has no `ordering` / `search` param",
-  /** `DashboardSummary` is institute-wide; the console has a batch filter. */
-  DASHBOARD_BATCH_SCOPE: "GET /api/dashboard/summary/ has no `batch` param",
-  /** `risk_score` has no documented scale or severity thresholds. */
-  RISK_SCORE_BANDS: "StudentList.risk_score has no documented scale/bands",
-  /** Mock scores are paginated with no guaranteed chronological ordering. */
+  /**
+   * `mock-scores/` is ordered by `held_on` in the view, but the contract does
+   * not promise it and the trend chart's whole meaning is the order of its
+   * points. The hook sorts rather than trusts.
+   */
   MOCK_SCORES_ORDER: "GET mock-scores/ does not guarantee held_on ordering",
-  /** `MarksLost` omits the paper max so 'X of Y' needs a second request. */
-  MARKS_LOST_DENOMINATOR: "MarksLost carries no max_marks / scored",
-  /** Nothing exposes the institute or the signed-in user. */
-  NO_SESSION_ENDPOINT: "No /api/me/ or /api/institute/ endpoint",
-  /** Intervention requires a mentor id but no mentor list endpoint exists. */
-  NO_MENTOR_LIST: "InterventionRequest.mentor has no source endpoint",
   /**
-   * The two reasoning-layer routes are live in the API but absent from the copy
-   * of `openapi.yaml` this worktree generates from, so `Diagnosis` and its
-   * verdict body are hand-written in `api/diagnosis.ts` instead of generated.
+   * Evidence question ids are paper labels (`"D16"`), and `attempts/` returns
+   * rows keyed by the same `question_id` — but nothing in the contract *says*
+   * they are the same identifier, and no endpoint resolves one to a question.
+   * So the card renders them as inert chips; a dead link would be worse.
    */
-  DIAGNOSIS_NOT_IN_CONTRACT:
-    "GET /api/students/{id}/diagnosis/ is not in openapi.yaml",
-  DIAGNOSIS_VERDICT_NOT_IN_CONTRACT:
-    "POST /api/students/{id}/diagnosis/verdict/ is not in openapi.yaml",
-  /** Nothing says whether a question id is an int pk or a paper label ("D3"). */
-  DIAGNOSIS_EVIDENCE_ID_TYPE:
-    "Diagnosis.hypotheses[].evidence_questions has no documented element type",
-  /** No documented link from a question id to anything the UI can open. */
   DIAGNOSIS_EVIDENCE_NOT_LINKABLE:
-    "Diagnosis evidence question ids have no lookup endpoint",
+    "Diagnosis evidence question ids have no documented lookup endpoint",
   /**
-   * `MarksLost` gained `insufficient_evidence`, `attributed_lost` and
-   * `recoverable_pct`, and `CauseEnum` gained a fifth member, after this
-   * worktree's `openapi.yaml` was generated. Patched in `api/types.ts`.
+   * `human_verdict` is declared a plain `string`, but the server's third value
+   * is the literal `"unreviewed"` and that enum is not in the schema.
+   * `api/diagnosis.ts` normalises it to `null`; a client that trusts the type
+   * tells a teacher who never answered that they disagreed.
    */
-  MARKS_LOST_FIFTH_CAUSE:
-    "openapi.yaml here predates MarksLost.insufficient_evidence / attributed_lost / recoverable_pct",
-  /** `TopicState.accuracy_30d` was dropped; this stale copy still declares it. */
-  TOPIC_STATE_ACCURACY_30D_REMOVED:
-    "openapi.yaml here still declares the removed TopicState.accuracy_30d",
-  /** Nothing says which denominator `MarksLostCause.share_pct` now divides by. */
-  MARKS_LOST_CAUSE_SHARE_DENOMINATOR:
-    "MarksLostCause.share_pct does not say whether it is of total_lost or attributed_lost",
+  DIAGNOSIS_VERDICT_UNREVIEWED:
+    'Diagnosis.human_verdict is typed `string` and carries an undeclared "unreviewed"',
 } as const;
 
 export type ApiGap = keyof typeof API_GAPS;

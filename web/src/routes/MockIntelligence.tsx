@@ -17,8 +17,17 @@ import {
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
-/** Papers in this fixture set are out of 300; the contract does not ship the max. */
-const MAX_MARKS = 300;
+/**
+ * The paper's maximum, when nothing has told us yet.
+ *
+ * `MarksLost.max_marks` is in the contract now and is the real answer — this
+ * constant only stands in for the moment before that request lands, and only
+ * for the paper picker, which lists papers whose `marks-lost` has not been
+ * fetched. It used to be the *only* source, which meant the header quoted
+ * "scored 134 of 300" for a paper that is out of 184. A denominator nobody
+ * checked is how a demo ends up showing a 73% score as 45%.
+ */
+const ASSUMED_MAX_MARKS = 300;
 
 export function MockIntelligence() {
   const params = useParams();
@@ -43,6 +52,9 @@ export function MockIntelligence() {
    */
   const totals = marksLost.data ? marksLostTotals(marksLost.data) : null;
 
+  /** The paper's real maximum, from the server, once it has answered. */
+  const maxMarks = marksLost.data?.max_marks ?? null;
+
   return (
     <div className="space-y-6 py-6">
       <Link
@@ -61,7 +73,10 @@ export function MockIntelligence() {
           <p className="tnum mt-1 text-sm text-muted-foreground">
             {student.data?.name ?? "—"}
             {row ? ` · held ${longDate(row.held_on)}` : ""}
-            {row ? ` · scored ${num(row.total)} of ${num(MAX_MARKS)}` : ""}
+            {/* The score is quoted only once the paper's own maximum has
+                arrived. A number out of the wrong denominator is worse than a
+                number that shows up half a second later. */}
+            {row && maxMarks ? ` · scored ${num(row.total)} of ${num(maxMarks)}` : ""}
           </p>
         </div>
 
@@ -80,7 +95,10 @@ export function MockIntelligence() {
             <SelectContent>
               {(scores.data ?? []).map((score) => (
                 <SelectItem key={score.paper_id} value={String(score.paper_id)}>
-                  {score.paper_name} · {num(score.total)}/300
+                  {/* No denominator here: `MockScore` carries no paper max, and
+                      the one we know belongs to the paper currently open, not
+                      to every row in this list. */}
+                  {score.paper_name} · {num(score.total)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -110,11 +128,18 @@ export function MockIntelligence() {
                   {subject.label}
                 </span>
               </div>
+              {/* No "/ 100". `MockScore` ships three subject scores and a
+                  total, and no per-subject maximum — and this paper is out of
+                  184, not 300, so thirds of it are not 100 either. The share of
+                  the paper's own total is a number we can actually stand
+                  behind. */}
               <div className="tnum mt-1.5 text-2xl leading-none font-semibold">
                 {num(row[subject.key])}
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
-                  / 100
-                </span>
+                {row.total > 0 ? (
+                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                    {pct((row[subject.key] / row.total) * 100)} of the paper
+                  </span>
+                ) : null}
               </div>
             </div>
           ))}
@@ -183,8 +208,8 @@ export function MockIntelligence() {
 
           <MarksLostBar
             data={marksLost.data}
-            maxMarks={MAX_MARKS}
-            scored={row?.total}
+            maxMarks={marksLost.data.max_marks ?? ASSUMED_MAX_MARKS}
+            scored={marksLost.data.score ?? row?.total}
           />
 
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">

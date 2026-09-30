@@ -14,8 +14,10 @@ const MODE_LABEL: Record<string, string> = {
  * What the student's own app shows today. A plan a student cannot interrogate
  * is a plan he stops following, so every block carries its reason.
  *
- * `/api/my/plan/` is scoped to the signed-in student, not to a student id, so
- * this panel is the demo account's plan — see API_GAPS.NO_SESSION_ENDPOINT.
+ * `/api/my/plan/` is scoped to the signed-in student, not to a student id — so
+ * a mentor signed in against the live API gets an empty list here rather than
+ * this student's plan. That is the endpoint working as specified, not the panel
+ * failing, and the empty state says so rather than implying no plan exists.
  */
 export function DayPlanPanel({ blocks }: { blocks: PlanBlock[] }) {
   const total = blocks.reduce((acc, block) => acc + block.minutes, 0);

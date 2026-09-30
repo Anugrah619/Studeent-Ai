@@ -52,10 +52,15 @@ export function HealthHeader({
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {/* No "of 300". `StudentState.mock_avg` averages across papers whose
+            maxima differ — the seeded series runs seven papers out of 300 and
+            one out of 184 — so there is no single denominator to quote, and
+            quoting one anyway is how "152.6 of 300" appeared beside a paper
+            worth 184. The count of papers is the honest caption. */}
         <StatTile
           label="Mock average"
           value={num(state.mock_avg, 1)}
-          caption={`of 300 across ${scores.length} mocks`}
+          caption={`marks, averaged across ${scores.length} mocks`}
           trend={
             scores.length > 1 ? (
               <Sparkline
@@ -80,10 +85,14 @@ export function HealthHeader({
               : undefined
           }
         />
+        {/* `risk_score` is 0–1 on the wire. Two decimals, not rounded to a
+            whole number — that turned 0.696 into "1" — and not multiplied to
+            70, which invents a percentage the score is not and lets the tile
+            quietly disagree with the band chip beside it. */}
         <StatTile
           label="Risk score"
-          value={num(state.risk_score)}
-          caption={`Band: ${band.label} · recomputed nightly`}
+          value={num(state.risk_score, 2)}
+          caption={`${band.label} · 0–1 scale · recomputed nightly`}
         />
         <StatTile
           label="Study consistency"

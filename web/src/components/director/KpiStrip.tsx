@@ -69,11 +69,19 @@ export function KpiStrip({ data, loading, scopeWarning }: Props) {
           )} exited`}
         />
 
+        {/* `latest_paper_max_marks` is on the summary, so the denominator is the
+            paper's own. It was hardcoded to 300, which on the seeded institute's
+            latest mock — out of 184 — understated a 98.3 average as a third of
+            the paper instead of half of it. */}
         <StatTile
           label="Mock average"
           loading={loading}
           value={num(data?.batch_mock_avg, 1)}
-          caption="of 300 · latest mock, institute-wide"
+          caption={
+            data?.latest_paper_max_marks
+              ? `of ${num(data.latest_paper_max_marks)} · ${data.latest_paper_name ?? "latest mock"}, institute-wide`
+              : "latest mock, institute-wide"
+          }
         />
 
         <StatTile

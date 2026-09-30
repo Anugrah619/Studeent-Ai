@@ -348,44 +348,13 @@ export function apiPost<P extends PostPath>(
 }
 
 /* ------------------------------------------------------------------ *
- * Ahead of the contract
+ * There used to be an "ahead of the contract" block here —
+ * `apiGetAhead`/`apiPostAhead`, which took the path as a plain string and the
+ * response shape from the caller, so the two reasoning-layer routes could be
+ * called while `openapi.yaml` had never heard of them.
  *
- * `apiGet`/`apiPost` will not compile against a path `openapi.yaml` has never
- * heard of — which is the point of them, and a problem exactly twice: the two
- * reasoning-layer routes shipped in the API before the spec caught up.
- *
- * These two escape hatches take the path as a plain string and the response
- * shape from the caller, so the types are a hand-written promise rather than a
- * generated fact. Everything else — cookies, CSRF, the `ApiError` flattening —
- * is the same code path the generated calls use, so nothing about session
- * handling is special-cased for them.
- *
- * Every call site is listed in `src/api/gaps.ts`. When the routes land in the
- * contract, delete the entry, switch the call to `apiGet`/`apiPost`, and the
- * hand-written types in `api/diagnosis.ts` become generated ones.
+ * They are in the contract now, so the escape hatches are deleted rather than
+ * left available. That is the point of them being narrow and named: an escape
+ * hatch nobody removes stops being a temporary measure and becomes the way
+ * untyped calls get added.
  * ------------------------------------------------------------------ */
-
-export interface AheadArgs {
-  path?: Record<string, string | number>;
-  query?: Record<string, string | number | boolean | undefined>;
-  signal?: AbortSignal;
-}
-
-export function apiGetAhead<T>(template: string, args?: AheadArgs): Promise<T> {
-  return request<T>(buildUrl(template, args), {
-    method: "GET",
-    signal: args?.signal,
-  });
-}
-
-export function apiPostAhead<T>(
-  template: string,
-  args: AheadArgs & { body?: unknown },
-): Promise<T> {
-  return request<T>(buildUrl(template, args), {
-    method: "POST",
-    signal: args.signal,
-    headers: args.body === undefined ? {} : { "Content-Type": "application/json" },
-    body: args.body === undefined ? undefined : JSON.stringify(args.body),
-  });
-}

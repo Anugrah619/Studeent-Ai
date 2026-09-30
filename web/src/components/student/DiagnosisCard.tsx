@@ -10,7 +10,12 @@ import {
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
-import type { Confidence, Diagnosis, Hypothesis } from "@/api/diagnosis";
+import {
+  timeToFixLabel,
+  type Confidence,
+  type Diagnosis,
+  type Hypothesis,
+} from "@/api/diagnosis";
 import {
   isNotEnoughEvidence,
   isReasoningUnavailable,
@@ -137,12 +142,15 @@ function Shell({
                 Cached
               </span>
             ) : null}
+            {/* An integer on the wire, not the opaque string this was first
+                written for. Prefixed so a bare `53` in the corner of a card
+                does not read as a count of something. */}
             {diagnosis.trace_id ? (
               <span
                 className="font-mono text-[10px] text-muted-foreground"
                 title="Trace id — every diagnosis is reproducible from this."
               >
-                {diagnosis.trace_id}
+                trace #{diagnosis.trace_id}
               </span>
             ) : null}
           </span>
@@ -187,6 +195,7 @@ function DiagnosisBody({
   data: Diagnosis;
 }) {
   const atStake = data.hypotheses.reduce((sum, h) => sum + h.marks_at_stake, 0);
+  const timeToFix = timeToFixLabel(data.time_to_fix);
 
   return (
     <div className="px-5 pt-5 pb-4 sm:px-7 sm:pt-7">
@@ -196,8 +205,8 @@ function DiagnosisBody({
       </p>
 
       {/* The cost and the price of fixing it, on one line, directly under the
-          claim. A 20-mark finding that takes forty minutes to fix is the whole
-          pitch in eleven words, and it belongs where the eye already is. */}
+          claim. A 25-mark finding that takes one sitting to fix is the whole
+          pitch in nine words, and it belongs where the eye already is. */}
       <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
         {atStake > 0 ? (
           <>
@@ -213,17 +222,14 @@ function DiagnosisBody({
                 ? ` across ${data.hypotheses.length} findings`
                 : ""}
             </span>
-            <span aria-hidden className="text-border">
-              ·
-            </span>
+            {timeToFix ? (
+              <span aria-hidden className="text-border">
+                ·
+              </span>
+            ) : null}
           </>
         ) : null}
-        {data.time_to_fix ? (
-          <span className="inline-flex items-center gap-1.5">
-            <Clock aria-hidden className="size-3.5" />
-            {data.time_to_fix}
-          </span>
-        ) : null}
+        {timeToFix ? <TimeToFixBand label={timeToFix} /> : null}
       </p>
 
       {data.pattern_found ? null : <NoPattern name={firstName(studentName)} />}
@@ -258,6 +264,39 @@ function DiagnosisBody({
 
       <VerdictBar studentId={studentId} paperId={paperId} data={data} />
     </div>
+  );
+}
+
+/**
+ * How long this takes to fix, as a band.
+ *
+ * It used to be free text, and the model — asked for a number of minutes —
+ * answered "40 minutes", then "20", then "45" for the same student and the
+ * same evidence, while the action it recommended never changed. The estimate
+ * was noise wearing a number's clothes.
+ *
+ * So it is four bands now, and the label carries no digits. That is the point:
+ * a director who spots one invented "45 minutes" has no way left to believe
+ * the misconception above it, and the misconception is the product. "One
+ * focused sitting" is a claim the system can actually defend — and a band, by
+ * being visibly a band, tells the reader how precise the claim is meant to be
+ * instead of implying a precision that was never there.
+ *
+ * Rendered with the word "about" and the `tabular-nums`-free body face, so
+ * nothing about it reads as a measurement.
+ */
+function TimeToFixBand({ label }: { label: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5"
+      title="A band, not an estimate — the model is not asked for a number of minutes, because when it was, it gave a different one each time for the same evidence."
+    >
+      <Clock aria-hidden className="size-3.5" />
+      <span>
+        <span className="text-muted-foreground">About </span>
+        <span className="font-medium text-foreground">{label.toLowerCase()}</span>
+      </span>
+    </span>
   );
 }
 
@@ -459,7 +498,8 @@ function VerdictBar({
               ? "You agreed with this diagnosis."
               : "You disagreed with this diagnosis."}{" "}
             <span className="font-normal text-muted-foreground">
-              Recorded against {data.trace_id || "this diagnosis"}.
+              Recorded against{" "}
+              {data.trace_id ? `trace #${data.trace_id}` : "this diagnosis"}.
             </span>
           </p>
         ) : (

@@ -4,8 +4,9 @@ import { isoDate } from "./rng";
 /**
  * Aarambh Classes, Kota — 312 students across 4 batches.
  *
- * There is no endpoint that returns the institute itself, so the name lives
- * here and in the app shell (see API_GAPS.NO_SESSION_ENDPOINT).
+ * The name matches the seeded institute on the live server, so flipping
+ * `VITE_USE_MOCKS` does not change which institute the masthead claims to be
+ * showing. `/api/me/` carries it for real; this is the offline stand-in.
  */
 export const INSTITUTE = {
   name: "Aarambh Classes",
@@ -13,11 +14,30 @@ export const INSTITUTE = {
   director: "Mr. V. Agarwal",
 } as const;
 
+/**
+ * Names and ids match the live `tenancy_mentor` rows, so a flag routed to
+ * mentor 1 in the mock is routed to Dr. S. Bhatia in both worlds.
+ */
 export const mentors: Mentor[] = [
-  { id: 1, name: "Dr. S. Bhatia", email: "bhatia@aarambh.example" },
-  { id: 2, name: "Prof. R. Nair", email: "nair@aarambh.example" },
-  { id: 3, name: "A. Kulkarni", email: "kulkarni@aarambh.example" },
-  { id: 4, name: "Dr. M. Saxena", email: "saxena@aarambh.example" },
+  { id: 1, name: "Dr. S. Bhatia", email: "bhatia@aarambh.example", student_count: 12 },
+  {
+    id: 2,
+    name: "Prof. R. Nagarajan",
+    email: "nagarajan@aarambh.example",
+    student_count: 12,
+  },
+  {
+    id: 3,
+    name: "Dr. M. Kulkarni",
+    email: "kulkarni@aarambh.example",
+    student_count: 12,
+  },
+  {
+    id: 4,
+    name: "Ms. A. Fernandes",
+    email: "fernandes@aarambh.example",
+    student_count: 10,
+  },
 ];
 
 export const batches: Batch[] = [

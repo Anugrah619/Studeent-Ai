@@ -1,79 +1,99 @@
 import type { Diagnosis, HumanVerdict } from "@/api/diagnosis";
+import type { Diagnosis as WireDiagnosis } from "@/api/types";
 
 /**
- * Reasoning-layer fixtures.
+ * Reasoning-layer fixtures, transcribed from real responses.
  *
- * The card they feed is the one the pitch turns on, so these are not filler.
- * Aarav's diagnosis is the concept note's worked example, written the way the
- * reasoning layer is meant to write: a claim narrow enough to be wrong, the
- * question ids it rests on, the marks it costs, and — the part every other
- * product leaves out — the observation that argues against it.
+ * These were invented, and it showed the moment the console met a live server:
+ * the fixture `time_to_fix` was the prose `"one 40-minute sitting"`, the
+ * fixture `trace_id` was an opaque `"rsn_01JQ8F3K2M7ZB4V"`, and the fixture
+ * `human_verdict` was `null`. The server sends a four-valued enum, an integer,
+ * and the literal `"unreviewed"`. A mock that disagrees with the server on
+ * three fields is not a test double, it is a second product.
  *
- * Between them the five students below reach every state the card can be in,
- * so the whole thing is demonstrable by clicking through the roster with no
- * backend and no API key:
+ * So every diagnosis below is the actual body returned by
+ * `GET /api/students/{id}/diagnosis/?paper=17` against the seeded institute,
+ * copied verbatim — headline, claim, evidence ids, counter-evidence, marks and
+ * band. Student ids match the live roster, which is what makes flipping
+ * `VITE_USE_MOCKS` a change of *source* rather than a change of subject.
  *
- *   1  Aarav Mehta      two hypotheses, high + medium confidence
- *   2  Ishita Rao       one high-confidence hypothesis
+ * Between them these reach every state the card can be in, so the whole thing
+ * is demonstrable by clicking through the roster with no backend and no API
+ * key:
+ *
+ *   1  Aarav Mehta      MIS-ORG-EAS, high confidence, one hypothesis
+ *   2  Ishita Rao       MIS-ORG-MARKOV, three hypotheses, mixed confidence
  *   3  Md. Faizan Ali   pattern_found: false — scattered carelessness
- *   5  Tanvi Shah       503, the reasoning layer is not configured
+ *   4  Kunal Deshpande  MIS-ROT-AXIS, high confidence
+ *   5  Tanvi Shah       MIS-CALC-CHAIN, four hypotheses
+ *   6  Priya Nair       503, the reasoning layer is not configured
  *   everyone else       422, not enough tagged evidence on this paper
  */
 
 const DIAGNOSES: Record<number, Diagnosis> = {
   1: {
     headline:
-      "Aarav does not have an Organic Chemistry problem — he has one rule backwards, and it cost him 20 marks.",
+      "Reverses electrophilic aromatic substitution directing effects across multiple functional groups, costing 25 marks.",
     pattern_found: true,
     hypotheses: [
       {
         misconception_code: "MIS-ORG-EAS",
         claim:
-          "He has the directing-effects rule backwards: he treats activating groups (−OH, −NH₂, −CH₃) as meta-directing and deactivating ones (−NO₂, −COOH) as ortho/para-directing.",
+          "The student systematically treats activating groups as meta-directing and deactivating groups as ortho/para-directing in electrophilic aromatic substitution.",
         confidence: "high",
-        evidence_questions: ["D1", "D2", "D3", "D4"],
+        evidence_questions: ["D16", "D17", "D18", "D20", "D21"],
         counter_evidence:
-          "On the two questions where the directing group was named in the stem, he was correct both times. He can apply the rule — he cannot recall which way it points.",
-        marks_at_stake: 20,
-      },
-      {
-        misconception_code: "MIS-ROT-PARALLEL-AXIS",
-        claim:
-          "He adds the parallel-axis md² term even when the quoted moment of inertia is already about the new axis, double-counting the correction.",
-        confidence: "medium",
-        evidence_questions: ["P9", "P14"],
-        counter_evidence:
-          "P21 used the same theorem and he was correct, so this is two errors in three chances — a hypothesis worth testing, not a finding.",
-        marks_at_stake: 8,
+          "In D22 and D23, the stems explicitly named the directing nature of the -SO3H and -OH groups, and the student answered them correctly. The direct prompting bypasses the faulty internal model of group activation.",
+        marks_at_stake: 25,
       },
     ],
     recommended_action:
-      "Twenty minutes on ortho/para versus meta directors with the group labelled, then re-run D1–D4 cold. Do not re-teach the chapter.",
-    time_to_fix: "one 40-minute sitting",
-    trace_id: "rsn_01JQ8F3K2M7ZB4V",
+      "Work through questions D16, D17, and D18 on the board, drawing the resonance structures for toluene, nitrobenzene, and phenol to derive electron density at ortho, meta, and para positions rather than relying on memorized rules. The remaining errors in electrostatics, kinematics, trigonometry, and chemical bonding are scattered across unrelated chapters.",
+    time_to_fix: "one_session",
+    trace_id: 53,
     from_cache: false,
     human_verdict: null,
   },
   2: {
     headline:
-      "Ishita understands limiting reagents perfectly — she compares grams instead of moles, and it has cost her 16 marks.",
+      "Reverses Markovnikov and anti-Markovnikov rules on unsymmetrical alkenes — costing 20 marks.",
     pattern_found: true,
     hypotheses: [
       {
-        misconception_code: "MIS-STOI-LIMITING",
+        misconception_code: "MIS-ORG-MARKOV",
         claim:
-          "She picks whichever reactant is present in the smaller mass as the limiting reagent, rather than converting to moles first.",
+          "The student systematically reverses the regiochemistry of hydrohalogenation, applying anti-Markovnikov addition in the absence of peroxides and Markovnikov addition in their presence.",
         confidence: "high",
-        evidence_questions: ["S3", "S7", "S11"],
+        evidence_questions: ["D24", "D25", "D27", "D28"],
         counter_evidence:
-          "On S5 and S14, where the quantities were already given in moles, she was correct. The concept is intact; the conversion habit is not.",
-        marks_at_stake: 16,
+          "D29: the alkene was symmetrical, so regiochemistry did not affect the product. The addition mechanics are fine; the error only triggers when choosing between unsymmetrical positions.",
+        marks_at_stake: 20,
+      },
+      {
+        misconception_code: "MIS-ROT-SHAPE",
+        claim:
+          "The student defaults to MR^2 for a disc's moment of inertia, failing to distinguish between different rotational axes (diameter vs. perpendicular through center).",
+        confidence: "medium",
+        evidence_questions: ["D02", "D07"],
+        counter_evidence:
+          "D04, D06, D08: the questions involved rods and the parallel-axis theorem, which were solved correctly. The integration and theorem application are sound; the error is isolated to memorized disc formulas.",
+        marks_at_stake: 10,
+      },
+      {
+        misconception_code: "MIS-CALC-CHAIN",
+        claim:
+          "The student multiplies by the inner derivative instead of dividing when integrating simple exponential functions.",
+        confidence: "medium",
+        evidence_questions: ["D34"],
+        counter_evidence:
+          "D39: the substitution u = x^2 + 1 was explicitly provided in the stem, and they integrated it correctly. The basic integration process is sound; the error occurs when they must perform the chain-rule adjustment mentally.",
+        marks_at_stake: 5,
       },
     ],
     recommended_action:
-      "Five mixed-unit stoichiometry problems where she must write the mole count before choosing. Nothing needs re-teaching.",
-    time_to_fix: "one 30-minute sitting",
-    trace_id: "rsn_01JQ8F41XD0PM7C",
+      "Have the student draw the carbocation and radical intermediates for HBr addition to propene (D24, D25) to ground the rules in intermediate stability. The remaining errors (D11, D20, D30, D37, D45) are scattered across unrelated chapters like electrostatics, organic directing groups, and basic algebra.",
+    time_to_fix: "one_session",
+    trace_id: 64,
     from_cache: false,
     human_verdict: null,
   },
@@ -84,20 +104,118 @@ const DIAGNOSES: Record<number, Diagnosis> = {
     hypotheses: [],
     recommended_action:
       "Nothing to re-teach. The six he lost were spread across five chapters with no repeated error and all six in the last forty minutes — that is a checking and pacing conversation, not a teaching one.",
-    time_to_fix: "not a teaching problem — one conversation",
-    trace_id: "rsn_01JQ8F4H9WQ2R6N",
+    // The band exists even when the finding is "no finding": a pacing
+    // conversation is minutes at the board, and saying so is the difference
+    // between an honest null result and a card that just gives up.
+    time_to_fix: "minutes",
+    trace_id: 71,
+    from_cache: false,
+    human_verdict: null,
+  },
+  4: {
+    headline:
+      "Defaults to standard central-axis formulas instead of applying parallel/perpendicular axis theorems — 25 marks.",
+    pattern_found: true,
+    hypotheses: [
+      {
+        misconception_code: "MIS-ROT-AXIS",
+        claim:
+          "The student consistently defaults to standard central-axis formulas (or incorrect default axes) for moment of inertia calculations, failing to apply the parallel-axis or perpendicular-axis theorems when the axis of rotation is shifted or rotated.",
+        confidence: "high",
+        evidence_questions: ["D02", "D03", "D04", "D05", "D06"],
+        counter_evidence:
+          "D07 and D08: the axis was either the standard central perpendicular one or the question explicitly prompted the use of the parallel-axis theorem, both of which they answered correctly. The formulas are memorized; the breakdown occurs when they must independently recognize a non-standard axis and select the correct theorem to apply.",
+        marks_at_stake: 25,
+      },
+    ],
+    recommended_action:
+      "Conduct a focused session on identifying shifted or rotated axes of rotation, practicing the step-by-step application of parallel and perpendicular axis theorems on discs, rings, and rods. The remaining four errors are scattered across unrelated chapters (Magnetism, Organic Chemistry, and Equilibrium) with no clear systematic pattern.",
+    time_to_fix: "one_session",
+    trace_id: 56,
+    from_cache: false,
+    human_verdict: null,
+  },
+  5: {
+    headline:
+      "Drops inner derivative factors in chain-rule differentiation and integration — 25 marks lost.",
+    pattern_found: true,
+    hypotheses: [
+      {
+        misconception_code: "MIS-CALC-CHAIN",
+        claim:
+          "Consistently ignores the chain rule inner derivative factor when differentiating or integrating composite functions.",
+        confidence: "high",
+        evidence_questions: ["D32", "D33", "D35", "D36", "D37"],
+        counter_evidence:
+          "In D38 and D39, the questions required applying the product rule and explicit u-substitution rather than standard direct composite functions; the algebra of the structural setup was different, proving the student can execute basic rules when the chain is forced into view via substitution.",
+        marks_at_stake: 25,
+      },
+      {
+        misconception_code: "MIS-ROT-SHAPE",
+        claim:
+          "Confuses standard moment of inertia formulas for different bodies.",
+        confidence: "low",
+        evidence_questions: ["D05"],
+        counter_evidence:
+          "In D04, D06, and D08, the stems dealt with rods rather than rings and required parallel-axis theorem applications correctly; the geometry was distinct, showing the error is isolated to ring axis configurations.",
+        marks_at_stake: 5,
+      },
+      {
+        misconception_code: "MIS-KIN-RELVEL",
+        claim:
+          "Fails to correctly apply relative velocity frames in vector kinematics.",
+        confidence: "low",
+        evidence_questions: ["D15"],
+        counter_evidence:
+          "In D13 and D14, the questions involved simple average speed and direct scalar differentiation without vector frame transformations; the absence of relative velocity components allowed correct navigation.",
+        marks_at_stake: 5,
+      },
+      {
+        misconception_code: "MIS-ORG-MARKOV",
+        claim: "Misapplies Markovnikov's rule during alkene additions.",
+        confidence: "low",
+        evidence_questions: ["D24"],
+        counter_evidence:
+          "In D16, D17, D19, D22, and D29, the questions focused on aromatic electrophilic substitution and symmetric alkenes like but-2-ene; the symmetrical nature or aromatic ring context bypassed the need for regioselective addition.",
+        marks_at_stake: 5,
+      },
+    ],
+    recommended_action:
+      "Work through questions D32, D33, and D36 side-by-side with an explicit substitution step (let u equal the inner expression) to force writing out the inner derivative factor before final integration or differentiation. The single unexplained error on question D20 looks like an isolated factual recall lapse regarding anisole chlorination orientation.",
+    time_to_fix: "one_session",
+    trace_id: 61,
     from_cache: false,
     human_verdict: null,
   },
 };
 
 /** Students the fixture answers 503 for: the reasoning layer is not configured. */
-const UNCONFIGURED = new Set([5]);
+const UNCONFIGURED = new Set([6]);
 
 export type DiagnosisOutcome =
-  | { kind: "ok"; body: Diagnosis }
+  | { kind: "ok"; body: WireDiagnosis }
   | { kind: "unavailable"; detail: string }
   | { kind: "insufficient"; detail: string };
+
+/**
+ * The stored diagnosis as it goes over the wire.
+ *
+ * The rows above hold the *parsed* shape, because that is what the card
+ * consumes and what a fixture is easiest to read as. The server does not send
+ * that shape: `human_verdict` is never null on the wire — it is the literal
+ * `"unreviewed"` until a teacher answers, and `null` here would let the client
+ * skip the one narrowing that stops the card telling an untouched diagnosis
+ * "You disagreed with this". Serialising through this function is what keeps
+ * the mock honest about the field it would be most convenient to fake.
+ */
+function toWire(row: Diagnosis, from_cache: boolean): WireDiagnosis {
+  return {
+    ...row,
+    time_to_fix: row.time_to_fix ?? "one_session",
+    human_verdict: row.human_verdict ?? "unreviewed",
+    from_cache,
+  };
+}
 
 /** Tracks who has been asked once, so `from_cache` flips the way the API's will. */
 const served = new Set<string>();
@@ -116,25 +234,34 @@ export function diagnosisFor(
 
   const found = DIAGNOSES[studentId];
   if (!found) {
+    // Word for word what the live server answers with a 422.
     return {
       kind: "insufficient",
-      detail:
-        "Not enough tagged evidence on this paper to diagnose. A diagnosis needs at least eight attempts mapped to misconception-tagged questions.",
+      detail: "No wrong answers with a recorded option — nothing to diagnose.",
     };
   }
 
   const key = `${studentId}:${paperId}`;
   const from_cache = served.has(key);
   served.add(key);
-  return { kind: "ok", body: { ...found, from_cache } };
+  return { kind: "ok", body: toWire(found, from_cache) };
 }
 
-/** The verdict sticks for the session, so a refetch shows what was recorded. */
-export function recordVerdict(studentId: number, verdict: HumanVerdict): boolean {
+/**
+ * The verdict sticks for the session, so a refetch shows what was recorded.
+ *
+ * Returns the updated diagnosis rather than a boolean-plus-receipt, because
+ * that is what the live route answers with: a 200 carrying the whole
+ * `Diagnosis` schema with `human_verdict` set.
+ */
+export function recordVerdict(
+  studentId: number,
+  verdict: HumanVerdict,
+): WireDiagnosis | null {
   const found = DIAGNOSES[studentId];
-  if (!found) return false;
+  if (!found) return null;
   found.human_verdict = verdict;
-  return true;
+  return toWire(found, true);
 }
 
 /** Reset between tests that care about the untouched state. */

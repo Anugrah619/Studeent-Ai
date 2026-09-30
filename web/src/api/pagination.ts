@@ -8,22 +8,27 @@
  *
  *     { count, next, previous, results: [...] }
  *
- * The `@action` routes do NOT. `StudentViewSet.mock_scores`,
- * `.subject_breakdown`, `.topic_states` and `.attempts` each build their rows
- * by hand and return `Response(Serializer(rows, many=True).data)` — they never
- * call `paginate_queryset`, so what comes back over the wire is a **bare
- * array**.
+ * The four `@action` detail routes — `mock_scores`, `subject_breakdown`,
+ * `topic_states`, `attempts` — used to answer with a **bare array**: they
+ * built their rows by hand, returned `Response(Serializer(rows,
+ * many=True).data)`, and never called `paginate_queryset`. `openapi.yaml`
+ * disagreed, because drf-spectacular sees a list-shaped `@action` on a
+ * paginated viewset and assumes the pagination applies. The generated types
+ * inherited the lie, and code that trusted them read `.results` off an array
+ * and got `undefined`.
  *
- * `openapi.yaml` disagrees with the server on exactly this point.
- * drf-spectacular sees a list-shaped `@action` on a paginated viewset,
- * assumes the pagination applies, and emits `PaginatedMockScoreList`,
- * `PaginatedSubjectBreakdownList`, `PaginatedTopicStateList` and
- * `PaginatedAttemptList`. The generated types inherit the lie, and any code
- * that trusts them reads `.results` off an array and gets `undefined`.
+ * VERIFIED AGAINST A RUNNING SERVER: all four now return the envelope.
+ * `GET /api/students/1/topic-states/` answers `{count: 56, next: null,
+ * results: [56 rows]}` — one page, no `next`, `count === results.length`. The
+ * contract and the server agree, and the disagreement this file was written
+ * for is closed.
  *
- * So the client refuses to trust either shape and accepts both. When the
- * contract is corrected this file does not need to change — it is already
- * right for whichever shape wins.
+ * **Both branches stay anyway**, and not out of caution. The cost of keeping
+ * them is one `Array.isArray` per list response. The cost of being wrong is a
+ * panel that renders empty against whichever of the two shapes the client did
+ * not expect — and this file has now watched that expectation flip once
+ * already. An assumption that has been wrong in both directions is not one to
+ * hard-code on the third pass.
  */
 import type { Paginated } from "./types";
 

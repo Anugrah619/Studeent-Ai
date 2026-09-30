@@ -70,23 +70,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Restrict every queryset to the caller's institute.
+         * @description The institute's batches, each with its live student count.
          *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
-         *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
+         *     Ordered by name (`Batch.Meta.ordering`). This is the source for the
+         *     console's batch filter, which feeds `?batch=` on `/api/students/` and
+         *     on `/api/dashboard/summary/`.
          */
         get: operations["batches_list"];
         put?: never;
@@ -105,23 +93,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Restrict every queryset to the caller's institute.
+         * @description The institute's batches, each with its live student count.
          *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
-         *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
+         *     Ordered by name (`Batch.Meta.ordering`). This is the source for the
+         *     console's batch filter, which feeds `?batch=` on `/api/students/` and
+         *     on `/api/dashboard/summary/`.
          */
         get: operations["batches_retrieve"];
         put?: never;
@@ -151,15 +127,39 @@ export interface paths {
          *     per month) that is a multi-second query on every dashboard load.
          *
          *     No index fixes it, because the query genuinely wanted every row.
-         *     Asking for one paper instead is what fixes it: the DB agent
-         *     measured the rewritten form at **56 buffers and 0.687 ms, 12x
-         *     faster**, and — the part that matters more than the multiple — it
-         *     stops growing with history.
+         *     Asking for one paper instead is what fixes it.
+         *
+         *     **Re-measured, because the number in the handoff was for a
+         *     different query.** Three warm runs of each, `EXPLAIN (ANALYZE,
+         *     BUFFERS)` against the seeded 24,000 attempts:
+         *
+         *     ```
+         *     old  Seq Scan, 24000 rows, SUM only          343 buffers  3.56 ms
+         *     new  Index Scan, 3300 rows, SUM + COUNT(DISTINCT student_id)
+         *                                                   52 buffers  1.14 ms
+         *     new  Index Scan, 3300 rows, SUM only          52 buffers  0.61 ms
+         *     ```
+         *
+         *     So **6.6x fewer buffers and 3.1x faster** as actually shipped.
+         *     The handoff's "12x / 0.687 ms" was measured on a bare `SUM`; the
+         *     shipped version also needs `COUNT(DISTINCT student_id)` to have a
+         *     denominator, and that adds a quicksort of 3,300 rows which roughly
+         *     doubles the time. Against the same bare-`SUM` shape this
+         *     reproduces at 0.61 ms — 5.8x, not 12x, because the 8.7 ms
+         *     baseline was a colder cache than this 3.56 ms one.
+         *
+         *     The multiple is the least interesting part. `old` is
+         *     O(institute history) and `new` is O(one paper): at the design's
+         *     45k attempts per institute per month the old plan is reading two
+         *     years of history on every dashboard load while the new one still
+         *     reads ~3,300 rows.
          *
          *     **② `batch_mock_avg` was a SUM.** It added up every mark scored by
          *     every student on every paper and presented the total as an
-         *     average. On the seeded institute it read 8,437.0 out of a possible
-         *     300. It is now the mean total per student on the latest paper.
+         *     average. On the seeded institute it now reads **52,471.0** against
+         *     a paper worth 300 — the number grew as more events landed, which
+         *     is the tell. It is now the mean total per student on the latest
+         *     paper: **163.2 of 300 over 44 sitters**. Confirmed fixed.
          *
          *     **③ `revision_debt_pct` was not a percentage.** It divided a sum
          *     of per-student overdue counts by the student count — a mean, not a
@@ -167,6 +167,15 @@ export interface paths {
          *     renders beside it. It is now the share of scheduled revisions that
          *     are overdue, and the old quantity is still available under the
          *     name it should always have had, `avg_revision_debt`.
+         *
+         *     **④ `?batch=` now scopes the whole strip.** The console has had a
+         *     batch filter since the first frontend pass and the KPI strip
+         *     ignored it (`web/src/api/gaps.ts: DASHBOARD_BATCH_SCOPE`), so
+         *     picking "Alpha" narrowed the triage table underneath a header
+         *     still reporting the whole institute — two different populations
+         *     stacked on one screen with nothing to say so. Every count,
+         *     average and rate below is filtered; `batch_id` / `batch_name` come
+         *     back in the payload so the caller can prove which one it got.
          */
         get: operations["dashboard_summary_retrieve"];
         put?: never;
@@ -185,23 +194,20 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Restrict every queryset to the caller's institute.
+         * @description Detector output — what the console triages, newest first.
          *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
+         *     Every filter below was already implemented and none of them were in
+         *     the contract, so the console reached them through an
+         *     `undocumentedQuery` escape hatch and re-applied each one client-side
+         *     in case the server ignored it
+         *     (`web/src/api/gaps.ts: FLAGS_OPEN_FILTER`). They are declared now.
+         *     `?student=` is genuinely new: Student 360 was fetching every flag in
+         *     the institute and filtering in the browser.
          *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
+         *     Ordered by `raised_at` descending. `?open=true` combined with
+         *     `?severity=` is served by the partial index `idx_flag_open`
+         *     `(institute_id, severity, raised_at DESC) WHERE resolved_at IS NULL`,
+         *     with no sort step at all.
          */
         get: operations["flags_list"];
         put?: never;
@@ -220,23 +226,20 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Restrict every queryset to the caller's institute.
+         * @description Detector output — what the console triages, newest first.
          *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
+         *     Every filter below was already implemented and none of them were in
+         *     the contract, so the console reached them through an
+         *     `undocumentedQuery` escape hatch and re-applied each one client-side
+         *     in case the server ignored it
+         *     (`web/src/api/gaps.ts: FLAGS_OPEN_FILTER`). They are declared now.
+         *     `?student=` is genuinely new: Student 360 was fetching every flag in
+         *     the institute and filtering in the browser.
          *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
+         *     Ordered by `raised_at` descending. `?open=true` combined with
+         *     `?severity=` is served by the partial index `idx_flag_open`
+         *     `(institute_id, severity, raised_at DESC) WHERE resolved_at IS NULL`,
+         *     with no sort step at all.
          */
         get: operations["flags_retrieve"];
         put?: never;
@@ -256,8 +259,51 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Log what the mentor did. This is what closes the risk loop. */
+        /**
+         * @description Log what the mentor did about this flag.
+         *
+         *     Deliberately does NOT resolve the flag. Contacting a student is not
+         *     the same event as the student recovering, and `Flag.outcome` is a
+         *     training label for the eventual risk model — so it has to record
+         *     what actually happened, weeks later, not the act of picking up the
+         *     phone. Closing is a separate, explicit judgement: see `resolve`.
+         */
         post: operations["flags_intervene_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/flags/{id}/resolve/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Close a flag, recording what actually became of the student.
+         *
+         *     Until this existed there was no way to close a flag at all, and the
+         *     consequences compounded quietly:
+         *
+         *     * `run_detectors` suppresses a re-raise while a flag for the same
+         *       (student, type, topic) is open — so with nothing ever closing,
+         *       detectors went permanently mute. Seven of eight had already
+         *       stopped firing on the seeded data.
+         *     * `flags_resolved` and `recovery_rate_pct` on the director's KPI
+         *       strip were structurally frozen. "17 of 23 flagged students
+         *       recovered" is the number that renews a contract, and it could
+         *       never move off its seeded value.
+         *
+         *     `outcome` is required rather than defaulted. A closed flag with no
+         *     stated outcome is a lost training label, and an honest "declined"
+         *     is worth more to the model than a polite blank.
+         */
+        post: operations["flags_resolve_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -288,6 +334,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mentors/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The institute's mentors — who a flag can be routed to.
+         *
+         *     Added because `POST /api/flags/{id}/intervene/` takes a mentor id and
+         *     nothing in the contract could produce one
+         *     (`web/src/api/gaps.ts: NO_MENTOR_LIST`). The intervention dialog was
+         *     left with a required field it had no way to populate.
+         *
+         *     Read-only and deliberately thin: name, email, and how many students
+         *     each one carries, which is what a director picking a mentor wants to
+         *     see. Creating and reassigning mentors stays in the Django admin,
+         *     where it is an occasional back-office act rather than a console flow.
+         *
+         *     Tenant-scoped like everything else. Note that `Mentor` is one of the
+         *     17 tables carrying `institute_id` directly, so Postgres RLS covers it
+         *     too — this list cannot cross a tenant boundary even if the mixin were
+         *     removed.
+         */
+        get: operations["mentors_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mentors/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The institute's mentors — who a flag can be routed to.
+         *
+         *     Added because `POST /api/flags/{id}/intervene/` takes a mentor id and
+         *     nothing in the contract could produce one
+         *     (`web/src/api/gaps.ts: NO_MENTOR_LIST`). The intervention dialog was
+         *     left with a required field it had no way to populate.
+         *
+         *     Read-only and deliberately thin: name, email, and how many students
+         *     each one carries, which is what a director picking a mentor wants to
+         *     see. Creating and reassigning mentors stays in the Django admin,
+         *     where it is an occasional back-office act rather than a console flow.
+         *
+         *     Tenant-scoped like everything else. Note that `Mentor` is one of the
+         *     17 tables carrying `institute_id` directly, so Postgres RLS covers it
+         *     too — this list cannot cross a tenant boundary even if the mixin were
+         *     removed.
+         */
+        get: operations["mentors_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/my/plan/": {
         parameters: {
             query?: never;
@@ -295,7 +409,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Today's plan for the logged-in student. */
+        /**
+         * @description Today's plan for the logged-in student.
+         *
+         *     Scoped by the account, not by a path parameter: there is no way to
+         *     ask for another student's plan. A caller with no linked `Student`
+         *     gets an empty list rather than a 403, because a mentor opening the
+         *     student PWA is a navigation mistake, not an attack.
+         *
+         *     Ordered by `start_time` ascending.
+         */
         get: operations["my_plan_list"];
         put?: never;
         post?: never;
@@ -314,7 +437,16 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Today's plan for the logged-in student. */
+        /**
+         * @description Today's plan for the logged-in student.
+         *
+         *     Scoped by the account, not by a path parameter: there is no way to
+         *     ask for another student's plan. A caller with no linked `Student`
+         *     gets an empty list rather than a 403, because a mentor opening the
+         *     student PWA is a navigation mistake, not an attack.
+         *
+         *     Ordered by `start_time` ascending.
+         */
         post: operations["my_plan_complete_create"];
         delete?: never;
         options?: never;
@@ -330,44 +462,20 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Restrict every queryset to the caller's institute.
+         * @description The logged-in student's own study log — read and append.
          *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
-         *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
+         *     Ordered by `ts` descending, most recent first. Append-only by
+         *     construction: there is no update or delete route, matching the
+         *     append-only rule the admin enforces on `StudyLog` itself.
          */
         get: operations["my_study_logs_list"];
         put?: never;
         /**
-         * @description Restrict every queryset to the caller's institute.
+         * @description The logged-in student's own study log — read and append.
          *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
-         *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
+         *     Ordered by `ts` descending, most recent first. Append-only by
+         *     construction: there is no update or delete route, matching the
+         *     append-only rule the admin enforces on `StudyLog` itself.
          */
         post: operations["my_study_logs_create"];
         delete?: never;
@@ -384,23 +492,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Restrict every queryset to the caller's institute.
+         * @description Mock papers the institute has held.
          *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
-         *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
+         *     **Ordered by `held_on` descending** — most recent first, from
+         *     `TestPaper.Meta.ordering`. The first element is therefore the paper
+         *     `/api/dashboard/summary/` reports `batch_mock_avg` for, which is what
+         *     lets the console label the KPI without a second request.
          */
         get: operations["papers_list"];
         put?: never;
@@ -419,23 +516,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Restrict every queryset to the caller's institute.
+         * @description Mock papers the institute has held.
          *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
-         *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
+         *     **Ordered by `held_on` descending** — most recent first, from
+         *     `TestPaper.Meta.ordering`. The first element is therefore the paper
+         *     `/api/dashboard/summary/` reports `batch_mock_avg` for, which is what
+         *     lets the console label the KPI without a second request.
          */
         get: operations["papers_retrieve"];
         put?: never;
@@ -453,25 +539,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * @description Restrict every queryset to the caller's institute.
-         *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
-         *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
-         */
+        /** @description The triage table: one row per student, worst risk first. */
         get: operations["students_list"];
         put?: never;
         post?: never;
@@ -489,23 +557,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Restrict every queryset to the caller's institute.
+         * @description Students and their derived state — the director's triage surface.
          *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
-         *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
+         *     The list route is the triage table; the `@action` routes below are
+         *     Student 360's panels. Every one of them is scoped to the caller's
+         *     institute and every one of them is paginated (see
+         *     `apps/api/pagination.py` for why that is uniform rather than
+         *     convenient).
          */
         get: operations["students_retrieve"];
         put?: never;
@@ -524,27 +582,70 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Restrict every queryset to the caller's institute.
+         * @description Raw attempts for one student, ordered by `question_id`.
          *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
-         *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
+         *     This used to slice at 400 rows and say nothing about it. The seed
+         *     averages ~490 attempts per student, so an unfiltered call was
+         *     already losing about a fifth of them silently — the response had
+         *     no field that could have told anyone. It is paginated now:
+         *     `count` is the true total and `next` is populated when there is
+         *     more.
          */
         get: operations["students_attempts_list"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/students/{id}/diagnosis/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description What this student actually misunderstands — the product's core claim.
+         *
+         *     Deterministic code counts which distractors were chosen and what each
+         *     cost. The model does the part that is genuinely judgement: whether
+         *     this is a systematic misconception or scattered carelessness, and
+         *     what the *correct* answers reveal about where the error starts.
+         *
+         *     Fails loudly rather than degrading to generic advice. A model told
+         *     only "got Q17 wrong, topic Rotational Motion" returns "revise
+         *     Rotational Motion" — worse than an honest error, because it looks
+         *     like an answer.
+         */
+        get: operations["students_diagnosis_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/students/{id}/diagnosis/verdict/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Record whether the mentor agreed — this is how training data is made.
+         *
+         *     Model output alone is a guess. The same output with a teacher's
+         *     judgement attached is a labelled example, and a corpus of those is
+         *     what we eventually fine-tune our own model on.
+         */
+        post: operations["students_diagnosis_verdict_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -581,7 +682,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Per-subject totals for every paper this student sat. */
+        /**
+         * @description Per-subject totals for every paper this student sat.
+         *
+         *     **Ordered by `held_on` ascending** — oldest paper first. The view
+         *     always did this; the contract did not say so
+         *     (`web/src/api/gaps.ts: MOCK_SCORES_ORDER`), which left the trend
+         *     chart re-sorting defensively on arrival. It is a guarantee now:
+         *     the payload is chart-ready in the order given, left to right.
+         */
         get: operations["students_mock_scores_list"];
         put?: never;
         post?: never;
@@ -600,6 +709,11 @@ export interface paths {
         };
         /**
          * @description Study-time share vs marks-lost share. The neglect chart.
+         *
+         *     Always exactly three rows, in the fixed order Physics, Chemistry,
+         *     Maths — a subject with no data comes back as zeroes rather than
+         *     being omitted, so the chart's three bars never renumber
+         *     themselves between students.
          *
          *     `marks_lost_share_pct` is now a share of **marks**, computed by
          *     `features.marks_lost_by_topic`. It previously counted lost
@@ -627,23 +741,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Restrict every queryset to the caller's institute.
+         * @description This student's per-chapter mastery, weakest first.
          *
-         *     Kept deliberately, alongside Postgres row-level security, and the DB
-         *     agent's handoff argues the case at length. The short version is that
-         *     RLS does not cover two cases this does:
-         *
-         *     * **Superusers bypass RLS entirely**, by design — the admin is
-         *       cross-tenant back-office. Without this mixin a superuser's API call
-         *       would quietly return every institute's students.
-         *     * **RLS binding happens in middleware, off `request.user`.** Add JWT
-         *       or token auth and DRF authenticates *inside* the view, by which
-         *       point the middleware has already seen `AnonymousUser` and left the
-         *       connection unscoped. This still works.
-         *
-         *     The two are not independent sources of truth: both derive the
-         *     institute from the same user, and `manage.py rls_check` asserts the
-         *     database half.
+         *     Ordered by `mastery` ascending; Postgres sorts NULLs last on an
+         *     ascending sort, so chapters with too little evidence to score sit
+         *     at the end rather than masquerading as the weakest ones.
          */
         get: operations["students_topic_states_list"];
         put?: never;
@@ -677,7 +779,8 @@ export interface components {
             year: number;
             /** Format: date */
             exam_date?: string | null;
-            readonly student_count: number;
+            /** @description Students in this batch. Null when the batch is embedded in another payload (e.g. `StudentDetail.batch`), where it is not computed. */
+            readonly student_count: number | null;
         };
         /** @enum {unknown} */
         BlankEnum: "";
@@ -686,9 +789,17 @@ export interface components {
          *     * `execution_error` - execution_error
          *     * `time_exhaustion` - time_exhaustion
          *     * `avoidable_skip` - avoidable_skip
+         *     * `insufficient_evidence` - insufficient_evidence
          * @enum {string}
          */
-        CauseEnum: "conceptual_gap" | "execution_error" | "time_exhaustion" | "avoidable_skip";
+        CauseEnum: "conceptual_gap" | "execution_error" | "time_exhaustion" | "avoidable_skip" | "insufficient_evidence";
+        /**
+         * @description * `high` - high
+         *     * `medium` - medium
+         *     * `low` - low
+         * @enum {string}
+         */
+        ConfidenceEnum: "high" | "medium" | "low";
         /**
          * @description Director's KPI strip.
          *
@@ -706,21 +817,27 @@ export interface components {
          *     The old quantity survives as `avg_revision_debt`, correctly named.
          */
         DashboardSummary: {
+            /** @description The batch every KPI below is scoped to, echoed back from `?batch=`. Null means the whole institute. It is echoed rather than assumed so a console can tell 'the server honoured my filter' from 'the server ignored it' — which is exactly the state this endpoint was in before `?batch=` existed. */
+            batch_id: number | null;
+            /** @description Display name for `batch_id`. Null when unscoped. */
+            batch_name: string | null;
             total_students: number;
             active_students: number;
             flagged_this_week: number;
             critical_flags: number;
             /**
              * Format: double
-             * @description Mean total marks per student on the most recent paper.
+             * @description Mean total marks per student on the most recent paper — out of `latest_paper_max_marks`, over `latest_paper_students` sitters. Null when nobody in scope sat it, which is the honest answer rather than 0.
              */
             batch_mock_avg: number | null;
+            /** @description The institute's most recent paper by `held_on`. Stays institute-wide even under `?batch=`: the batch narrows who is counted, not which paper is reported. */
             latest_paper_id: number | null;
             latest_paper_name: string | null;
             /** Format: date */
             latest_paper_held_on: string | null;
+            /** @description The denominator for `batch_mock_avg`. */
             latest_paper_max_marks: number | null;
-            /** @description How many students sat the paper `batch_mock_avg` is computed over. */
+            /** @description How many students in scope sat the paper `batch_mock_avg` is computed over. 0 with a non-null `latest_paper_id` means this batch did not sit the institute's latest mock. */
             latest_paper_students: number;
             /**
              * Format: double
@@ -743,6 +860,59 @@ export interface components {
         Detail: {
             detail: string;
         };
+        /**
+         * @description The output of `diagnose_misconception` — the product's core claim.
+         *
+         *     `pattern_found=False` is a real and useful answer. Scattered carelessness
+         *     is a different problem from a systematic misconception and needs a
+         *     different response, so the model is allowed to say so rather than being
+         *     pushed into inventing a pattern.
+         */
+        Diagnosis: {
+            headline: string;
+            pattern_found: boolean;
+            hypotheses: components["schemas"]["DiagnosisHypothesis"][];
+            recommended_action: string;
+            /**
+             * @description How much teaching time this costs, as one of four bands. Bounded rather than free text because the model, asked for minutes, returned 40 / 20 / 45 for the same student and the same evidence while its recommended action stayed stable — false precision on a genuinely fuzzy judgement. minutes = a correction at the board · one_session = one focused sitting · several_sessions = a few sittings over a week or two · term_long = a foundational gap needing sustained work. The client supplies the display label.
+             *
+             *     * `minutes` - minutes
+             *     * `one_session` - one_session
+             *     * `several_sessions` - several_sessions
+             *     * `term_long` - term_long
+             */
+            time_to_fix: components["schemas"]["TimeToFixEnum"];
+            /** @description Feed back agreement/disagreement against this id. */
+            trace_id: number;
+            /** @description True if replayed rather than freshly generated. */
+            from_cache: boolean;
+            human_verdict: string;
+        };
+        DiagnosisHypothesis: {
+            misconception_code: string;
+            claim: string;
+            confidence: components["schemas"]["ConfidenceEnum"];
+            evidence_questions: string[];
+            counter_evidence: string;
+            marks_at_stake: number;
+        };
+        /**
+         * @description A mentor agreeing or disagreeing. This is what creates training data.
+         *
+         *     Raw model output is a guess. The same output with a teacher's verdict
+         *     attached is a labelled example — and a corpus of those is the thing a
+         *     competitor cannot obtain by buying an API key.
+         */
+        DiagnosisVerdictRequest: {
+            verdict: components["schemas"]["VerdictEnum"];
+            note?: string;
+        };
+        /**
+         * @description One detector output, evidenced and routable.
+         *
+         *     Filterable by `?open=`, `?severity=`, `?student=` and `?mentor=`;
+         *     ordered by `raised_at` descending.
+         */
         Flag: {
             readonly id: number;
             readonly student_id: number;
@@ -750,17 +920,71 @@ export interface components {
             readonly batch_name: string;
             readonly mentor_name: string;
             readonly topic_name: string;
+            /** @description Detector identifier — `weak_topic`, `over_attempting`, `plateau`, `subject_imbalance`, `confidence_mismatch`, `revision_overdue`, `disengagement`, `overload`, `mock_decline`. Open-ended on purpose: detectors are added without a migration, so a client must render an unknown type rather than assume a closed set. */
             type: string;
+            /**
+             * @description How hard this flag argues for attention. **Graded per detector, not from `risk_score`** — the two answer different questions, and a student can carry a critical flag on one chapter while scoring low overall risk.
+             *
+             *     Each detector states its own cut-offs in the units it measures, so they are comparable within a type and only roughly comparable across types. The shape is consistent:
+             *     - `critical` — act this week. e.g. `subject_imbalance` at >= 50 marks *and* >= 10% of the paper at stake; `plateau` at a 30-point gap; `disengagement` at 14 silent days.
+             *     - `high` — act this cycle. The same measures at roughly two-thirds of the critical cut-off (30 marks / 6%, 24 points, 7 silent days).
+             *     - `watch` — the rule fired but below those bars. Evidence, not an instruction.
+             *     - `improving` — the condition is resolving on its own. Deliberately not silence: a mentor should see that what they did worked.
+             *
+             *     `evidence` carries whatever that detector measured, and `rule_version` is what lets the grading be re-derived after the thresholds change.
+             *
+             *     * `watch` - Watch
+             *     * `high` - High
+             *     * `critical` - Critical
+             *     * `improving` - Improving
+             */
             severity: components["schemas"]["SeverityEnum"];
             headline: string;
+            /** @description What this detector measured, in its own keys. Shape varies by `type` — it is what answers 'why was this flagged?' six months later, read together with `rule_version`. */
             evidence?: unknown;
             rule_version?: string;
             /** Format: date-time */
             raised_at: string;
             /** Format: date-time */
             resolved_at?: string | null;
-            outcome?: components["schemas"]["OutcomeEnum"] | components["schemas"]["BlankEnum"];
+            outcome?: components["schemas"]["FlagOutcomeEnum"] | components["schemas"]["BlankEnum"];
+            /** @description `resolved_at is null`. The same set `?open=true` returns. */
             readonly is_open: boolean;
+        };
+        /**
+         * @description * `recovered` - Recovered
+         *     * `declined` - Declined
+         *     * `unknown` - Unknown
+         * @enum {string}
+         */
+        FlagOutcomeEnum: "recovered" | "declined" | "unknown";
+        /**
+         * @description * `recovered` - recovered
+         *     * `declined` - declined
+         *     * `unknown` - unknown
+         * @enum {string}
+         */
+        FlagResolveOutcomeEnum: "recovered" | "declined" | "unknown";
+        /**
+         * @description Closing a flag. `outcome` is required, on purpose.
+         *
+         *     Every resolved flag is a labelled training example for the eventual
+         *     risk model — "given this student's state in month 3, did they recover?"
+         *     Defaulting the field would fill that dataset with polite blanks, so the
+         *     mentor has to say which way it went. `declined` is a perfectly good
+         *     answer and more useful than silence.
+         */
+        FlagResolveRequest: {
+            /**
+             * @description What actually became of the student. Required.
+             *
+             *     * `recovered` - recovered
+             *     * `declined` - declined
+             *     * `unknown` - unknown
+             */
+            outcome: components["schemas"]["FlagResolveOutcomeEnum"];
+            /** @description Optional. If given, also logged as an Intervention. */
+            note?: string;
         };
         Institute: {
             readonly id: number;
@@ -805,10 +1029,22 @@ export interface components {
         /**
          * @description Mistake taxonomy for one paper — the line that sells the product.
          *
-         *     The four cause fields and `total_lost` / `recoverable` are unchanged
-         *     from v0.1. Everything else is additive: paper identity, the score the
-         *     taxonomy partitions, the student's own pace baseline that the cause
-         *     rules used, and the per-chapter breakdown a mentor asks for next.
+         *     **BREAKING, v0.3.** A fifth cause, `insufficient_evidence`, and two
+         *     new fields, `attributed_lost` and `recoverable_pct`. `conceptual_gap`
+         *     keeps its name and its type but its *value falls* — by a third across
+         *     the seeded cohort — because it no longer absorbs marks lost on
+         *     chapters whose mastery was never measured.
+         *
+         *     The old shape had four buckets partitioning `total_lost`, with
+         *     `recoverable` defined as `total_lost - conceptual_gap`. Every chapter
+         *     held below the four-attempt evidence floor arrived with a null
+         *     mastery, failed the "do they know it" test for the same reason a
+         *     chapter they are genuinely bad at fails it, and was booked as a
+         *     demonstrated conceptual gap. A refusal to claim became a claim.
+         *
+         *     A client rendering the taxonomy must give the new bucket its own
+         *     neutral segment. Folding it back into `conceptual_gap` to keep the
+         *     old four-bar chart reinstates the defect in the presentation layer.
          */
         MarksLost: {
             paper_id: number;
@@ -820,13 +1056,24 @@ export interface components {
             attempted: number;
             /** Format: double */
             score: number;
+            /** @description Marks lost where mastery was **measured and low**, plus wrong answers on chapters they know that took more than twice their own median time. Evidenced failures only. */
             conceptual_gap: number;
             execution_error: number;
             time_exhaustion: number;
             avoidable_skip: number;
+            /** @description Marks lost on chapters below the four-attempt evidence floor, where `TopicState.mastery` is null. **Not a cause.** The action it implies is 'practise this chapter so we can tell you', not 'relearn it'. */
+            insufficient_evidence: number;
+            /** @description `max_marks - score`. The five cause buckets sum to exactly this. */
             total_lost: number;
-            /** @description Marks lost to causes that need no new learning. */
+            /** @description `total_lost - insufficient_evidence` — the marks the analysis is entitled to explain, and the denominator of `recoverable_pct`. */
+            attributed_lost: number;
+            /** @description Marks lost to causes that need no new learning: `execution_error + time_exhaustion + avoidable_skip`. **No longer `total_lost - conceptual_gap`** — that identity held only while four buckets partitioned the loss, and counting unmeasured chapters as recoverable would be the same unsupported claim the fifth bucket exists to stop, pointed the other way. */
             recoverable: number;
+            /**
+             * Format: double
+             * @description `recoverable / attributed_lost * 100` — the headline share. Over attributed marks, not total: a percentage diluted by marks nobody can explain is not the claim being made. Null when `attributed_lost` is 0, which is an honest 'cannot say' and must not render as 0%.
+             */
+            recoverable_pct: number | null;
             /**
              * Format: double
              * @description Median seconds this student spends on a question they get right. Null when they have fewer than 8 timed correct answers, in which case the time rule was not applied.
@@ -835,12 +1082,30 @@ export interface components {
             causes: components["schemas"]["MarksLostCause"][];
             top_loss_topics: components["schemas"]["LossTopic"][];
         };
-        /** @description One row of the mistake taxonomy, chart-ready. */
+        /**
+         * @description One row of the mistake taxonomy, chart-ready.
+         *
+         *     Five rows now, always, in this order. `insufficient_evidence` was
+         *     added in v0.3 and appended rather than inserted, so a client reading
+         *     `causes[i]` positionally keeps reading the same cause it did before.
+         */
         MarksLostCause: {
+            /**
+             * @description `insufficient_evidence` is **not a diagnosis** — it is the marks lost on chapters whose mastery sits below the four-attempt evidence floor, so no cause can be claimed. Render it in a neutral colour, never in the conceptual-gap red: it previously *was* counted as conceptual gap, which was the defect this bucket exists to fix.
+             *
+             *     * `conceptual_gap` - conceptual_gap
+             *     * `execution_error` - execution_error
+             *     * `time_exhaustion` - time_exhaustion
+             *     * `avoidable_skip` - avoidable_skip
+             *     * `insufficient_evidence` - insufficient_evidence
+             */
             cause: components["schemas"]["CauseEnum"];
             marks: number;
             questions: number;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Share of `total_lost`. The five rows sum to 100%.
+             */
             share_pct: number;
         };
         /** @description The caller's identity. Drives navigation and the institute label. */
@@ -863,10 +1128,19 @@ export interface components {
             is_staff: boolean;
             is_superuser: boolean;
         };
+        /**
+         * @description Who a flag can be routed to. Backs the intervention dialog.
+         *
+         *     `student_count` is active students only — a mentor whose whole batch
+         *     has left is available, and a director choosing between mentors is
+         *     asking about present load, not historical.
+         */
         Mentor: {
             readonly id: number;
             name: string;
             email?: string;
+            /** @description Active students currently assigned to this mentor. Null when this mentor is embedded in another payload (e.g. `StudentDetail.mentor`), where the count is not computed. */
+            readonly student_count: number | null;
         };
         MockScore: {
             paper_id: number;
@@ -891,13 +1165,6 @@ export interface components {
         ModeEnum: "learn" | "practice" | "revise";
         /** @enum {unknown} */
         NullEnum: null;
-        /**
-         * @description * `recovered` - Recovered
-         *     * `declined` - Declined
-         *     * `unknown` - Unknown
-         * @enum {string}
-         */
-        OutcomeEnum: "recovered" | "declined" | "unknown";
         PaginatedAttemptList: {
             /** @example 123 */
             count: number;
@@ -942,6 +1209,21 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["Flag"][];
+        };
+        PaginatedMentorList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["Mentor"][];
         };
         PaginatedMockScoreList: {
             /** @example 123 */
@@ -1104,7 +1386,12 @@ export interface components {
             readonly mentor: components["schemas"]["Mentor"];
             readonly state: components["schemas"]["StudentState"];
         };
-        /** @description Row in the director's triage table. */
+        /**
+         * @description Row in the director's triage table.
+         *
+         *     Sortable on `risk_score`, `mock_avg`, `mock_trend`, `open_flags`,
+         *     `name` and `roll_no` via `?ordering=`; default `-risk_score,name`.
+         */
         StudentList: {
             readonly id: number;
             name: string;
@@ -1112,32 +1399,86 @@ export interface components {
             readonly batch_name: string;
             readonly mentor_name: string;
             target?: string;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Composite risk on a **0–1** scale, not 0–100. Null when there is not yet enough signal to score the student at all — an unscored student is unmeasured, not safe, and sorts out of the triage table rather than sitting at a confident 0.0.
+             *
+             *     Bands, which `?at_risk=true` and the console's chips both key off:
+             *     - `>= 0.75` critical
+             *     - `>= 0.55` high — this is the at-risk threshold
+             *     - `>= 0.35` watch
+             *     - below that, ok
+             *
+             *     It is a weighted sum of four normalised components, each explainable on its own: mock decline 0.50, subject imbalance 0.20, inconsistent study 0.20, revision debt 0.10. Components with no data are dropped and the remainder renormalised, so a student is never penalised for what is not known about them. These weights are a stated prior, not a trained model.
+             */
             readonly risk_score: number;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Marks gained or lost across recent papers. Signed marks, not a percentage.
+             */
             readonly mock_trend: number;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Mean total marks across this student's papers.
+             */
             readonly mock_avg: number;
+            /** @description Flags currently unresolved for this student. */
             readonly open_flags: number;
             /** Format: date */
             exited_at?: string | null;
         };
+        /**
+         * @description The per-student rollup behind Student 360's health header.
+         *
+         *     Every float here is on a stated scale, because the one field that was
+         *     not (`risk_score`) got rendered on the wrong one.
+         */
         StudentState: {
-            /** Format: double */
-            consistency?: number | null;
-            /** Format: double */
-            load_index?: number | null;
-            /** Format: double */
-            balance_index?: number | null;
-            revision_debt?: number;
-            /** Format: double */
-            risk_score?: number | null;
-            /** Format: double */
-            mock_avg?: number | null;
-            /** Format: double */
-            mock_trend?: number | null;
-            /** Format: double */
-            syllabus_pct?: number | null;
+            /**
+             * Format: double
+             * @description Study regularity, 0–1. Share of recent days with any logged study.
+             */
+            readonly consistency: number | null;
+            /**
+             * Format: double
+             * @description Study hours this month over last month, clamped to 0–3. **A ratio, not a fraction**: 1.0 is steady, 1.3 is a third more work than last month. Null when there is no prior month.
+             */
+            readonly load_index: number | null;
+            /**
+             * Format: double
+             * @description Largest gap, 0–1, between a subject's share of study time and its share of marks lost. 0 is perfectly aimed effort. Below 0.10 is normal variation rather than a signal.
+             */
+            readonly balance_index: number | null;
+            /** @description Count of revision cycles now past due and not done. */
+            readonly revision_debt: number;
+            /**
+             * Format: double
+             * @description Composite risk on a **0–1** scale, not 0–100. Null when there is not yet enough signal to score the student at all — an unscored student is unmeasured, not safe, and sorts out of the triage table rather than sitting at a confident 0.0.
+             *
+             *     Bands, which `?at_risk=true` and the console's chips both key off:
+             *     - `>= 0.75` critical
+             *     - `>= 0.55` high — this is the at-risk threshold
+             *     - `>= 0.35` watch
+             *     - below that, ok
+             *
+             *     It is a weighted sum of four normalised components, each explainable on its own: mock decline 0.50, subject imbalance 0.20, inconsistent study 0.20, revision debt 0.10. Components with no data are dropped and the remainder renormalised, so a student is never penalised for what is not known about them. These weights are a stated prior, not a trained model.
+             */
+            readonly risk_score: number | null;
+            /**
+             * Format: double
+             * @description Mean total marks across this student's papers.
+             */
+            readonly mock_avg: number | null;
+            /**
+             * Format: double
+             * @description Marks gained or lost across recent papers. **Signed marks, not a percentage** — negative is a decline, and -40 is the point where the decline component of `risk_score` saturates.
+             */
+            readonly mock_trend: number | null;
+            /**
+             * Format: double
+             * @description Share of the *batch's* chapters marked taught, 0–100. A batch property, not a student one: a student cannot be behind on a chapter nobody has taught yet.
+             */
+            readonly syllabus_pct: number | null;
             /** Format: date-time */
             readonly computed_at: string;
         };
@@ -1175,6 +1516,14 @@ export interface components {
             max_marks?: number;
             duration_min?: number;
         };
+        /**
+         * @description * `minutes` - minutes
+         *     * `one_session` - one_session
+         *     * `several_sessions` - several_sessions
+         *     * `term_long` - term_long
+         * @enum {string}
+         */
+        TimeToFixEnum: "minutes" | "one_session" | "several_sessions" | "term_long";
         Topic: {
             readonly id: number;
             name: string;
@@ -1183,28 +1532,43 @@ export interface components {
             weight?: number;
             readonly subject: string;
         };
+        /** @description One (student, chapter) rollup. Returned weakest-mastery-first. */
         TopicState: {
             readonly id: number;
             readonly topic: components["schemas"]["Topic"];
-            /** Format: double */
-            mastery?: number | null;
-            /** Format: double */
-            retention?: number | null;
+            /**
+             * Format: double
+             * @description Measured command of this chapter, 0–1. **Null below the evidence floor of 4 attempts** — roughly a quarter of rows on the seeded data. Null is not zero and must not render as 0%: it means not enough evidence to say, and a client that conflates the two shows a diligent new student as a crisis.
+             */
+            readonly mastery: number | null;
+            /**
+             * Format: double
+             * @description Forecast recall probability, 0–1, decayed since `last_revised`.
+             */
+            readonly retention: number | null;
             attempts_n?: number;
             correct_n?: number;
-            /** Format: double */
-            accuracy_30d?: number | null;
             exposure_min?: number;
             /** Format: double */
             avg_time_spent?: number | null;
-            self_rating?: number | null;
-            /** Format: double */
-            readonly confidence_gap: number;
+            /** @description The student's own latest confidence, 1–5. Null if never rated. */
+            readonly self_rating: number | null;
+            /**
+             * Format: double
+             * @description `self_rating` rescaled to 0–1 minus `mastery`, so both sides are on one scale. **Positive means overconfident** — rates it strong, scores weak. Null when either input is missing.
+             */
+            readonly confidence_gap: number | null;
             /** Format: date-time */
             last_seen?: string | null;
             /** Format: date-time */
             last_revised?: string | null;
         };
+        /**
+         * @description * `agreed` - agreed
+         *     * `disagreed` - disagreed
+         * @enum {string}
+         */
+        VerdictEnum: "agreed" | "disagreed";
     };
     responses: never;
     parameters: never;
@@ -1287,8 +1651,12 @@ export interface operations {
     batches_list: {
         parameters: {
             query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -1308,7 +1676,10 @@ export interface operations {
     };
     batches_retrieve: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
             header?: never;
             path: {
                 /** @description A unique integer value identifying this batch. */
@@ -1330,7 +1701,16 @@ export interface operations {
     };
     dashboard_summary_retrieve: {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description Scope every KPI to one batch (`Batch.id`, from `/api/batches/`). Omit it for the whole institute. The response echoes `batch_id` / `batch_name` so the caller can tell a filtered strip from an unfiltered one. A batch id belonging to another institute is a 404, not a silent strip of zeroes.
+                 *
+                 *     `latest_paper_*` stays institute-wide: it names the institute's most recent mock, and `batch_mock_avg` is that paper restricted to this batch's students. If the batch did not sit it, `latest_paper_students` is 0 and `batch_mock_avg` is null.
+                 */
+                batch?: number;
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1345,13 +1725,33 @@ export interface operations {
                     "application/json": components["schemas"]["DashboardSummary"];
                 };
             };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
         };
     };
     flags_list: {
         parameters: {
             query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description Only flags for students assigned to this mentor (`Mentor.id`, from `/api/mentors/`). Students with no mentor never match. */
+                mentor?: number;
+                /** @description `true` returns only unresolved flags (`resolved_at` is null). Any other value, including `false`, is ignored and returns everything — this is a presence filter, not a boolean field. */
+                open?: boolean;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description Exact match on the flag's severity. Thresholds are per detector and are documented on `FlagSerializer.severity`. */
+                severity?: "critical" | "high" | "improving" | "watch";
+                /** @description Only flags raised against this `Student.id`. */
+                student?: number;
             };
             header?: never;
             path?: never;
@@ -1371,7 +1771,10 @@ export interface operations {
     };
     flags_retrieve: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
             header?: never;
             path: {
                 /** @description A unique integer value identifying this flag. */
@@ -1393,7 +1796,10 @@ export interface operations {
     };
     flags_intervene_create: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
             header?: never;
             path: {
                 /** @description A unique integer value identifying this flag. */
@@ -1419,6 +1825,44 @@ export interface operations {
             };
         };
     };
+    flags_resolve_create: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this flag. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlagResolveRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["FlagResolveRequest"];
+                "multipart/form-data": components["schemas"]["FlagResolveRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Flag"];
+                };
+            };
+            /** @description Already resolved */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     me_retrieve: {
         parameters: {
             query?: never;
@@ -1438,11 +1882,66 @@ export interface operations {
             };
         };
     };
+    mentors_list: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedMentorList"];
+                };
+            };
+        };
+    };
+    mentors_retrieve: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this mentor. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Mentor"];
+                };
+            };
+        };
+    };
     my_plan_list: {
         parameters: {
             query?: {
+                /** @description The day to plan for, `YYYY-MM-DD`. Defaults to today in the server's local timezone. An unparseable date is a 400 from the ORM. */
+                date?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -1487,6 +1986,8 @@ export interface operations {
             query?: {
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -1532,8 +2033,12 @@ export interface operations {
     papers_list: {
         parameters: {
             query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -1553,7 +2058,10 @@ export interface operations {
     };
     papers_retrieve: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
             header?: never;
             path: {
                 /** @description A unique integer value identifying this test paper. */
@@ -1576,11 +2084,22 @@ export interface operations {
     students_list: {
         parameters: {
             query?: {
+                /** @description Only students who have not left (`exited_at` is null). */
                 active?: boolean;
+                /** @description Only students whose `risk_score` is at or above 0.55, the console's at-risk threshold. Students with no score yet are excluded — an unscored student is unmeasured, not safe. */
                 at_risk?: boolean;
+                /** @description Only students in this batch. */
                 batch?: number;
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description Sort column, `-` for descending, comma-separated for tie-breakers. Unknown fields are ignored. Default: `-risk_score,name`. `name` is always appended as a final tie-break so paging is stable. */
+                ordering?: "-mock_avg" | "-mock_trend" | "-name" | "-open_flags" | "-risk_score" | "-roll_no" | "mock_avg" | "mock_trend" | "name" | "open_flags" | "risk_score" | "roll_no";
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description Case-insensitive substring match on `name` or `roll_no`. Ignored when blank. */
+                search?: string;
             };
             header?: never;
             path?: never;
@@ -1600,7 +2119,10 @@ export interface operations {
     };
     students_retrieve: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
             header?: never;
             path: {
                 /** @description A unique integer value identifying this student. */
@@ -1623,8 +2145,14 @@ export interface operations {
     students_attempts_list: {
         parameters: {
             query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description Only attempts recorded against this `TestPaper.id`. Omit it and you get practice attempts too — which on the seeded data is ~490 rows per student, so page through the envelope rather than assuming one page. */
+                paper?: number;
             };
             header?: never;
             path: {
@@ -1645,11 +2173,88 @@ export interface operations {
             };
         };
     };
+    students_diagnosis_retrieve: {
+        parameters: {
+            query?: {
+                /** @description Bypass the cache and re-reason. */
+                force?: boolean;
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description Restrict to one paper. */
+                paper?: number;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this student. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Diagnosis"];
+                };
+            };
+            /** @description Nothing to diagnose — see detail */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Reasoning layer unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    students_diagnosis_verdict_create: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this student. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiagnosisVerdictRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["DiagnosisVerdictRequest"];
+                "multipart/form-data": components["schemas"]["DiagnosisVerdictRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Diagnosis"];
+                };
+            };
+        };
+    };
     students_marks_lost_retrieve: {
         parameters: {
             query: {
                 /** @description Include the per-question cause breakdown. */
                 detail?: boolean;
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description The `TestPaper.id` to attribute. Non-numeric or missing values are a 400, not an empty result. */
                 paper: number;
             };
             header?: never;
@@ -1669,6 +2274,14 @@ export interface operations {
                     "application/json": components["schemas"]["MarksLost"];
                 };
             };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1682,8 +2295,12 @@ export interface operations {
     students_mock_scores_list: {
         parameters: {
             query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path: {
@@ -1707,8 +2324,12 @@ export interface operations {
     students_subject_breakdown_list: {
         parameters: {
             query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path: {
@@ -1732,8 +2353,14 @@ export interface operations {
     students_topic_states_list: {
         parameters: {
             query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description Only chapters with a measured `mastery` below 0.5. Chapters below the evidence floor carry a null mastery and are excluded, because 'not enough attempts to say' is not the same claim as 'weak'. */
+                weak?: boolean;
             };
             header?: never;
             path: {
