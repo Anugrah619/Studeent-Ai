@@ -88,12 +88,33 @@ def reason(
     if not force:
         cached = (
             ReasoningTrace.objects
-            .filter(task=task, context_hash=context_hash, output__isnull=False)
+            .filter(
+                task=task,
+                context_hash=context_hash,
+                # Keyed on the prompt version as well as the context, because
+                # a prompt edit is a deliberate change of behaviour and must
+                # invalidate. Without this, improving the prompt to v2 keeps
+                # serving v1 answers and every A/B looks like a no-op — the
+                # three prompt iterations on 25 Sep only escaped it because
+                # they happened to pass force=True.
+                #
+                # `model` is deliberately NOT in the key. Falling back from
+                # 3.8-flash to flash-lite under Google capacity pressure is
+                # incidental, not a change of intent, and keying on it would
+                # shatter the cache into one entry per model at exactly the
+                # moment the cache is most needed.
+                prompt_version=prompt_version,
+                output__isnull=False,
+            )
             .exclude(output={})
             .first()
         )
         if cached:
             logger.info("reasoning cache hit: %s %s", task, context_hash[:8])
+            # Transient marker — the caller needs to tell the reader whether
+            # this was reasoned just now or replayed. The stored trace keeps
+            # its original latency, so latency cannot carry the signal.
+            cached._from_cache = True
             return cached.output, cached
 
     client = _client()
