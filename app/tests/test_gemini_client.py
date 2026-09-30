@@ -390,20 +390,6 @@ def test_an_empty_output_is_not_served_as_a_cache_hit(monkeypatch, institute_id)
     assert output["headline"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "BUG (backend): the cache key is (task, context_hash) only — it "
-        "ignores prompt_version and model. So the moment the diagnosis "
-        "prompt is improved to v2, every student whose answers have not "
-        "changed keeps being served the v1 answer, from a row that records "
-        "the v1 prompt version, with no API call and nothing in the UI to "
-        "say so. Iterating on the prompt is the main way this product gets "
-        "better, and the cache currently hides the result of doing it. "
-        "`force=True` is a manual escape hatch, not a fix: the fix is to "
-        "include prompt_version (and model) in the cache lookup."
-    ),
-)
 def test_a_new_prompt_version_is_not_served_the_old_prompts_answer(
     monkeypatch, institute_id
 ):
@@ -419,25 +405,17 @@ def test_a_new_prompt_version_is_not_served_the_old_prompts_answer(
     assert output["headline"].startswith("Drops")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "BUG (backend, apps/api/views.py): the diagnosis endpoint reports "
-        "`from_cache` as `trace.latency_ms is None`, but a cache hit returns "
-        "the ORIGINAL trace, whose latency_ms is the millisecond count "
-        "measured on the live call. `from_cache` is therefore False on every "
-        "cache hit and True never, so the console cannot tell a replay from "
-        "a fresh judgement. `reason()` gives the caller no signal to use — "
-        "the fix is for it to return one (a flag, or a third element) rather "
-        "than for views.py to guess from a field that means something else."
-    ),
-)
 def test_a_cache_hit_is_reported_as_one(monkeypatch, institute_id):
     call(monkeypatch, FakeGemini(OUTPUT), institute_id=institute_id)
     _, cached = call(monkeypatch, FakeGemini(OUTPUT), institute_id=institute_id)
 
-    from_cache = cached.latency_ms is None          # views.py, verbatim
-    assert from_cache, "a replayed diagnosis is indistinguishable from a fresh one"
+    # `reason()` marks the replayed trace; views.py reads this. Latency
+    # cannot carry the signal, because a cache hit returns the ORIGINAL
+    # trace with the millisecond count of the live call that produced it —
+    # which is why the first version of this check was always False.
+    assert getattr(cached, "_from_cache", False), (
+        "a replayed diagnosis is indistinguishable from a fresh one"
+    )
 
 
 # ============================================================ 3 · refusal to fabricate
@@ -485,6 +463,12 @@ def test_no_key_but_a_cached_trace_replays_it(
     output, trace = gemini.reason(
         task=ReasoningTrace.DIAGNOSE, context=CONTEXT,
         system_prompt="sp", response_schema=SCHEMA, institute_id=institute_id,
+        # Must match the rehearsed trace. The cache key includes the prompt
+        # version, so a v2 prompt deliberately will NOT replay a v1 answer —
+        # see test_a_new_prompt_version_is_not_served_the_old_prompts_answer.
+        # `diagnose()` passes its own PROMPT_VERSION here, so this mirrors
+        # the real caller rather than relying on the parameter default.
+        prompt_version="diagnose-v1",
     )
     assert output == {"headline": "Rehearsed last night."}
     assert trace.human_verdict == ReasoningTrace.UNREVIEWED

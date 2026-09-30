@@ -677,7 +677,12 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
         return Response(ser.DiagnosisSerializer({
             **output,
             "trace_id": trace.id,
-            "from_cache": trace.latency_ms is None,
+            # Set by gemini.reason() on a cache hit. It cannot be inferred
+            # from latency: a replay returns the ORIGINAL trace, carrying the
+            # millisecond count of the live call that produced it — so
+            # `latency_ms is None` was always False and the console could
+            # never tell a reader they were looking at a replay.
+            "from_cache": getattr(trace, "_from_cache", False),
             "human_verdict": trace.human_verdict,
         }).data)
 

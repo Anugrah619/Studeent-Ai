@@ -293,6 +293,7 @@ def build_context(student, paper=None) -> dict:
             continue
 
         mis = opt.misconception
+        entry["_key"] = (a.test_paper_id, a.question_id)
         entry["option_text"] = opt.text
         if mis:
             entry["indicates"] = mis.code
@@ -342,12 +343,19 @@ def build_context(student, paper=None) -> dict:
 
     # The wrong answers get their stems too, so the claim can name what the
     # student was actually asked rather than gesturing at a chapter.
+    # Key on (paper, question), not question alone. Every paper numbers its
+    # questions Q1..Q75, so matching on the label only meant a diagnosis
+    # spanning two mocks gave every same-numbered wrong answer whichever
+    # stem happened to be found first — and the model would then quote to a
+    # mentor, as evidence, a question the student never sat.
+    #
+    # The counter-evidence lookup twenty lines above always used the full
+    # key; this line simply did not. Only bites when `?paper=` is omitted,
+    # which is why it survived every single-paper test.
     for w in wrong:
-        key = next(
-            (k for k in stems if k[1] == w["q"]), None
-        )
-        if key:
-            w["stem"] = stems[key][:220]
+        stem = stems.get(w.pop("_key", None))
+        if stem:
+            w["stem"] = stem[:220]
 
     return {
         "student_ref": f"S-{student.id}",

@@ -449,20 +449,6 @@ def test_the_payload_can_be_restricted_to_one_paper(cohort):
     assert just_new["marks_lost_by_pattern"] == {"MIS-ORG-EAS": 5}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "BUG (backend): across papers, every wrong answer sharing a "
-        "question_id is given the SAME stem — the first one found on any "
-        "paper. `build_context` attaches it with "
-        "`next(k for k in stems if k[1] == w['q'])`, dropping the paper half "
-        "of the key that the counter-evidence lookup keeps. Every paper "
-        "numbers its questions Q1..Q75, so a student diagnosed across two "
-        "mocks has the model quoting a question they never sat, and citing "
-        "it back to the mentor as evidence. The fix is the key the same "
-        "function already builds: (test_paper_id, question_id)."
-    ),
-)
 def test_each_wrong_answer_gets_the_stem_of_its_own_paper(cohort):
     """Two mocks, both numbered from Q1. The stems must not merge."""
     student = f.make_student(cohort, "Same Ids")
