@@ -5,6 +5,8 @@ but scoping here too means a bug shows up as an empty list rather than a
 leak, and the intent is visible where developers actually read.
 """
 
+import logging
+
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
@@ -18,13 +20,55 @@ from apps.derived.models import Flag, Intervention, PlanBlock, TopicState
 from apps.derived.services import features
 from apps.events.models import Attempt, RevisionEvent, StudyLog
 from apps.events.services import mock_analysis
-from apps.ingestion.models import TestPaper
+from apps.ingestion.models import QuestionTopicMap, TestPaper
 from apps.tenancy.models import Batch, Mentor, Student
 
 from . import serializers as ser
 from .pagination import StandardPagination, SubResourcePagination
 
+logger = logging.getLogger(__name__)
+
 SUBJECTS = ["Physics", "Chemistry", "Maths"]
+
+#: What the diagnosis endpoint says when it cannot produce one.
+#:
+#: These are read over a mentor's shoulder by a coaching director, so they
+#: are written for that reader: what happened, whether anything is broken,
+#: and what makes it work. No exception class names, no API keys, no
+#: "fallback chain" — the technical string still exists and is logged, it
+#: just is not the sentence on the screen.
+#:
+#: The rule each of them follows: say what is missing, say whose job it is,
+#: and never imply the student's results are wrong when they are not.
+DIAGNOSIS_NO_OPTIONS = (
+    "There are no wrong answers here with the chosen option recorded, so "
+    "there is nothing to diagnose yet. Either this student got nothing "
+    "wrong on this paper, or the results were uploaded as scores alone — "
+    "without knowing which option each student picked, the most that can "
+    "be said is how many marks were lost, not why."
+)
+
+DIAGNOSIS_NO_TAGS = (
+    "This student's wrong answers are on questions whose options have not "
+    "been described yet. We know the answers were wrong, but not what each "
+    "wrong option represents — and it is the wrong option a student is "
+    "drawn to that reveals the misunderstanding. Describing the options is "
+    "a one-time job per paper, done once and reused for every student who "
+    "sits it."
+)
+
+DIAGNOSIS_BUSY = (
+    "The reasoning service is at capacity right now and could not finish "
+    "this diagnosis. Nothing has been lost and nothing is wrong with this "
+    "student's record — this usually clears within a few minutes. Open the "
+    "panel again shortly."
+)
+
+DIAGNOSIS_NOT_PREPARED = (
+    "No diagnosis has been prepared for this student's current results, and "
+    "the reasoning service cannot be reached to prepare one now. Diagnoses "
+    "already prepared still open normally; this one needs the service back."
+)
 
 #: `?institute=` is read by `TenantScopedMixin.institute_id()` on **every**
 #: tenant-scoped route, so it belongs in the contract on every one of them.
@@ -530,13 +574,43 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         parameters=[
             INSTITUTE_PARAM,
-            OpenApiParameter("paper", int, description="Restrict to one paper."),
+            OpenApiParameter(
+                "paper", int,
+                description=(
+                    "Restrict the diagnosis to one paper. Echoed back as "
+                    "`paper_id` / `paper_name`, so the response says what it "
+                    "is about and can be cached under its own key. Omit it "
+                    "and the diagnosis spans every paper the student has "
+                    "sat, and both fields come back null."
+                ),
+            ),
             OpenApiParameter("force", bool, description="Bypass the cache and re-reason."),
         ],
         responses={
             200: ser.DiagnosisSerializer,
-            422: OpenApiResponse(description="Nothing to diagnose — see detail"),
-            503: OpenApiResponse(description="Reasoning layer unavailable"),
+            404: OpenApiResponse(
+                response=ser.DetailSerializer,
+                description="No such paper in this institute.",
+            ),
+            422: OpenApiResponse(
+                response=ser.DetailSerializer,
+                description=(
+                    "Nothing to diagnose. A real state of the data, not a "
+                    "failure: either no wrong answer here has its chosen "
+                    "option recorded, or none of those options has been "
+                    "described yet. `detail` is a complete sentence written "
+                    "for a coaching director and is safe to show verbatim."
+                ),
+            ),
+            503: OpenApiResponse(
+                response=ser.DetailSerializer,
+                description=(
+                    "The reasoning service could not be reached. `detail` is "
+                    "written for a coaching director and is safe to show "
+                    "verbatim; the technical cause is logged server-side "
+                    "rather than returned."
+                ),
+            ),
         },
         tags=["reasoning"],
     )
@@ -553,6 +627,13 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
         only "got Q17 wrong, topic Rotational Motion" returns "revise
         Rotational Motion" — worse than an honest error, because it looks
         like an answer.
+
+        **Every error body here is prose, not a developer message.** This
+        panel is read over a mentor's shoulder by the person deciding
+        whether to buy the product, and "GEMINI_API_KEY is not set" in front
+        of them costs more than the outage does. The exception text is
+        logged; what is returned is a sentence that explains the situation
+        and says whether anything is actually wrong.
         """
         from apps.reasoning.services import diagnose as dx
         from apps.reasoning.services.gemini import (
@@ -576,12 +657,21 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
                 student, paper,
                 force=request.query_params.get("force") == "true",
             )
-        except ValueError as exc:
-            # Not enough tagged evidence. A real state, not a crash.
-            return Response({"detail": str(exc)},
+        except dx.NoOptionsRecorded:
+            return Response({"detail": DIAGNOSIS_NO_OPTIONS},
                             status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-        except (GeminiUnavailable, NoCredentialsAndNoCache) as exc:
-            return Response({"detail": str(exc)},
+        except dx.NoMisconceptionTags:
+            return Response({"detail": DIAGNOSIS_NO_TAGS},
+                            status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        except NoCredentialsAndNoCache as exc:
+            logger.warning("diagnosis unavailable for student %s: %s", pk, exc)
+            return Response({"detail": DIAGNOSIS_NOT_PREPARED},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except GeminiUnavailable as exc:
+            # The technical string belongs in the log, where a developer
+            # will look for it, and nowhere near the screen.
+            logger.warning("diagnosis failed for student %s: %s", pk, exc)
+            return Response({"detail": DIAGNOSIS_BUSY},
                             status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         return Response(ser.DiagnosisSerializer({
@@ -605,6 +695,7 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
         what we eventually fine-tune our own model on.
         """
         from apps.reasoning.models import ReasoningTrace
+        from apps.reasoning.services import diagnose as dx
 
         payload = ser.DiagnosisVerdictSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
@@ -629,8 +720,18 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
         trace.reviewed_by = mentor
         trace.save(update_fields=["human_verdict", "human_note", "reviewed_by"])
 
+        # Replayed through the same presentation step as a live diagnosis,
+        # so the card the mentor just reviewed comes back identical to the
+        # one they reviewed. The stored `trace.output` is the model's raw
+        # JSON and carries none of the derived fields.
+        presented = dx.present(
+            trace.output,
+            context=trace.context or {},
+            student=trace.student,
+            paper=dx.paper_for_trace(trace),
+        )
         return Response(ser.DiagnosisSerializer({
-            **trace.output,
+            **presented,
             "trace_id": trace.id,
             "from_cache": True,
             "human_verdict": trace.human_verdict,
@@ -828,6 +929,118 @@ class FlagViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
                 flag=flag, mentor=mentor, action=note, taken_at=timezone.now()
             )
         return Response(ser.FlagSerializer(flag).data)
+
+
+@extend_schema(tags=["questions"], parameters=[INSTITUTE_PARAM])
+class QuestionViewSet(TenantScopedMixin, mixins.RetrieveModelMixin,
+                      viewsets.GenericViewSet):
+    """One question, in full. What an evidence chip opens onto.
+
+    The diagnosis card cites questions — "he chose the centre-of-mass
+    option on D16, D17 and D20" — and until this existed those citations
+    were dead text. A director reading a claim about their student's
+    thinking reaches for the mouse at exactly that point, and finding
+    nothing there is where a demo stops being believed. Evidence that
+    cannot be inspected is an assertion.
+
+    **Retrieve only, on purpose.** There is no list route: a paper's
+    questions are reached through the diagnosis that cites them or through
+    the admin, and an endpoint that will page through every question an
+    institute owns is a data-export surface nobody has asked for. Adding
+    `list` later is additive; removing it would not be.
+
+    Tenant-scoped through `QuestionTopicMap.institute`, so a question id
+    from another institute is a 404 rather than a leak — Postgres RLS
+    covers the same table as a second line.
+    """
+
+    serializer_class = ser.QuestionDetailSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return self.scoped(
+            QuestionTopicMap.objects
+            .select_related("test_paper", "topic__parent__parent")
+            .prefetch_related("options__misconception")
+        )
+
+    @extend_schema(
+        parameters=[
+            INSTITUTE_PARAM,
+            OpenApiParameter(
+                "student", int,
+                description=(
+                    "Show this question **as one student answered it**: "
+                    "`options[].chosen`, plus `chosen_label`, `status`, "
+                    "`marks` and `time_spent`.\n\n"
+                    "This is what `DiagnosisEvidence.question_id` is for — "
+                    "pair it with the student whose diagnosis cited it and "
+                    "the panel shows the stem, the option they reached for, "
+                    "and what reaching for it indicates.\n\n"
+                    "Omit it and those fields are all null and "
+                    "`options[].chosen` is null too, which is 'not asked' "
+                    "rather than 'not chosen'. A student id from another "
+                    "institute is a 404, not a silently unanswered question."
+                ),
+            ),
+        ],
+        responses={
+            200: ser.QuestionDetailSerializer,
+            404: OpenApiResponse(
+                response=ser.DetailSerializer,
+                description="No such question, or no such student, in this institute.",
+            ),
+        },
+    )
+    def retrieve(self, request, *args, **kwargs):
+        """The stem, every option, which is correct, and what each wrong one means.
+
+        With `?student=`, also which option this student chose — which is
+        the pairing that makes the diagnosis checkable: the claim says
+        "reverses the directing-effect rule", and here is the option that
+        exactly that reversal produces, ticked.
+        """
+        question = self.get_object()
+
+        student = None
+        raw = request.query_params.get("student")
+        if raw:
+            student = (
+                Student.objects
+                .filter(pk=raw, institute_id=self.institute_id())
+                .first()
+                if str(raw).isdigit() else None
+            )
+            if student is None:
+                return Response({"detail": "No such student in this institute."},
+                                status=status.HTTP_404_NOT_FOUND)
+
+        attempt = None
+        if student is not None:
+            attempt = (
+                Attempt.objects
+                .filter(student=student, institute_id=self.institute_id(),
+                        test_paper_id=question.test_paper_id,
+                        question_id=question.question_id)
+                .order_by("-ts", "-id")
+                .first()
+            )
+
+        chosen = (attempt.chosen_option or None) if attempt else None
+        question.student_id = student.id if student else None
+        question.chosen_label = chosen
+        question.status = attempt.status if attempt else None
+        question.marks = attempt.marks if attempt else None
+        question.time_spent = attempt.time_spent if attempt else None
+
+        # `None` rather than `False` when no student was named. The two
+        # render differently and must: `False` on every option says "they
+        # answered nothing", which would be a claim we were never asked to
+        # make.
+        for option in question.options.all():
+            option.chosen = None if student is None else option.label == chosen
+
+        return Response(ser.QuestionDetailSerializer(question).data)
 
 
 @extend_schema(tags=["papers"], parameters=[INSTITUTE_PARAM])

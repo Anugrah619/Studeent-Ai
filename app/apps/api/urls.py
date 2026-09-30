@@ -9,6 +9,10 @@ router.register("mentors", views.MentorViewSet, basename="mentor")
 router.register("students", views.StudentViewSet, basename="student")
 router.register("flags", views.FlagViewSet, basename="flag")
 router.register("papers", views.TestPaperViewSet, basename="paper")
+# Retrieve-only: `GET /api/questions/{id}/`. The router generates no list
+# route because the viewset has no `list` method, which is the intent —
+# see `QuestionViewSet`.
+router.register("questions", views.QuestionViewSet, basename="question")
 router.register("dashboard", views.DashboardViewSet, basename="dashboard")
 router.register("my/plan", views.MyPlanViewSet, basename="my-plan")
 router.register("my/study-logs", views.StudyLogViewSet, basename="my-study-log")

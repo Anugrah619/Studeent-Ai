@@ -9,7 +9,13 @@ from rest_framework import serializers
 
 from apps.derived.models import Flag, Intervention, PlanBlock, StudentState, TopicState
 from apps.events.models import Attempt, StudyLog
-from apps.ingestion.models import TestPaper
+from apps.ingestion.models import (
+    Misconception,
+    QuestionOption,
+    QuestionTopicMap,
+    TestPaper,
+)
+from apps.reasoning.services.diagnose import MARKS_PER_WRONG
 from apps.syllabus.models import Topic
 from apps.tenancy.models import Batch, Institute, Mentor, Student
 
@@ -366,13 +372,106 @@ class FlagSerializer(serializers.ModelSerializer):
         ]
 
 
+class DiagnosisEvidenceSerializer(serializers.Serializer):
+    """One cited question, resolved so the console can actually open it.
+
+    `evidence_questions` carries bare labels like `"D16"`, and a label is
+    unique only *within one paper* — there is no URL a client can build
+    from it. That is why this exists: the server resolves every citation
+    against the student's own attempts and hands back the id that
+    `GET /api/questions/{id}/` answers on.
+    """
+
+    question_id = serializers.IntegerField(
+        allow_null=True,
+        help_text=(
+            "`QuestionTopicMap.id` — pass it straight to "
+            "`GET /api/questions/{id}/?student={student_id}` to get the "
+            "stem, the options, which one is correct, which one this "
+            "student chose and what that choice indicates. It is the same "
+            "value as `QuestionDetail.id` on that endpoint.\n\n"
+            "**Null means the citation did not resolve**: the model named a "
+            "question that is not a wrong answer this student gave on this "
+            "paper, or the paper carries no mapped question by that label. "
+            "Render those as plain text, never as a link to nowhere — a "
+            "chip that opens an empty panel is worse than a chip that "
+            "visibly is not one."
+        ),
+    )
+    label = serializers.CharField(
+        help_text=(
+            "The question as the paper prints it — `\"D16\"`. What the chip "
+            "shows, and the same string as `QuestionDetail.label`."
+        )
+    )
+    chose = serializers.CharField(
+        allow_blank=True,
+        help_text=(
+            "The option letter this student actually picked, e.g. `\"C\"`. "
+            "Blank when the citation did not resolve."
+        ),
+    )
+    marks_at_stake = serializers.IntegerField(
+        help_text=(
+            f"What this one question cost: {MARKS_PER_WRONG} — the 4 marks "
+            "forgone plus the 1-mark penalty. 0 when the citation did not "
+            "resolve, because no marks can be claimed for a question we "
+            "cannot tie to an answer."
+        )
+    )
+
+
 class DiagnosisHypothesisSerializer(serializers.Serializer):
+    """One candidate explanation, with the questions it rests on."""
+
     misconception_code = serializers.CharField()
     claim = serializers.CharField()
     confidence = serializers.ChoiceField(choices=["high", "medium", "low"])
-    evidence_questions = serializers.ListField(child=serializers.CharField())
-    counter_evidence = serializers.CharField(allow_blank=True)
-    marks_at_stake = serializers.IntegerField()
+    evidence_questions = serializers.ListField(
+        child=serializers.CharField(),
+        help_text=(
+            "The labels the model cited, verbatim. **Display only.** It is "
+            "kept because it is what the model wrote, but it cannot be "
+            "linked from — use `evidence` instead, which is the same list "
+            "with each label resolved to a routable id."
+        ),
+    )
+    evidence = DiagnosisEvidenceSerializer(
+        many=True,
+        help_text=(
+            "`evidence_questions`, resolved. One entry per cited label, in "
+            "the order the model gave them."
+        ),
+    )
+    counter_evidence = serializers.CharField(
+        help_text=(
+            "The correct answers that narrow this finding — the strongest "
+            "thing on the card, because it is what separates 'weak at this "
+            "chapter' from 'fails only when the condition is implicit'.\n\n"
+            "**Never blank and never null.** The prompt already tells the "
+            "model to say plainly that there is no counter-evidence on this "
+            "paper when there is none; the server now guarantees it. If the "
+            "model returns nothing, one of two sentences is substituted — "
+            "'no counter-evidence on this paper, the weakness may be "
+            "chapter-wide' when none was available to it, or 'the model did "
+            "not state the counter-evidence, treat this finding as "
+            "un-narrowed' when some was. The second is deliberately not "
+            "disguised as the first: they are different claims and only one "
+            "of them is good news."
+        )
+    )
+    marks_at_stake = serializers.IntegerField(
+        help_text=(
+            f"`{MARKS_PER_WRONG} x` the number of citations in `evidence` "
+            "that resolved. **Counted server-side, not taken from the "
+            "model** — the model is asked for judgement, not arithmetic, "
+            "and this is the arithmetic. Sum `evidence[].marks_at_stake` to "
+            "check it.\n\n"
+            "Only the model's own figure survives if *no* citation "
+            "resolved, in which case there is nothing better to offer and "
+            "`evidence` will show why."
+        )
+    )
 
 
 class DiagnosisSerializer(serializers.Serializer):
@@ -384,9 +483,52 @@ class DiagnosisSerializer(serializers.Serializer):
     pushed into inventing a pattern.
     """
 
+    paper_id = serializers.IntegerField(
+        allow_null=True,
+        help_text=(
+            "The paper this diagnosis is about, echoed back from `?paper=` "
+            "so the payload says what it is about instead of the client "
+            "having to remember what it asked for — which is also what "
+            "makes it safe to cache under its own key.\n\n"
+            "Null means the diagnosis spans **every paper this student has "
+            "sat**, which is what omitting `?paper=` asks for. Null is not "
+            "'unknown'."
+        ),
+    )
+    paper_name = serializers.CharField(
+        allow_null=True,
+        help_text="Display name for `paper_id`. Null when the diagnosis spans all papers.",
+    )
+
     headline = serializers.CharField()
     pattern_found = serializers.BooleanField()
     hypotheses = DiagnosisHypothesisSerializer(many=True)
+    total_marks_at_stake = serializers.IntegerField(
+        help_text=(
+            "Marks the whole diagnosis accounts for, computed server-side "
+            "as `MARKS_PER_WRONG x` the number of **distinct** questions "
+            "cited across all hypotheses.\n\n"
+            "**Hypotheses cannot overlap, so this is a clean total.** A "
+            "student picks one option per question, and one option carries "
+            "at most one misconception, so a wrong answer is evidence for "
+            "exactly one finding. (Six of the forty tagged questions do "
+            "*offer* two different misconceptions across their distractors "
+            "— but only the one the student actually chose can fire.) The "
+            "de-duplication above therefore guards against the model citing "
+            "the same question twice rather than against real overlap, and "
+            "on every trace recorded so far it has removed nothing.\n\n"
+            "**It will still differ from the number in `headline`, and that "
+            "is not a contradiction.** The headline quotes the cost of the "
+            "*leading* hypothesis; this is the cost of all of them. A card "
+            "showing both should label this one as the total across "
+            "findings.\n\n"
+            "It is also generally **less** than the marks the paper lost in "
+            "total: wrong answers on untagged distractors, skips and "
+            "unreached questions are all real losses that a misconception "
+            "diagnosis has nothing to say about. For the full partition of "
+            "a paper's lost marks use `/api/students/{id}/marks-lost/`."
+        )
+    )
     recommended_action = serializers.CharField()
     time_to_fix = serializers.ChoiceField(
         choices=["minutes", "one_session", "several_sessions", "term_long"],
@@ -422,6 +564,139 @@ class DiagnosisVerdictSerializer(serializers.Serializer):
 
     verdict = serializers.ChoiceField(choices=["agreed", "disagreed"])
     note = serializers.CharField(required=False, allow_blank=True)
+
+
+class MisconceptionSerializer(serializers.ModelSerializer):
+    """What a particular wrong answer means — the taxonomy, not the score.
+
+    Global rather than tenant-scoped: physics misconceptions are the same
+    in Kota and Jaipur. Institutes share the vocabulary; only their data
+    is separated.
+    """
+
+    class Meta:
+        model = Misconception
+        fields = ["code", "subject", "name", "description", "remedy"]
+
+
+class QuestionOptionSerializer(serializers.ModelSerializer):
+    """One lettered option, and what choosing it would reveal.
+
+    `misconception` is populated on wrong options that have been
+    explained, which is the whole reason this endpoint is worth opening:
+    it answers *why the wrong option was tempting*, not just that it was
+    wrong. A wrong option with a null misconception is a gap in the
+    taxonomy rather than a bug — it simply cannot contribute to a
+    diagnosis.
+    """
+
+    misconception = MisconceptionSerializer(
+        read_only=True, allow_null=True,
+        help_text=(
+            "The wrong belief that produces this option. Always null on the "
+            "correct option, and null on wrong options nobody has explained "
+            "yet."
+        ),
+    )
+    chosen = serializers.BooleanField(
+        read_only=True, allow_null=True, default=None,
+        help_text=(
+            "Whether the student named by `?student=` picked this option. "
+            "**Null on every option when `?student=` was not given** — null "
+            "is 'not asked', which is a different thing from `false`, and a "
+            "client that renders null as 'not chosen' will show a question "
+            "where the student appears to have answered nothing."
+        ),
+    )
+
+    class Meta:
+        model = QuestionOption
+        fields = ["label", "text", "is_correct", "chosen", "misconception"]
+
+
+class QuestionDetailSerializer(serializers.ModelSerializer):
+    """One question, in full — what a director sees on clicking an evidence chip.
+
+    This is the endpoint that closes the loop the diagnosis card opens.
+    A finding cites `D16`; clicking it has to show the actual question,
+    the option the student reached for, and what reaching for it means.
+    Without that the evidence is an assertion the reader has no way to
+    check, and checkability is the entire argument for tagging distractors.
+
+    With `?student=`, three fields at the bottom and `options[].chosen`
+    describe what that one student did here. Without it the question comes
+    back on its own, which is what a client wants when it is showing the
+    paper rather than a person.
+    """
+
+    label = serializers.CharField(
+        source="question_id", read_only=True,
+        help_text=(
+            "The question as the paper prints it — `\"D16\"`. Unique within "
+            "a paper, **not** across papers, which is why `id` and not this "
+            "is what `DiagnosisEvidence.question_id` carries. Stored as "
+            "`QuestionTopicMap.question_id`."
+        ),
+    )
+    paper_id = serializers.IntegerField(source="test_paper_id", read_only=True)
+    paper_name = serializers.CharField(source="test_paper.name", read_only=True)
+    topic = serializers.CharField(
+        source="topic.name", read_only=True, default=None, allow_null=True,
+        help_text="Chapter. Null on a question nobody has mapped yet.",
+    )
+    subject = serializers.SerializerMethodField()
+    options = QuestionOptionSerializer(many=True, read_only=True)
+
+    student_id = serializers.IntegerField(
+        read_only=True, default=None, allow_null=True,
+        help_text="Echo of `?student=`. Null when the question was fetched on its own.",
+    )
+    chosen_label = serializers.CharField(
+        read_only=True, default=None, allow_null=True,
+        help_text=(
+            "The option letter this student picked. Null when `?student=` "
+            "was not given, and also when it was but the student left this "
+            "question blank or never reached it — `status` distinguishes "
+            "those."
+        ),
+    )
+    status = serializers.ChoiceField(
+        choices=Attempt.STATUS,
+        read_only=True, default=None, allow_null=True,
+        help_text=(
+            "What became of this question for this student. A closed set, "
+            "because `blank` and `not_reached` are the distinction the "
+            "whole marks-lost taxonomy rests on — choosing to skip and "
+            "running out of time need opposite advice. Null when "
+            "`?student=` was not given, or when this student has no attempt "
+            "recorded here."
+        ),
+    )
+    marks = serializers.FloatField(
+        read_only=True, default=None, allow_null=True,
+        help_text="Marks scored on this question after negative marking. Null as above.",
+    )
+    time_spent = serializers.IntegerField(
+        read_only=True, default=None, allow_null=True,
+        help_text="Seconds spent. Often genuinely absent even when the attempt exists.",
+    )
+
+    class Meta:
+        model = QuestionTopicMap
+        fields = [
+            "id", "label", "paper_id", "paper_name", "topic", "subject",
+            "difficulty", "question_text", "solution", "options",
+            "student_id", "chosen_label", "status", "marks", "time_spent",
+        ]
+
+    @staticmethod
+    def get_subject(obj) -> str | None:
+        node = obj.topic
+        if node is None:
+            return None
+        while node.parent_id is not None:
+            node = node.parent
+        return node.name
 
 
 class FlagResolveSerializer(serializers.Serializer):
