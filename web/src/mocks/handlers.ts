@@ -17,6 +17,7 @@ import { diagnosisFor, recordVerdict } from "./fixtures/diagnosis";
 import { flags, interventions } from "./fixtures/flags";
 import { INSTITUTE, batches, mentors, papers } from "./fixtures/institute";
 import { planBlocks } from "./fixtures/plan";
+import { KNOWN_STUDENTS, hasQuestion, questionFor } from "./fixtures/questions";
 import {
   mockScoresFor,
   seedById,
@@ -340,6 +341,54 @@ export const handlers = [
           { detail: "No attempts recorded for that student on that paper." },
           { status: 404 },
         );
+  }),
+
+  /* --------------------------------------- one cited question, in full
+   *
+   * What an evidence chip opens. Three behaviours here were checked against the
+   * running server rather than inferred, and each one is a bug the panel would
+   * otherwise ship:
+   *
+   *   1. `?student=` omitted → the per-student fields are null AND
+   *      `options[].chosen` is null on every option. Null is "not asked",
+   *      which is a different claim from `false`.
+   *   2. `?student=` given for someone with no attempt here → `chosen` is
+   *      **false** on every option while `status` stays null. So the mock must
+   *      not derive one from the other.
+   *   3. A student outside the institute, or a non-numeric `?student=`, is a
+   *      **404 on the question** — not a 200 with the student fields blanked.
+   *      A mock that answered 200 would let the panel quietly show a stranger's
+   *      paper as unanswered.
+   */
+
+  http.get("/api/questions/:id/", async ({ params, request }) => {
+    await settle();
+    if (session.me === null) return UNAUTHENTICATED;
+
+    const questionId = id(params);
+    if (!hasQuestion(questionId)) {
+      return HttpResponse.json(
+        { detail: "No QuestionTopicMap matches the given query." },
+        { status: 404 },
+      );
+    }
+
+    const raw = new URL(request.url).searchParams.get("student");
+    if (raw === null) {
+      // The "not asked" shape. Everything per-student comes back null.
+      return HttpResponse.json(questionFor(questionId));
+    }
+
+    const studentId = Number(raw);
+    if (!Number.isInteger(studentId) || !KNOWN_STUDENTS.has(studentId)) {
+      // Word for word what the live server answers.
+      return HttpResponse.json(
+        { detail: "No such student in this institute." },
+        { status: 404 },
+      );
+    }
+
+    return HttpResponse.json(questionFor(questionId, studentId));
   }),
 
   /* ------------------------------------------------- the reasoning layer

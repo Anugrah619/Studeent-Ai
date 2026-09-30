@@ -13,6 +13,7 @@ import {
   type Diagnosis,
   type DiagnosisVerdictBody,
 } from "./diagnosis";
+import { fetchQuestion, type QuestionDetail } from "./questions";
 import type {
   Batch,
   DashboardSummary,
@@ -62,6 +63,14 @@ export const qk = {
   plan: ["my", "plan"] as const,
   diagnosis: (id: number, paper?: number) =>
     ["students", id, "diagnosis", paper ?? null] as const,
+  /**
+   * Keyed by student as well as question, because the *same* question carries
+   * different per-student fields — `chosen`, `status`, `marks`, `time_spent`.
+   * One cache entry per question would show Aarav's chosen option on Tanvi's
+   * panel, which is the one error a proof-of-evidence panel cannot make.
+   */
+  question: (id: number, student?: number) =>
+    ["questions", id, "student", student ?? null] as const,
 };
 
 export interface StudentFilters {
@@ -242,6 +251,34 @@ export function isReasoningUnavailable(error: unknown): boolean {
 /** 422: it is wired up, and honestly has too little tagged evidence to reason. */
 export function isNotEnoughEvidence(error: unknown): boolean {
   return error instanceof ApiError && error.status === NOT_ENOUGH_EVIDENCE;
+}
+
+/**
+ * One cited question, as one student answered it.
+ *
+ * `enabled` is what keeps this lazy: an evidence chip mounts its panel closed
+ * and passes `enabled: false`, so a hypothesis with five chips costs nothing
+ * until one is clicked.
+ *
+ * `retry: false`, for the same reason `useDiagnosis` has it. The failure that
+ * matters here is a 404 — the citation does not resolve to a question this
+ * institute holds — and that does not change on a second attempt. Retrying
+ * turns a sentence the panel can say plainly into three seconds of spinner.
+ */
+export function useQuestion(
+  questionId: number,
+  studentId: number | undefined,
+  enabled = true,
+) {
+  return useQuery<QuestionDetail, Error>({
+    queryKey: qk.question(questionId, studentId),
+    queryFn: ({ signal }) => fetchQuestion(questionId, studentId, signal),
+    enabled: enabled && Number.isFinite(questionId),
+    retry: false,
+    // A question and its tagged distractors do not change inside a sitting, and
+    // re-opening the same chip should be instant.
+    staleTime: 10 * 60_000,
+  });
 }
 
 /**
