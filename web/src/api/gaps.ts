@@ -35,6 +35,11 @@
  *     `api/diagnosis.ts` is generated types plus a parser.
  *   DIAGNOSIS_EVIDENCE_ID_TYPE                 declared `string[]`, and the
  *     live server returns paper labels (`"D16"`).
+ *   DIAGNOSIS_EVIDENCE_NOT_LINKABLE            `DiagnosisHypothesis.evidence`
+ *     resolves every cited label to a `question_id` that
+ *     `GET /api/questions/{id}/` answers on, plus the option this student
+ *     picked. A label alone never could be linked — it is unique only within
+ *     one paper — which is exactly why the server resolves it now.
  */
 
 export const API_GAPS = {
@@ -44,14 +49,6 @@ export const API_GAPS = {
    * points. The hook sorts rather than trusts.
    */
   MOCK_SCORES_ORDER: "GET mock-scores/ does not guarantee held_on ordering",
-  /**
-   * Evidence question ids are paper labels (`"D16"`), and `attempts/` returns
-   * rows keyed by the same `question_id` — but nothing in the contract *says*
-   * they are the same identifier, and no endpoint resolves one to a question.
-   * So the card renders them as inert chips; a dead link would be worse.
-   */
-  DIAGNOSIS_EVIDENCE_NOT_LINKABLE:
-    "Diagnosis evidence question ids have no documented lookup endpoint",
   /**
    * `human_verdict` is declared a plain `string`, but the server's third value
    * is the literal `"unreviewed"` and that enum is not in the schema.

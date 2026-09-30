@@ -11,9 +11,11 @@ import {
   ThumbsUp,
 } from "lucide-react";
 import {
+  isResolved,
   timeToFixLabel,
   type Confidence,
   type Diagnosis,
+  type Evidence,
   type Hypothesis,
 } from "@/api/diagnosis";
 import {
@@ -194,7 +196,16 @@ function DiagnosisBody({
   paperId: number;
   data: Diagnosis;
 }) {
-  const atStake = data.hypotheses.reduce((sum, h) => sum + h.marks_at_stake, 0);
+  /**
+   * The server's own total, not a sum taken here.
+   *
+   * It counts *distinct* cited questions across every hypothesis, so a model
+   * that cites one question under two findings does not get to charge for it
+   * twice. Summing `hypotheses[].marks_at_stake` in the browser would — and a
+   * marks figure that is quietly too high is the one number on this card a
+   * director can check against the paper in about a minute.
+   */
+  const atStake = data.total_marks_at_stake;
   const timeToFix = timeToFixLabel(data.time_to_fix);
 
   return (
@@ -338,7 +349,10 @@ function NoPattern({ name }: { name: string }) {
  * ------------------------------------------------------------------ */
 
 function HypothesisBlock({ hypothesis }: { hypothesis: Hypothesis }) {
-  const { evidence_questions: evidence } = hypothesis;
+  // `evidence`, not `evidence_questions`. The latter is the labels the model
+  // literally wrote and is display-only; this is the same list with each one
+  // resolved against the student's own attempts.
+  const { evidence } = hypothesis;
 
   return (
     <article className="rounded-lg border border-border bg-background/60 p-4">
@@ -370,16 +384,18 @@ function HypothesisBlock({ hypothesis }: { hypothesis: Hypothesis }) {
           <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
             Rests on
           </span>
-          {/* Not links: nothing in the contract maps a question id to anything
-              openable — API_GAPS.DIAGNOSIS_EVIDENCE_NOT_LINKABLE. Showing them
-              as inert chips is honest; a dead link would not be. */}
-          {evidence.map((q) => (
-            <span
-              key={String(q)}
-              className="tnum rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
-            >
-              {String(q)}
-            </span>
+          {/* Each chip carries the option this student actually picked, which
+              is the difference between "he got D16 wrong" and "he picked C on
+              D16" — the second is checkable against the paper in his hand.
+
+              A citation the server could not tie to one of this student's wrong
+              answers comes back with `question_id: null`, and is rendered as
+              plain text rather than as something that looks openable. The
+              contract is explicit about that, and it is right: a chip that
+              opens an empty panel is worse than a chip that visibly is not
+              one. */}
+          {evidence.map((cited) => (
+            <EvidenceChip key={cited.label} cited={cited} />
           ))}
           <span className="text-[11px] text-muted-foreground">
             {evidence.length === 1
@@ -393,6 +409,42 @@ function HypothesisBlock({ hypothesis }: { hypothesis: Hypothesis }) {
         <CounterEvidence text={hypothesis.counter_evidence} />
       ) : null}
     </article>
+  );
+}
+
+/**
+ * One cited question.
+ *
+ * Resolved citations show the label and the option this student picked, which
+ * is what makes the claim checkable against the paper in the teacher's hand.
+ * Unresolved ones — the model named a question that is not a wrong answer this
+ * student gave on this paper — are deliberately duller and carry a title
+ * saying so, rather than sitting in the row looking like the others.
+ */
+function EvidenceChip({ cited }: { cited: Evidence }) {
+  if (!isResolved(cited)) {
+    return (
+      <span
+        className="tnum rounded border border-dashed border-border px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+        title="The model cited this question, but it is not one of this student's wrong answers on this paper — so nothing is claimed for it."
+      >
+        {cited.label}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="tnum inline-flex items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+      title={`${cited.label}: chose ${cited.chose} · ${cited.marks_at_stake} marks`}
+    >
+      {cited.label}
+      {cited.chose ? (
+        <span className="font-normal text-muted-foreground">
+          chose {cited.chose}
+        </span>
+      ) : null}
+    </span>
   );
 }
 

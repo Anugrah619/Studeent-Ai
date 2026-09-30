@@ -266,6 +266,37 @@ test("the diagnosis card leads with the headline and shows its evidence", async 
 
   assert.ok(card.includes("trace #53"), "the trace id is on screen");
 
+  // Each chip carries the option this student picked, which is what makes the
+  // claim checkable against the paper in the teacher's hand.
+  assert.ok(card.includes("chose C"), "the chosen option travels with the chip");
+
+  await act(async () => root.unmount());
+});
+
+test("an unresolved citation renders as text, never as a link to nowhere", async () => {
+  // Tanvi's weakest hypothesis cites D12, which is not one of her wrong answers
+  // on this paper — `question_id: null`. It must still be shown (the model said
+  // it) and must visibly not be openable.
+  const root = await renderAt("/students/5");
+  await waitFor(() => diagnosisCard().includes("MIS-KIN-RELVEL"), {
+    timeout: 8000,
+  });
+
+  const card = diagnosisCard();
+  assert.ok(card.includes("D12"), "the unresolved citation is still shown");
+  assert.ok(
+    !/D12[^A-Za-z]*chose/.test(card),
+    "no chosen option is claimed for a citation that did not resolve",
+  );
+
+  // The total is the server's, over distinct questions — not a browser-side sum
+  // of the four hypotheses, which is the number that can quietly drift high.
+  assert.match(
+    card,
+    /40 marks\s*at stake across 4 findings/,
+    "the total comes from total_marks_at_stake",
+  );
+
   await act(async () => root.unmount());
 });
 

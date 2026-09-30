@@ -131,7 +131,7 @@ export function MarksLostBar({
           <strong className="font-semibold text-foreground">
             {num(data.conceptual_gap)}
           </strong>{" "}
-          of those were things he genuinely does not know;{" "}
+          of those were things they genuinely do not know;{" "}
           <strong className="font-semibold text-foreground">
             {num(data.recoverable)}
           </strong>
@@ -146,7 +146,7 @@ export function MarksLostBar({
               <strong className="font-semibold text-foreground">
                 {num(totals.unattributed)}
               </strong>{" "}
-              are left uncalled: he has barely attempted those chapters, and a
+              are left uncalled: they have barely attempted those chapters, and a
               guess there would be worse than a blank.
             </>
           ) : null}

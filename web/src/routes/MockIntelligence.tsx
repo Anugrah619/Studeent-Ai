@@ -177,7 +177,7 @@ export function MockIntelligence() {
                 {num(marksLost.data.conceptual_gap)} marks
               </strong>{" "}
               went to things this student genuinely does not know. The rest went
-              to execution, the clock, and questions he could have answered and
+              to execution, the clock, and questions they could have answered and
               did not
               {totals.recoverablePct === null
                 ? ""
@@ -198,7 +198,7 @@ export function MockIntelligence() {
                     {num(totals.unattributed)} marks
                   </strong>{" "}
                   of the {num(totals.totalLost)} lost are not attributed to any
-                  cause. Those questions come from chapters he has barely
+                  cause. Those questions come from chapters they have barely
                   attempted, so calling them a proven gap would be a guess. They
                   are counted, shown, and left uncalled.
                 </span>

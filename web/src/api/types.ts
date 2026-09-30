@@ -68,7 +68,11 @@ export type CauseName = S["CauseEnum"];
  * ------------------------------------------------------------------ */
 
 export type Diagnosis = S["Diagnosis"];
+export type DiagnosisEvidence = S["DiagnosisEvidence"];
 export type DiagnosisHypothesis = S["DiagnosisHypothesis"];
+export type QuestionDetail = S["QuestionDetail"];
+export type QuestionOption = S["QuestionOption"];
+export type Misconception = S["Misconception"];
 export type DiagnosisVerdictRequest = S["DiagnosisVerdictRequest"];
 export type Confidence = S["ConfidenceEnum"];
 export type Verdict = S["VerdictEnum"];

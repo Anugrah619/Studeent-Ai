@@ -29,6 +29,7 @@ import { apiGet, apiPost } from "./client";
 import type {
   Confidence,
   Diagnosis as WireDiagnosis,
+  DiagnosisEvidence,
   DiagnosisHypothesis,
   DiagnosisVerdictRequest,
   TimeToFix,
@@ -44,7 +45,22 @@ export const CONFIDENCE_LEVELS = ["high", "medium", "low"] as const;
 export type { Confidence, TimeToFix };
 export type HumanVerdict = Verdict;
 export type Hypothesis = DiagnosisHypothesis;
+export type Evidence = DiagnosisEvidence;
 export type DiagnosisVerdictBody = DiagnosisVerdictRequest;
+
+/**
+ * A citation the server could tie to an answer this student actually gave.
+ *
+ * `question_id: null` means the model named a question that is not one of this
+ * student's wrong answers on this paper. The contract is explicit about what
+ * to do: render those as plain text, never as a link to nowhere. This narrowing
+ * is what lets the card do that without a null check at every use.
+ */
+export type ResolvedEvidence = Evidence & { question_id: number };
+
+export function isResolved(row: Evidence): row is ResolvedEvidence {
+  return typeof row.question_id === "number";
+}
 
 /**
  * The wire shape with the two fields the client is allowed to narrow.
@@ -123,9 +139,25 @@ function int(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function nullableInt(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function parseEvidence(raw: unknown): Evidence {
+  const row = (raw ?? {}) as Record<string, unknown>;
+  return {
+    // Anything that is not a number is an unresolved citation, which the card
+    // renders as plain text. Coercing it to 0 would build a link to /questions/0.
+    question_id: nullableInt(row.question_id),
+    label: str(row.label),
+    chose: str(row.chose),
+    marks_at_stake: int(row.marks_at_stake),
+  };
+}
+
 function parseHypothesis(raw: unknown): Hypothesis {
   const row = (raw ?? {}) as Record<string, unknown>;
-  const evidence = Array.isArray(row.evidence_questions)
+  const labels = Array.isArray(row.evidence_questions)
     ? row.evidence_questions
         .filter(
           (q): q is string | number =>
@@ -133,12 +165,28 @@ function parseHypothesis(raw: unknown): Hypothesis {
         )
         .map(String)
     : [];
+  /**
+   * `evidence` is the list to render; `evidence_questions` is what the model
+   * literally wrote and is display-only. When the server sends no `evidence` —
+   * an older deployment — the labels are lifted into unresolved rows, so the
+   * card has exactly one list to walk and shows chips that visibly are not
+   * links rather than showing nothing.
+   */
+  const evidence = Array.isArray(row.evidence)
+    ? row.evidence.map(parseEvidence)
+    : labels.map((label) => ({
+        question_id: null,
+        label,
+        chose: "",
+        marks_at_stake: 0,
+      }));
   return {
     misconception_code: str(row.misconception_code, "UNCODED"),
     claim: str(row.claim),
     // An unrecognised confidence must not read as high. Default down.
     confidence: isConfidence(row.confidence) ? row.confidence : "low",
-    evidence_questions: evidence,
+    evidence_questions: labels,
+    evidence,
     counter_evidence: str(row.counter_evidence),
     marks_at_stake: int(row.marks_at_stake),
   };
@@ -146,17 +194,33 @@ function parseHypothesis(raw: unknown): Hypothesis {
 
 export function parseDiagnosis(raw: unknown): Diagnosis {
   const body = (raw ?? {}) as Record<string, unknown>;
+  const hypotheses = Array.isArray(body.hypotheses)
+    ? body.hypotheses.map(parseHypothesis)
+    : [];
   return {
+    // Echoed back from `?paper=`. Null is not "unknown" — it means the
+    // diagnosis spans every paper this student has sat.
+    paper_id: nullableInt(body.paper_id),
+    paper_name: typeof body.paper_name === "string" ? body.paper_name : null,
     headline: str(body.headline),
     // Absent `pattern_found` with no hypotheses is "no pattern", not a pattern
     // with nothing behind it — the card must never claim more than it has.
     pattern_found:
       typeof body.pattern_found === "boolean"
         ? body.pattern_found
-        : Array.isArray(body.hypotheses) && body.hypotheses.length > 0,
-    hypotheses: Array.isArray(body.hypotheses)
-      ? body.hypotheses.map(parseHypothesis)
-      : [],
+        : hypotheses.length > 0,
+    hypotheses,
+    /**
+     * Counted server-side over *distinct* cited questions, so it is not the sum
+     * of `hypotheses[].marks_at_stake` when the model cites one question twice.
+     * The card used to do that sum itself; it reads this instead, because the
+     * arithmetic belongs where the de-duplication happens. Falls back to the
+     * sum only for a server too old to send it.
+     */
+    total_marks_at_stake:
+      typeof body.total_marks_at_stake === "number"
+        ? int(body.total_marks_at_stake)
+        : hypotheses.reduce((sum, h) => sum + h.marks_at_stake, 0),
     recommended_action: str(body.recommended_action),
     time_to_fix: isTimeToFix(body.time_to_fix) ? body.time_to_fix : null,
     trace_id: int(body.trace_id),
