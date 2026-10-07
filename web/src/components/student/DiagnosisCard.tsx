@@ -448,7 +448,7 @@ function HypothesisBlock({
  * so. They are deliberately not buttons: a chip that opens an empty panel is
  * worse than a chip that visibly is not one.
  */
-function EvidenceChip({
+export function EvidenceChip({
   cited,
   studentId,
   studentName,
@@ -538,7 +538,7 @@ const CONFIDENCE_WORD: Record<Confidence, string> = {
   low: "Low confidence",
 };
 
-function ConfidenceMeter({ level }: { level: Confidence }) {
+export function ConfidenceMeter({ level }: { level: Confidence }) {
   const filled = CONFIDENCE_STEPS[level];
   return (
     <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">

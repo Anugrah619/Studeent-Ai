@@ -1,5 +1,11 @@
 import type { DashboardSummary } from "@/api/types";
 import { flags } from "./flags";
+import {
+  DIAGNOSTIC_MAX_MARKS,
+  DIAGNOSTIC_PAPER_ID,
+  DIAGNOSTIC_PAPER_NAME,
+  paperById,
+} from "./institute";
 import { round } from "./rng";
 
 const WEEK_MS = 7 * 86_400_000;
@@ -34,11 +40,18 @@ export function dashboardSummary(): DashboardSummary {
     // 20M rows. The paper identity travels with the number so the strip can
     // say *which* mock the average is for, instead of implying it is
     // lifetime.
-    batch_mock_avg: 158.4,
-    latest_paper_id: 14,
-    latest_paper_name: "Mock 14",
-    latest_paper_held_on: "2026-09-06",
-    latest_paper_max_marks: 300,
+    //
+    // The latest paper is the diagnostic one, because that is what the
+    // fixture's own paper list says: it is held four days ago, after every
+    // AIT mock. This used to name "Mock 14" out of 300 while `papers` and
+    // every diagnosis fixture said paper 17 was the most recent — and the
+    // live summary names paper 17 too. The average is the live figure for
+    // that paper; the sitter count is this (larger) mock roster's.
+    batch_mock_avg: 98.3,
+    latest_paper_id: DIAGNOSTIC_PAPER_ID,
+    latest_paper_name: DIAGNOSTIC_PAPER_NAME,
+    latest_paper_held_on: paperById.get(DIAGNOSTIC_PAPER_ID)?.held_on ?? null,
+    latest_paper_max_marks: DIAGNOSTIC_MAX_MARKS,
     latest_paper_students: 298,
 
     revision_debt_pct: 31.2,

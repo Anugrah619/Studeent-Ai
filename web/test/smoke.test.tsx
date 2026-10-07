@@ -17,6 +17,13 @@ import {
 } from "../src/api/questions";
 import { handlers } from "../src/mocks/handlers";
 import { questionFor } from "../src/mocks/fixtures/questions";
+import { dashboardSummary } from "../src/mocks/fixtures/dashboard";
+import {
+  DIAGNOSTIC_MAX_MARKS,
+  DIAGNOSTIC_PAPER_ID,
+  papers,
+} from "../src/mocks/fixtures/institute";
+import { labelsNamedIn } from "../src/lib/explainer";
 import { text, waitFor } from "./dom";
 
 const server = setupServer(...handlers);
@@ -717,4 +724,229 @@ test("logging an intervention closes the flag and drops the row", async () => {
   );
 
   await act(async () => root.unmount());
+});
+
+/* ------------------------------------------------------------------ *
+ * The explanation layer — "How it works" and "Data & trust"
+ *
+ * Both pages promise a director that every example is the system rather than
+ * a slide about it. These tests hold them to that: each figure asserted below
+ * is one the fixtures serve (transcripts of the live server), so a page that
+ * hardcoded a number, or fell back to the 300-mark mock it used to name, fails
+ * here rather than in front of a buyer.
+ * ------------------------------------------------------------------ */
+
+function section(id: string): string {
+  const el = document.getElementById(id);
+  assert.ok(el, `section #${id} is on the page`);
+  return el!.textContent ?? "";
+}
+
+test("the explainer's steps 1 and 2 stand when the AI is not connected", async () => {
+  // Must run before the happy path below: the diagnosis for the explainer's
+  // paper is cached by the shared query client once it succeeds.
+  server.use(
+    http.get("/api/students/:id/diagnosis/", () =>
+      HttpResponse.json(
+        { detail: "The reasoning service could not be reached." },
+        { status: 503 },
+      ),
+    ),
+  );
+
+  const root = await renderAt("/how-it-works");
+  await waitFor(
+    () =>
+      section("step-reason").includes("not connected") &&
+      section("step-count").includes("134"),
+    { timeout: 8000 },
+  );
+
+  assert.ok(
+    section("step-reason").includes("Steps 1 and 2 need no AI at all"),
+    "the AI step says why the steps above still stand",
+  );
+  assert.ok(
+    !section("step-reason").includes("Could not load this panel"),
+    "a 503 is explained, not shown as the red error state",
+  );
+  assert.ok(section("step-count").includes("of 184"), "the count needs no AI");
+  assert.ok(section("step-record").includes("36"), "nor does the answer sheet");
+
+  await act(async () => root.unmount());
+});
+
+test("how it works walks four steps on the API's own figures", async () => {
+  const root = await renderAt("/how-it-works");
+  await waitFor(
+    () =>
+      section("step-reason").includes("Checked against") &&
+      section("step-count").includes("5×") &&
+      section("step-record").includes("Nitration of toluene"),
+    { timeout: 10000 },
+  );
+
+  const body = text();
+  for (const heading of [
+    "Every answer is recorded",
+    "We count, exactly",
+    "The AI reads the pattern",
+    "A teacher checks it, and the system learns",
+  ]) {
+    assert.ok(body.includes(heading), `step: ${heading}`);
+  }
+  assert.ok(body.includes("Mock 15 — Diagnostic"), "the paper the summary names");
+  assert.ok(!body.includes("AIT Mock 14"), "not the 300-mark mock it used to name");
+
+  // 1 — the answer sheet is the whole paper, and the record is the cited answer.
+  const sheet = document.querySelectorAll(
+    "ol[aria-label='Answer sheet, one entry per question'] li",
+  );
+  assert.equal(sheet.length, 46, "one cell per question on the paper");
+  const step1 = section("step-record");
+  assert.match(step1, /36\s*right/, "right answers counted from the sheet");
+  assert.match(step1, /10\s*wrong/, "wrong answers counted from the sheet");
+  assert.ok(step1.includes("opened below"), "the cited answer is marked on the sheet");
+  assert.ok(step1.includes("Aarav chose this"), "the option he picked, not just a cross");
+  assert.ok(step1.includes("MIS-ORG-EAS"), "the label the option carried in advance");
+  assert.ok(step1.includes("158 s"), "time taken, from the record");
+
+  // 2 — the count. Every number the server provides, none recomputed.
+  const step2 = section("step-count");
+  assert.match(step2, /134\s*of 184/, "score against the paper's own maximum");
+  assert.match(step2, /36\s*of 46/, "right answers against questions on the paper");
+  assert.ok(step2.includes("78% of those he answered"), "accuracy over answered");
+  assert.ok(step2.includes("50"), "marks lost, as the server totals them");
+  assert.ok(step2.includes("5×"), "the same tagged option, five times");
+  assert.ok(step2.includes("−15"), "chapter losses from top_loss_topics");
+  assert.match(step2, /7 of 10\s*Hydrocarbons/, "the chapter he mostly got right");
+  assert.match(step2, /98\.3 of 184/, "the institute figure from the summary");
+
+  // 3 — the AI, with the counter-evidence checked against the sheet.
+  const step3 = section("step-reason");
+  assert.match(
+    step3,
+    /Reverses electrophilic aromatic substitution directing effects/,
+    "the headline, from the diagnosis",
+  );
+  assert.ok(step3.includes("the student answered them correctly"), "the counter-evidence");
+  assert.match(step3, /D22\s*right/, "D22 is confirmed against the answer sheet");
+  assert.match(step3, /D23\s*right/, "and so is D23");
+  assert.ok(step3.includes("trace #53"), "the trace the reasoning is saved under");
+  assert.ok(step3.includes("Student S-1"), "the AI saw a code, not a name");
+  assert.ok(!/\d+[- ]?minute/i.test(step3), "a band, never an invented minute count");
+
+  // 4 — the loop. Read-only: the verdict is given on the student's own page.
+  const step4El = document.getElementById("step-check")!;
+  const step4 = section("step-check");
+  assert.ok(step4.includes("Not given yet"), "an unreviewed trace says so");
+  assert.ok(step4.includes("in Aarav’s own words"), "the belief, in his voice");
+  assert.ok(
+    !buttons(step4El).some((b) => b.textContent?.trim() === "Agree"),
+    "no verdict is recorded from an explainer page",
+  );
+
+  // …and the chip opens the real question.
+  const chip = buttons(step4El).find(
+    (b) => b.textContent?.includes("D17") && b.textContent?.includes("chose C"),
+  );
+  assert.ok(chip, "the evidence chip is a control");
+  await click(chip!);
+  await waitFor(() => document.querySelector('[role="dialog"]') !== null, {
+    timeout: 8000,
+  });
+  await waitFor(() => (dialog().textContent ?? "").includes("D17"), { timeout: 8000 });
+
+  await act(async () => root.unmount());
+});
+
+test("data & trust labels what is simulated and prints no number it cannot read", async () => {
+  const root = await renderAt("/trust");
+  await waitFor(
+    () =>
+      section("maths").includes("trace #53") &&
+      section("privacy").includes("Aarav Mehta") &&
+      section("real").includes("46 questions"),
+    { timeout: 8000 },
+  );
+
+  const real = section("real");
+  for (const label of ["Simulated", "Our own", "Being added", "Real"]) {
+    assert.ok(real.includes(label), `status: ${label}`);
+  }
+  assert.ok(real.includes("312 students"), "student count from the summary");
+  assert.ok(real.includes("184 marks"), "the paper, from /api/papers/");
+
+  // No provenance field exists yet, so the past-papers row must carry words
+  // and no figure at all.
+  const pastPapers = Array.from(document.querySelectorAll("#real tbody tr")).find(
+    (tr) => tr.textContent?.includes("Official past papers"),
+  );
+  assert.ok(pastPapers, "the past-papers row exists");
+  assert.ok(!/\d/.test(pastPapers!.textContent ?? ""), "and invents no count");
+  // The flow's step ordinals are decorative (`aria-hidden`); every other
+  // character of the section must be free of figures.
+  const crossCheck = document.getElementById("answer-key")!.cloneNode(true) as HTMLElement;
+  crossCheck.querySelectorAll("[aria-hidden='true']").forEach((el) => el.remove());
+  assert.ok(!/\d/.test(crossCheck.textContent ?? ""), "nor does the cross-check");
+
+  const privacy = section("privacy");
+  assert.ok(privacy.includes("S-1"), "what the AI is given");
+  assert.equal(privacy.match(/Never sent/g)?.length, 3, "name, roll number, contact");
+
+  const maths = section("maths");
+  assert.ok(maths.includes("25 marks at stake"), "the server's total");
+  assert.match(maths, /5 of 5/, "every citation matched the answer sheet");
+
+  await act(async () => root.unmount());
+});
+
+test("both explainer pages are in the main navigation, and the console links in", async () => {
+  const root = await renderAt("/");
+  await waitFor(() => text().includes("Students who need you this week"));
+
+  const primary = Array.from(document.querySelectorAll("nav[aria-label='Primary'] a"));
+  const hrefs = new Set(primary.map((a) => a.getAttribute("href")));
+  assert.ok(hrefs.has("/how-it-works"), "How it works is in the main navigation");
+  assert.ok(hrefs.has("/trust"), "Data & trust is in the main navigation");
+
+  const consoleLink = Array.from(document.querySelectorAll("main a")).find(
+    (a) => a.textContent?.trim() === "How it works",
+  );
+  assert.ok(consoleLink, "the console header links to How it works");
+  assert.equal(consoleLink!.getAttribute("href"), "/how-it-works");
+
+  await act(async () => root.unmount());
+});
+
+test("a counter-evidence label matches only a whole label on this paper", () => {
+  const row = (question_id: string, status: "correct" | "wrong") => ({
+    id: question_id.length,
+    question_id,
+    topic_name: "Hydrocarbons",
+    status,
+    time_spent: 1,
+    marks: 0,
+    source: "mock" as const,
+    ts: "2026-09-20T10:00:00+05:30",
+  });
+  const sheet = [
+    row("D2", "wrong"),
+    row("D22", "correct"),
+    row("D23", "correct"),
+    row("SO3", "wrong"),
+  ];
+  const named = labelsNamedIn(
+    "D23 and D22: the -SO3H group was named in the stem.",
+    sheet,
+  ).map((r) => r.question_id);
+  assert.deepEqual(named, ["D23", "D22"], "only whole labels, in the order named");
+});
+
+test("the mock summary's latest paper is the paper every diagnosis is about", () => {
+  const summary = dashboardSummary();
+  assert.equal(summary.latest_paper_id, DIAGNOSTIC_PAPER_ID);
+  assert.equal(summary.latest_paper_max_marks, DIAGNOSTIC_MAX_MARKS);
+  const latest = papers.reduce((a, b) => (a.held_on > b.held_on ? a : b));
+  assert.equal(latest.id, DIAGNOSTIC_PAPER_ID, "and it is the most recent fixture paper");
 });

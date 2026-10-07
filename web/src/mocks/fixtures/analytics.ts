@@ -14,6 +14,7 @@ import {
   round,
   splitInteger,
 } from "./rng";
+import { diagnosticAttemptsFor, diagnosticMarksLostFor } from "./diagnosticSitting";
 import { mockScoresFor } from "./students";
 import { SUBJECT_LABEL, syllabus } from "./syllabus";
 
@@ -100,6 +101,10 @@ const PINNED_MARKS_LOST: Record<
 };
 
 export function marksLostFor(studentId: number, paperId: number): MarksLost | undefined {
+  // A live transcript beats a generated split wherever one exists.
+  const transcribed = diagnosticMarksLostFor(studentId, paperId);
+  if (transcribed) return transcribed;
+
   const row = mockScoresFor(studentId).find((r) => r.paper_id === paperId);
   if (!row) return undefined;
 
@@ -258,7 +263,20 @@ export function topicStatesFor(studentId: number): TopicState[] {
  * Raw attempts
  * ------------------------------------------------------------------ */
 
-export function attemptsFor(studentId: number): Attempt[] {
+/**
+ * Raw attempts, optionally for one paper.
+ *
+ * `?paper=` is honoured where a live transcript exists for that sitting, which
+ * is what the "How it works" page reads. Everywhere else the generated sheet is
+ * returned as before — it has never been paper-specific, and inventing a
+ * per-paper split for sittings nobody has transcribed would just be a second
+ * set of numbers to disagree with the server.
+ */
+export function attemptsFor(studentId: number, paperId?: number): Attempt[] {
+  if (paperId !== undefined) {
+    const transcribed = diagnosticAttemptsFor(studentId, paperId);
+    if (transcribed) return transcribed;
+  }
   const rand = mulberry32(hashSeed("attempts", studentId));
   const latest = papers[papers.length - 1];
   const states = topicStatesFor(studentId);
