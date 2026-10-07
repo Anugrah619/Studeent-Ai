@@ -1,0 +1,1857 @@
+{
+  "schema": "student-ai/official-syllabus/1",
+  "exam": {
+    "code": "JEE_MAIN",
+    "name": "JEE Main",
+    "paper": "Paper 1 (B.E./B.Tech.)",
+    "year": 2026,
+    "questions": 75,
+    "marks_correct": 4,
+    "marks_wrong": -1,
+    "total_marks": 300,
+    "pattern_source": {
+      "file": "data/raw/syllabus/jee_main_2026_information_bulletin.pdf",
+      "pages": [
+        17,
+        18,
+        21
+      ],
+      "page_numbering": "1-based PDF page index (the bulletin prints different numbers: 11, 12, 15)",
+      "says": "Mathematics, Physics, Chemistry: 20 MCQ (Section A) + 5 numerical (Section B) each, 75 questions, 300 marks. MCQ: +4 / -1 / 0. Numerical: +4 / -1 / 0 ('There will be negative marking for Section B')."
+    }
+  },
+  "source": {
+    "file": "data/raw/syllabus/jee_main_2026_syllabus.pdf",
+    "sha256": "7cad9da2a12065444828f744bd9f1a93a2dd0d9bd54c32a6d92d94a769e4f905",
+    "url": "https://cdnbbsr.s3waas.gov.in/s3f8e59f4b2fe7c5705bf878bbd494ccdf/uploads/2025/10/202510311323551056.pdf",
+    "linked_from": "https://jeemain.nta.nic.in/ ('Syllabus')",
+    "title_on_document": "Syllabus for JEE (Main) - 2026",
+    "pages_used": "1-11 (Paper 1). Pages 12-17 are Paper 2A/2B and are not used.",
+    "page_numbering": "page = 1-based page index of the PDF file (the document prints no page numbers)",
+    "downloaded": "2026-10-07"
+  },
+  "structure": {
+    "rule": "subject -> unit -> chapter. A unit is NTA's 'UNIT n'. NTA does not divide its JEE units into chapters, so each unit has exactly one chapter with the same name. Chemistry's 'group' is NTA's own Physical/Inorganic/Organic heading. Nothing here is grouped or split beyond what the PDF prints.",
+    "name": "NTA's wording, re-cased for display; name_verbatim is exactly as printed.",
+    "weight": "Not recorded. Chapter weights will be counted from past papers, not estimated."
+  },
+  "ncert": {
+    "edition": "Rationalised textbooks, 'Reprint 2026-27' (printed on every page of the files checked)",
+    "source": "https://ncert.nic.in/textbook.php",
+    "how_verified": "Every chapter number, title and PDF link was checked by downloading the chapter PDF from ncert.nic.in on 2026-10-07 and reading its opening page: the printed heading for 104 of the 106 files; for keph107 (Gravitation) and lech104 (d- and f-Block) the heading is an image, so the opening text was read instead. File checksums and headings: data/raw/syllabus/ncert/chapter_pdf_check.tsv; book contents pages: data/raw/syllabus/ncert/*ps.pdf.",
+    "shape": "ncert_ref is null (no counterpart) or a list of {class, subject, book, chapter, title, pdf[, sections]}. 'sections' is present only when a syllabus chapter maps to part of an NCERT chapter. NCERT Chemistry calls its chapters 'Unit n'; 'chapter' holds that n."
+  },
+  "subjects": [
+    {
+      "name": "Mathematics",
+      "name_verbatim": "MATHEMATICS",
+      "page": 1,
+      "units": [
+        {
+          "no": 1,
+          "name": "Sets, Relations and Functions",
+          "name_verbatim": "SETS, RELATIONS AND FUNCTIONS",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Sets, Relations and Functions",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 1,
+                  "title": "Sets",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh101.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 2,
+                  "title": "Relations and Functions",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh102.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part I",
+                  "chapter": 1,
+                  "title": "Relations and Functions",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh101.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 2,
+          "name": "Complex Numbers and Quadratic Equations",
+          "name_verbatim": "COMPLEX NUMBERS AND QUADRATIC EQUATIONS",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Complex Numbers and Quadratic Equations",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 4,
+                  "title": "Complex Numbers and Quadratic Equations",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh104.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 3,
+          "name": "Matrices and Determinants",
+          "name_verbatim": "MATRICES AND DETERMINANTS",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Matrices and Determinants",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part I",
+                  "chapter": 3,
+                  "title": "Matrices",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh103.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part I",
+                  "chapter": 4,
+                  "title": "Determinants",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh104.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 4,
+          "name": "Permutations and Combinations",
+          "name_verbatim": "PERMUTATIONS AND COMBINATIONS",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Permutations and Combinations",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 6,
+                  "title": "Permutations and Combinations",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh106.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 5,
+          "name": "Binomial Theorem and Its Simple Applications",
+          "name_verbatim": "BINOMIAL THEOREM AND ITS SIMPLE APPLICATIONS",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Binomial Theorem and Its Simple Applications",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 7,
+                  "title": "Binomial Theorem",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh107.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 6,
+          "name": "Sequence and Series",
+          "name_verbatim": "SEQUENCE AND SERIES",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Sequence and Series",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 8,
+                  "title": "Sequences and Series",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh108.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 7,
+          "name": "Limit, Continuity and Differentiability",
+          "name_verbatim": "LIMIT, CONTINUITY AND DIFFERENTIABILITY",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Limit, Continuity and Differentiability",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 12,
+                  "title": "Limits and Derivatives",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh112.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part I",
+                  "chapter": 5,
+                  "title": "Continuity and Differentiability",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh105.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part I",
+                  "chapter": 6,
+                  "title": "Application of Derivatives",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh106.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 8,
+          "name": "Integral Calculus",
+          "name_verbatim": "INTEGRAL CALCULAS",
+          "page": 1,
+          "pages": [
+            1,
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Integral Calculus",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1,
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part II",
+                  "chapter": 7,
+                  "title": "Integrals",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh201.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part II",
+                  "chapter": 8,
+                  "title": "Application of Integrals",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh202.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 9,
+          "name": "Differential Equations",
+          "name_verbatim": "DIFFRENTIAL EQUATIONS",
+          "page": 2,
+          "pages": [
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Differential Equations",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part II",
+                  "chapter": 9,
+                  "title": "Differential Equations",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh203.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 10,
+          "name": "Co-ordinate Geometry",
+          "name_verbatim": "CO-ORDINATE GEOMETRY",
+          "page": 2,
+          "pages": [
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Co-ordinate Geometry",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 9,
+                  "title": "Straight Lines",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh109.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 10,
+                  "title": "Conic Sections",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh110.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 11,
+          "name": "Three Dimensional Geometry",
+          "name_verbatim": "THREE DIMENSIONAL GEOMETRY",
+          "page": 2,
+          "pages": [
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Three Dimensional Geometry",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 11,
+                  "title": "Introduction to Three Dimensional Geometry",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh111.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part II",
+                  "chapter": 11,
+                  "title": "Three Dimensional Geometry",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh205.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 12,
+          "name": "Vector Algebra",
+          "name_verbatim": "VECTOR ALGEBRA",
+          "page": 2,
+          "pages": [
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Vector Algebra",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part II",
+                  "chapter": 10,
+                  "title": "Vector Algebra",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh204.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 13,
+          "name": "Statistics and Probability",
+          "name_verbatim": "STATISTICS AND PROBABILITY",
+          "page": 2,
+          "pages": [
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Statistics and Probability",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 13,
+                  "title": "Statistics",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh113.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 14,
+                  "title": "Probability",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh114.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part II",
+                  "chapter": 13,
+                  "title": "Probability",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh207.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 14,
+          "name": "Trigonometry",
+          "name_verbatim": "TRIGONOMETRY",
+          "page": 2,
+          "pages": [
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Trigonometry",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Mathematics",
+                  "book": "Mathematics",
+                  "chapter": 3,
+                  "title": "Trigonometric Functions",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kemh103.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Mathematics",
+                  "book": "Mathematics Part I",
+                  "chapter": 2,
+                  "title": "Inverse Trigonometric Functions",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lemh102.pdf"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Physics",
+      "name_verbatim": "PHYSICS",
+      "page": 3,
+      "units": [
+        {
+          "no": 1,
+          "name": "Units and Measurements",
+          "name_verbatim": "Units and Measurements",
+          "page": 3,
+          "pages": [
+            3
+          ],
+          "chapters": [
+            {
+              "name": "Units and Measurements",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 1,
+                  "title": "Units and Measurement",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph101.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 2,
+          "name": "Kinematics",
+          "name_verbatim": "Kinematics",
+          "page": 3,
+          "pages": [
+            3
+          ],
+          "chapters": [
+            {
+              "name": "Kinematics",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 2,
+                  "title": "Motion in a Straight Line",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph102.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 3,
+                  "title": "Motion in a Plane",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph103.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 3,
+          "name": "Laws of Motion",
+          "name_verbatim": "Laws of Motion",
+          "page": 3,
+          "pages": [
+            3
+          ],
+          "chapters": [
+            {
+              "name": "Laws of Motion",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 4,
+                  "title": "Laws of Motion",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph104.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 4,
+          "name": "Work, Energy and Power",
+          "name_verbatim": "Work, Energy and Power",
+          "page": 3,
+          "pages": [
+            3
+          ],
+          "chapters": [
+            {
+              "name": "Work, Energy and Power",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 5,
+                  "title": "Work, Energy and Power",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph105.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 5,
+          "name": "Rotational Motion",
+          "name_verbatim": "Rotational Motion",
+          "page": 3,
+          "pages": [
+            3
+          ],
+          "chapters": [
+            {
+              "name": "Rotational Motion",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 6,
+                  "title": "Systems of Particles and Rotational Motion",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph106.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 6,
+          "name": "Gravitation",
+          "name_verbatim": "Gravitation",
+          "page": 3,
+          "pages": [
+            3
+          ],
+          "chapters": [
+            {
+              "name": "Gravitation",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 7,
+                  "title": "Gravitation",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph107.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 7,
+          "name": "Properties of Solids and Liquids",
+          "name_verbatim": "Properties of Solids and Liquids",
+          "page": 3,
+          "pages": [
+            3,
+            4
+          ],
+          "chapters": [
+            {
+              "name": "Properties of Solids and Liquids",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3,
+                4
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 8,
+                  "title": "Mechanical Properties of Solids",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph201.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 9,
+                  "title": "Mechanical Properties of Fluids",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph202.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 10,
+                  "title": "Thermal Properties of Matter",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph203.pdf"
+                }
+              ],
+              "ncert_note": "NTA folds heat, thermal expansion, calorimetry and heat transfer into this unit, so it spans NCERT's thermal-properties chapter as well as the two mechanical-properties chapters."
+            }
+          ]
+        },
+        {
+          "no": 8,
+          "name": "Thermodynamics",
+          "name_verbatim": "Thermodynamics",
+          "page": 4,
+          "pages": [
+            4
+          ],
+          "chapters": [
+            {
+              "name": "Thermodynamics",
+              "name_source": "nta_unit",
+              "page": 4,
+              "pages": [
+                4
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 11,
+                  "title": "Thermodynamics",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph204.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 9,
+          "name": "Kinetic Theory of Gases",
+          "name_verbatim": "Kinetic Theory of Gases",
+          "page": 4,
+          "pages": [
+            4
+          ],
+          "chapters": [
+            {
+              "name": "Kinetic Theory of Gases",
+              "name_source": "nta_unit",
+              "page": 4,
+              "pages": [
+                4
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 12,
+                  "title": "Kinetic Theory",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph205.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 10,
+          "name": "Oscillations and Waves",
+          "name_verbatim": "Oscillations and Waves",
+          "page": 4,
+          "pages": [
+            4
+          ],
+          "chapters": [
+            {
+              "name": "Oscillations and Waves",
+              "name_source": "nta_unit",
+              "page": 4,
+              "pages": [
+                4
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 13,
+                  "title": "Oscillations",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph206.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 14,
+                  "title": "Waves",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph207.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 11,
+          "name": "Electrostatics",
+          "name_verbatim": "Electrostatics",
+          "page": 4,
+          "pages": [
+            4
+          ],
+          "chapters": [
+            {
+              "name": "Electrostatics",
+              "name_source": "nta_unit",
+              "page": 4,
+              "pages": [
+                4
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 1,
+                  "title": "Electric Charges and Fields",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph101.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 2,
+                  "title": "Electrostatic Potential and Capacitance",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph102.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 12,
+          "name": "Current Electricity",
+          "name_verbatim": "Current Electricity",
+          "page": 5,
+          "pages": [
+            5
+          ],
+          "chapters": [
+            {
+              "name": "Current Electricity",
+              "name_source": "nta_unit",
+              "page": 5,
+              "pages": [
+                5
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 3,
+                  "title": "Current Electricity",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph103.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 13,
+          "name": "Magnetic Effects of Current and Magnetism",
+          "name_verbatim": "Magnetic Effects of Current and Magnetism",
+          "page": 5,
+          "pages": [
+            5
+          ],
+          "chapters": [
+            {
+              "name": "Magnetic Effects of Current and Magnetism",
+              "name_source": "nta_unit",
+              "page": 5,
+              "pages": [
+                5
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 4,
+                  "title": "Moving Charges and Magnetism",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph104.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 5,
+                  "title": "Magnetism and Matter",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph105.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 14,
+          "name": "Electromagnetic Induction and Alternating Currents",
+          "name_verbatim": "Electromagnetic Induction and Alternating Currents",
+          "page": 5,
+          "pages": [
+            5
+          ],
+          "chapters": [
+            {
+              "name": "Electromagnetic Induction and Alternating Currents",
+              "name_source": "nta_unit",
+              "page": 5,
+              "pages": [
+                5
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 6,
+                  "title": "Electromagnetic Induction",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph106.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 7,
+                  "title": "Alternating Current",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph107.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 15,
+          "name": "Electromagnetic Waves",
+          "name_verbatim": "Electromagnetic Waves",
+          "page": 5,
+          "pages": [
+            5
+          ],
+          "chapters": [
+            {
+              "name": "Electromagnetic Waves",
+              "name_source": "nta_unit",
+              "page": 5,
+              "pages": [
+                5
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 8,
+                  "title": "Electromagnetic Waves",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph108.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 16,
+          "name": "Optics",
+          "name_verbatim": "Optics",
+          "page": 5,
+          "pages": [
+            5
+          ],
+          "chapters": [
+            {
+              "name": "Optics",
+              "name_source": "nta_unit",
+              "page": 5,
+              "pages": [
+                5
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 9,
+                  "title": "Ray Optics and Optical Instruments",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph201.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 10,
+                  "title": "Wave Optics",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph202.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 17,
+          "name": "Dual Nature of Matter and Radiation",
+          "name_verbatim": "Dual Nature of Matter and Radiation",
+          "page": 6,
+          "pages": [
+            6
+          ],
+          "chapters": [
+            {
+              "name": "Dual Nature of Matter and Radiation",
+              "name_source": "nta_unit",
+              "page": 6,
+              "pages": [
+                6
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 11,
+                  "title": "Dual Nature of Radiation and Matter",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph203.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 18,
+          "name": "Atoms and Nuclei",
+          "name_verbatim": "Atoms and Nuclei",
+          "page": 6,
+          "pages": [
+            6
+          ],
+          "chapters": [
+            {
+              "name": "Atoms and Nuclei",
+              "name_source": "nta_unit",
+              "page": 6,
+              "pages": [
+                6
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 12,
+                  "title": "Atoms",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph204.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 13,
+                  "title": "Nuclei",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph205.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 19,
+          "name": "Electronic Devices",
+          "name_verbatim": "Electronic Devices",
+          "page": 6,
+          "pages": [
+            6
+          ],
+          "chapters": [
+            {
+              "name": "Electronic Devices",
+              "name_source": "nta_unit",
+              "page": 6,
+              "pages": [
+                6
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 14,
+                  "title": "Semiconductor Electronics: Materials, Devices and Simple Circuits",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph206.pdf"
+                }
+              ],
+              "ncert_note": "Partial. The rationalised NCERT chapter has sections 14.1-14.7 only, ending at '14.7 Application of Junction Diode as a Rectifier'. NTA also lists logic gates, the Zener diode (and voltage regulator), LED, photodiode and solar cell; a search of the full NCERT chapter text on 2026-10-07 found none of these terms. Those topics have no current NCERT textbook coverage."
+            }
+          ]
+        },
+        {
+          "no": 20,
+          "name": "Experimental Skills",
+          "name_verbatim": "Experimental Skills",
+          "page": 6,
+          "pages": [
+            6
+          ],
+          "chapters": [
+            {
+              "name": "Experimental Skills",
+              "name_source": "nta_unit",
+              "page": 6,
+              "pages": [
+                6
+              ],
+              "ncert_ref": null,
+              "ncert_note": "No NCERT textbook chapter. The listed experiments belong to NCERT's separate laboratory manuals, which are not linked here."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chemistry",
+      "name_verbatim": "CHEMISTRY",
+      "page": 7,
+      "units": [
+        {
+          "no": 1,
+          "name": "Some Basic Concepts in Chemistry",
+          "name_verbatim": "SOME BASIC CONCEPTS IN CHEMISTRY",
+          "page": 7,
+          "pages": [
+            7
+          ],
+          "chapters": [
+            {
+              "name": "Some Basic Concepts in Chemistry",
+              "name_source": "nta_unit",
+              "page": 7,
+              "pages": [
+                7
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 1,
+                  "title": "Some Basic Concepts of Chemistry",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech101.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 2,
+          "name": "Atomic Structure",
+          "name_verbatim": "ATOMIC STRUCTURE",
+          "page": 7,
+          "pages": [
+            7
+          ],
+          "chapters": [
+            {
+              "name": "Atomic Structure",
+              "name_source": "nta_unit",
+              "page": 7,
+              "pages": [
+                7
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 2,
+                  "title": "Structure of Atom",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech102.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 3,
+          "name": "Chemical Bonding and Molecular Structure",
+          "name_verbatim": "CHEMICAL BONDING AND MOLECULAR STRUCTURE",
+          "page": 7,
+          "pages": [
+            7
+          ],
+          "chapters": [
+            {
+              "name": "Chemical Bonding and Molecular Structure",
+              "name_source": "nta_unit",
+              "page": 7,
+              "pages": [
+                7
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 4,
+                  "title": "Chemical Bonding and Molecular Structure",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech104.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 4,
+          "name": "Chemical Thermodynamics",
+          "name_verbatim": "CHEMICAL THERMODYNAMICS",
+          "page": 7,
+          "pages": [
+            7
+          ],
+          "chapters": [
+            {
+              "name": "Chemical Thermodynamics",
+              "name_source": "nta_unit",
+              "page": 7,
+              "pages": [
+                7
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 5,
+                  "title": "Thermodynamics",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech105.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 5,
+          "name": "Solutions",
+          "name_verbatim": "SOLUTIONS",
+          "page": 7,
+          "pages": [
+            7
+          ],
+          "chapters": [
+            {
+              "name": "Solutions",
+              "name_source": "nta_unit",
+              "page": 7,
+              "pages": [
+                7
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 1,
+                  "title": "Solutions",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech101.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 6,
+          "name": "Equilibrium",
+          "name_verbatim": "EQUILIBRIUM",
+          "page": 8,
+          "pages": [
+            8
+          ],
+          "chapters": [
+            {
+              "name": "Equilibrium",
+              "name_source": "nta_unit",
+              "page": 8,
+              "pages": [
+                8
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 6,
+                  "title": "Equilibrium",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech106.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 7,
+          "name": "Redox Reactions and Electrochemistry",
+          "name_verbatim": "REDOX REACTIONS AND ELECTROCHEMISTRY",
+          "page": 8,
+          "pages": [
+            8
+          ],
+          "chapters": [
+            {
+              "name": "Redox Reactions and Electrochemistry",
+              "name_source": "nta_unit",
+              "page": 8,
+              "pages": [
+                8
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 7,
+                  "title": "Redox Reactions",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech201.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 2,
+                  "title": "Electrochemistry",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech102.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 8,
+          "name": "Chemical Kinetics",
+          "name_verbatim": "CHEMICAL KINETICS",
+          "page": 8,
+          "pages": [
+            8
+          ],
+          "chapters": [
+            {
+              "name": "Chemical Kinetics",
+              "name_source": "nta_unit",
+              "page": 8,
+              "pages": [
+                8
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 3,
+                  "title": "Chemical Kinetics",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech103.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 9,
+          "name": "Classification of Elements and Periodicity in Properties",
+          "name_verbatim": "CLASSIFICATION OF ELEMENTS AND PERIODICITY IN PROPERTIES",
+          "page": 8,
+          "pages": [
+            8
+          ],
+          "chapters": [
+            {
+              "name": "Classification of Elements and Periodicity in Properties",
+              "name_source": "nta_unit",
+              "page": 8,
+              "pages": [
+                8
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 3,
+                  "title": "Classification of Elements and Periodicity in Properties",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech103.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Inorganic Chemistry"
+        },
+        {
+          "no": 10,
+          "name": "p-Block Elements",
+          "name_verbatim": "p- BLOCK ELEMENTS",
+          "page": 8,
+          "pages": [
+            8
+          ],
+          "chapters": [
+            {
+              "name": "p-Block Elements",
+              "name_source": "nta_unit",
+              "page": 8,
+              "pages": [
+                8
+              ],
+              "ncert_ref": null,
+              "ncert_note": "No counterpart in the current rationalised NCERT textbooks: Class XI Chemistry has Units 1-9 and Class XII Chemistry Units 1-10 (Reprint 2026-27 contents pages), and none is a p-block chapter. NTA still examines Groups 13-18. Deliberately not linked to Class XI Unit 3 (periodic trends), which is not a p-block treatment."
+            }
+          ],
+          "group": "Inorganic Chemistry"
+        },
+        {
+          "no": 11,
+          "name": "d- and f-Block Elements",
+          "name_verbatim": "d - and f- BLOCK ELEMENTS",
+          "page": 8,
+          "pages": [
+            8,
+            9
+          ],
+          "chapters": [
+            {
+              "name": "d- and f-Block Elements",
+              "name_source": "nta_unit",
+              "page": 8,
+              "pages": [
+                8,
+                9
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 4,
+                  "title": "The d- and f-Block Elements",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech104.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Inorganic Chemistry"
+        },
+        {
+          "no": 12,
+          "name": "Coordination Compounds",
+          "name_verbatim": "COORDINATION COMPOUNDS",
+          "page": 9,
+          "pages": [
+            9
+          ],
+          "chapters": [
+            {
+              "name": "Coordination Compounds",
+              "name_source": "nta_unit",
+              "page": 9,
+              "pages": [
+                9
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 5,
+                  "title": "Coordination Compounds",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech105.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Inorganic Chemistry"
+        },
+        {
+          "no": 13,
+          "name": "Purification and Characterisation of Organic Compounds",
+          "name_verbatim": "PURIFICATION AND CHARACTERISATION OF ORGANIC COMPOUNDS",
+          "page": 9,
+          "pages": [
+            9
+          ],
+          "chapters": [
+            {
+              "name": "Purification and Characterisation of Organic Compounds",
+              "name_source": "nta_unit",
+              "page": 9,
+              "pages": [
+                9
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 8,
+                  "title": "Organic Chemistry – Some Basic Principles and Techniques",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech202.pdf",
+                  "sections": [
+                    "8.8 Methods of Purification of Organic Compounds",
+                    "8.9 Qualitative Analysis of Organic Compounds",
+                    "8.10 Quantitative Analysis"
+                  ]
+                }
+              ],
+              "ncert_note": "Covered by three sections of one NCERT unit, not a whole chapter."
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 14,
+          "name": "Some Basic Principles of Organic Chemistry",
+          "name_verbatim": "SOME BASIC PRINCIPLES OF ORGANIC CHEMISTRY",
+          "page": 9,
+          "pages": [
+            9
+          ],
+          "chapters": [
+            {
+              "name": "Some Basic Principles of Organic Chemistry",
+              "name_source": "nta_unit",
+              "page": 9,
+              "pages": [
+                9
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 8,
+                  "title": "Organic Chemistry – Some Basic Principles and Techniques",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech202.pdf",
+                  "sections": [
+                    "8.1 General Introduction",
+                    "8.2 Tetravalence of Carbon: Shapes of Organic Compounds",
+                    "8.3 Structural Representations of Organic Compounds",
+                    "8.4 Classification of Organic Compounds",
+                    "8.5 Nomenclature of Organic Compounds",
+                    "8.6 Isomerism",
+                    "8.7 Fundamental Concepts in Organic Reaction Mechanism"
+                  ]
+                }
+              ],
+              "ncert_note": "Covered by sections 8.1-8.7 of the same NCERT unit that also covers Unit 13."
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 15,
+          "name": "Hydrocarbons",
+          "name_verbatim": "HYDROCARBONS",
+          "page": 9,
+          "pages": [
+            9
+          ],
+          "chapters": [
+            {
+              "name": "Hydrocarbons",
+              "name_source": "nta_unit",
+              "page": 9,
+              "pages": [
+                9
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 9,
+                  "title": "Hydrocarbons",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech203.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 16,
+          "name": "Organic Compounds Containing Halogens",
+          "name_verbatim": "ORGANIC COMPOUNDS CONTAINING HALOGENS",
+          "page": 9,
+          "pages": [
+            9
+          ],
+          "chapters": [
+            {
+              "name": "Organic Compounds Containing Halogens",
+              "name_source": "nta_unit",
+              "page": 9,
+              "pages": [
+                9
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 6,
+                  "title": "Haloalkanes and Haloarenes",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech201.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 17,
+          "name": "Organic Compounds Containing Oxygen",
+          "name_verbatim": "ORGANIC COMPOUNDS CONTAINING OXYGEN",
+          "page": 10,
+          "pages": [
+            10
+          ],
+          "chapters": [
+            {
+              "name": "Organic Compounds Containing Oxygen",
+              "name_source": "nta_unit",
+              "page": 10,
+              "pages": [
+                10
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 7,
+                  "title": "Alcohols, Phenols and Ethers",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech202.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 8,
+                  "title": "Aldehydes, Ketones and Carboxylic Acids",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech203.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 18,
+          "name": "Organic Compounds Containing Nitrogen",
+          "name_verbatim": "ORGANIC COMPOUNDS CONTAINING NITROGEN",
+          "page": 10,
+          "pages": [
+            10
+          ],
+          "chapters": [
+            {
+              "name": "Organic Compounds Containing Nitrogen",
+              "name_source": "nta_unit",
+              "page": 10,
+              "pages": [
+                10
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 9,
+                  "title": "Amines",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech204.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 19,
+          "name": "Biomolecules",
+          "name_verbatim": "BIOMOLECULES",
+          "page": 10,
+          "pages": [
+            10
+          ],
+          "chapters": [
+            {
+              "name": "Biomolecules",
+              "name_source": "nta_unit",
+              "page": 10,
+              "pages": [
+                10
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 10,
+                  "title": "Biomolecules",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech205.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 20,
+          "name": "Principles Related to Practical Chemistry",
+          "name_verbatim": "PRINCIPLES RELATED TO PRACTICAL CHEMISTRY",
+          "page": 10,
+          "pages": [
+            10,
+            11
+          ],
+          "chapters": [
+            {
+              "name": "Principles Related to Practical Chemistry",
+              "name_source": "nta_unit",
+              "page": 10,
+              "pages": [
+                10,
+                11
+              ],
+              "ncert_ref": null,
+              "ncert_note": "No NCERT textbook chapter. Salt analysis, titrimetry and preparations belong to NCERT's laboratory manuals, which are not linked here. (Detection of N, S and halogens also appears in Class XI Unit 8 section 8.9, already linked from Unit 13.)"
+            }
+          ],
+          "group": "Organic Chemistry"
+        }
+      ]
+    }
+  ],
+  "ambiguities": [
+    {
+      "where": "p.1 Unit 8, p.2 Unit 9",
+      "what": "Headings are printed 'INTEGRAL CALCULAS' and 'DIFFRENTIAL EQUATIONS'. Display names correct the spelling; name_verbatim keeps the print."
+    },
+    {
+      "where": "p.1 Unit 8, p.2 Unit 9",
+      "what": "The integral forms ('integrals of the type ...') and the differential-equation form are images; the PDF's text layer does not contain them. Irrelevant at chapter level; read the page image if the exact forms are ever needed."
+    },
+    {
+      "where": "p.7 Chemistry Unit 1",
+      "what": "Numbered 'UNIT I' (Roman) while every other unit is Arabic. Treated as Unit 1."
+    },
+    {
+      "where": "p.2 Unit 10",
+      "what": "'Co-ordinate Geometry' is one unit containing NTA's own sub-headings 'Straight line' and 'Circle, conic sections'. Kept as one chapter; not split."
+    },
+    {
+      "where": "p.5 Physics Unit 16",
+      "what": "'Optics' is one unit covering ray optics and (sub-heading) 'Wave optics'. Kept as one chapter; the NCERT link lists both NCERT chapters."
+    },
+    {
+      "where": "p.6 Physics Unit 20, p.10-11 Chemistry Unit 20",
+      "what": "'Experimental Skills' and 'Principles Related to Practical Chemistry' are examinable units with no NCERT textbook chapter; ncert_ref is null."
+    }
+  ]
+}

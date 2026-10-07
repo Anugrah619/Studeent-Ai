@@ -92,6 +92,7 @@ class SyllabusVersionAdmin(admin.ModelAdmin):
                 old_to_new[t.pk] = Topic.objects.create(
                     syllabus=clone, parent=None, name=t.name,
                     kind=t.kind, weight=t.weight, position=t.position,
+                    ncert_ref=t.ncert_ref,
                 ).pk
             for t in originals:
                 if t.parent_id:
@@ -117,7 +118,7 @@ class TopicAdmin(admin.ModelAdmin):
     inlines = (TopicInline,)
     list_per_page = 100
     save_on_top = True
-    fields = ("syllabus", "parent", "name", "kind", "weight", "position")
+    fields = ("syllabus", "parent", "name", "kind", "weight", "position", "ncert_ref")
 
     def get_queryset(self, request):
         return (

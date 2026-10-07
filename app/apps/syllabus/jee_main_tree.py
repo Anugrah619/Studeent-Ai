@@ -1,8 +1,11 @@
 """JEE Main syllabus tree.
 
-⚠️  PLACEHOLDER STRUCTURE — verify against the official NTA syllabus PDF
-    (nta.ac.in) before using with a real institute. NTA has revised the
-    syllabus more than once; chapter names and inclusions drift.
+⚠️  PLACEHOLDER STRUCTURE — typed from memory, never checked against NTA.
+    SUPERSEDED by data/syllabus/jee_main_2026.json, which is traced page by
+    page to NTA's "Syllabus for JEE (Main) - 2026" and loaded by
+    `manage.py load_official_syllabus`. This file is kept only because the
+    demo (syllabus version 1, every batch, attempt and question) is bound to
+    the tree it produced. Do not use it for anything new.
 
 `weight` is the typical marks a chapter carries in the paper. These are
 plausible estimates, not measured values. Replace them with counts derived

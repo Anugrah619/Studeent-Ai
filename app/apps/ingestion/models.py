@@ -10,6 +10,24 @@ from django.db import models
 from apps.tenancy import models as tenancy
 
 
+class Source(models.TextChoices):
+    """Where a paper or a question came from. The product must always be
+    able to say this out loud — a director who hears "this is the actual
+    NEET 2025 paper" trusts everything after it, and one who catches a
+    made-up question presented as a real one trusts nothing.
+
+    The default is `demo` because every row that existed before provenance
+    was tracked was written by us (the diagnostic bank) or is a synthetic
+    label-only mock. Real past papers are loaded by the question factory,
+    which sets `official_pyq` explicitly — nothing becomes "official" by
+    default.
+    """
+
+    OFFICIAL_PYQ = "official_pyq", "Official past paper"
+    DEMO = "demo", "Demo (written by us)"
+    GENERATED = "generated", "Generated"
+
+
 class TestPaper(tenancy.TenantScoped):
     name = models.CharField(max_length=200)                  # "Mock 14"
     exam = models.ForeignKey("syllabus.Exam", on_delete=models.PROTECT)
@@ -19,6 +37,22 @@ class TestPaper(tenancy.TenantScoped):
     marks_correct = models.IntegerField(default=4)
     marks_wrong = models.IntegerField(default=-1)
     duration_min = models.IntegerField(default=180)
+
+    # --- provenance -----------------------------------------------------
+    source = models.CharField(
+        max_length=16, choices=Source.choices, default=Source.DEMO
+    )
+    exam_year = models.IntegerField(null=True, blank=True)   # 2025
+    shift_or_booklet = models.CharField(
+        max_length=80, blank=True,
+        help_text="NEET test-booklet code or JEE Main date and shift — the "
+                  "official key is per booklet / per shift, so this is part "
+                  "of the paper's identity, not a label.",
+    )
+    # Files, URLs, checksums, and how the booklet code was verified.
+    # Mirrors `data/raw/manifest.json` at the moment of loading, so the
+    # database can answer "where did this come from" on its own.
+    provenance = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ["-held_on"]
@@ -132,6 +166,15 @@ class QuestionOption(models.Model):
         related_name="distractors",
     )
 
+    # A model's *proposal* for `misconception`, kept apart from it on
+    # purpose. The FK above is what diagnosis reads; a draft written there
+    # would become evidence the moment it was saved. A person promotes a
+    # draft by setting the FK — never the loader.
+    #   code     an existing taxonomy code, or a proposed new one
+    #   draft    {"is_new": bool, "name": ..., "belief": ..., "trace_id": ...}
+    draft_misconception_code = models.CharField(max_length=32, blank=True)
+    draft_misconception = models.JSONField(null=True, blank=True)
+
     class Meta:
         ordering = ["question", "label"]
         constraints = [
@@ -183,6 +226,53 @@ class QuestionTopicMap(tenancy.TenantScoped):
         "tenancy.User", null=True, blank=True, on_delete=models.SET_NULL
     )
     confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    # --- provenance -----------------------------------------------------
+    # Added with the question factory. Open book, not closed book: for a
+    # real past paper the answer is NTA's official key, always.
+    # `model_answer` is what Gemini got solving the question blind, kept
+    # only so the cross-check can be audited — it is never the answer.
+    MCQ, NUMERICAL = "mcq", "numerical"
+    ANSWER_TYPE = [(MCQ, "Multiple choice"), (NUMERICAL, "Numerical value")]
+
+    AGREED, DISAGREED, UNVERIFIABLE = "agreed", "disagreed", "unverifiable"
+    VERIFICATION = [
+        ("", "Not cross-checked"),
+        (AGREED, "Model agreed with the official key"),
+        (DISAGREED, "Model disagreed — needs a person"),
+        (UNVERIFIABLE, "Could not be checked (e.g. unreadable figure)"),
+    ]
+
+    source = models.CharField(
+        max_length=16, choices=Source.choices, default=Source.DEMO
+    )
+    # "NEET (UG) 2025 · Test Booklet Code 45 · Q17" — a citation frozen at
+    # load time, so a question copied into a practice set still says where
+    # it came from without its paper.
+    source_ref = models.CharField(max_length=160, blank=True)
+    # JEE Main's own id for the question. The official key is keyed on it,
+    # not on the question number, which is shuffled per candidate.
+    nta_question_id = models.CharField(max_length=24, blank=True)
+    subject_name = models.CharField(max_length=32, blank=True)
+    # The chapter as proposed, in words. Kept even once `topic` is linked,
+    # and the only chapter there is while it is not.
+    chapter_name = models.CharField(max_length=200, blank=True)
+
+    answer_type = models.CharField(max_length=10, choices=ANSWER_TYPE, default=MCQ)
+    official_answer = models.CharField(
+        max_length=32, blank=True,
+        help_text="Exactly as the official key gives it, after mapping to "
+                  "this paper's labels: '2', '1,2' (both accepted), '225'.",
+    )
+    numeric_answer = models.FloatField(null=True, blank=True)
+    model_answer = models.CharField(max_length=32, blank=True)
+    verification = models.CharField(
+        max_length=12, choices=VERIFICATION, blank=True, default=""
+    )
+    # Why it agreed or not, the model's short working, confidence, and the
+    # ids of every trace that touched this question.
+    verification_detail = models.JSONField(default=dict, blank=True)
+    has_diagram = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["test_paper", "question_id"]

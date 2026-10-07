@@ -32,6 +32,13 @@ class ReasoningTrace(tenancy.TenantScoped):
     FORENSICS = "answer_forensics"
     PRACTICE = "generate_practice"
     SUMMARY = "weekly_summary"
+    # The question factory (apps/ingestion/factory). Reading an official
+    # paper, solving it blind, and tagging it are three separate tasks so
+    # that each is a clean training example of one skill — and so the
+    # solve traces can be shown never to have contained the answer key.
+    READ_PAPER = "read_paper"
+    SOLVE_BLIND = "solve_blind"
+    TAG_QUESTIONS = "tag_questions"
     TASK = [
         (DIAGNOSE, "Diagnose misconception"),
         (DECLINE, "Analyse decline"),
@@ -39,6 +46,9 @@ class ReasoningTrace(tenancy.TenantScoped):
         (FORENSICS, "Answer forensics"),
         (PRACTICE, "Generate practice"),
         (SUMMARY, "Weekly summary"),
+        (READ_PAPER, "Read an official paper"),
+        (SOLVE_BLIND, "Solve questions without the key"),
+        (TAG_QUESTIONS, "Tag chapter, difficulty, distractors"),
     ]
 
     AGREED, DISAGREED, UNREVIEWED = "agreed", "disagreed", "unreviewed"

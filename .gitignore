@@ -19,3 +19,10 @@ venv/
 .idea/
 Thumbs.db
 desktop.ini
+
+# Exam content. The GitHub repo is publicly readable, so original papers and
+# the full question text extracted from them stay on this machine and in the
+# database only — never in git. Syllabus structure files (data/syllabus/) are
+# chapter lists, not content, and ARE committed.
+/data/raw/
+/data/extracted/

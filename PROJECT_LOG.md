@@ -280,3 +280,206 @@ Seven contract observations from building the panel, worth acting on:
   the optional one.
 - `difficulty` unions BlankEnum.
 - blank / not_reached branches are unreachable from a chip and undemoable.
+
+### 2026-10-06 — first human review: "the platform looks good"
+
+The user ran the full stack in a browser and judged it good. This closes the one
+open question no automated test could answer — whether the running product reads
+as convincing to a person, not just whether it functions. Up to now everything
+had been verified in jsdom and through the API only.
+
+Asked for a plain-language recap of how it works, what was built, and what comes
+next. No code changes this prompt. The two dev servers from the last session were
+stopped when that session ended; restart with `docker compose up -d`,
+`manage.py runserver`, and `npm run dev`.
+
+### 2026-10-07 — audit: how much of the educational data is real
+
+User asked how JEE/NEET data, papers, mocks, syllabus, competition and syllabus
+diversity were used. Checked the seed sources rather than answering from memory
+(Docker was down; the data is fully defined by the seed files anyway).
+
+**Honest finding: the data layer is almost entirely placeholder. The *analysis*
+is real; the *educational content* it runs on is not.**
+
+| Data | State |
+|---|---|
+| Exams | JEE Main only. **NEET does not exist** — appears in one prompt line and one code comment. No Biology. |
+| Syllabus | 56 JEE Main chapters typed from memory, file header says PLACEHOLDER, never checked against the NTA PDF |
+| Chapter weights | Guesses (4/8/12), not counted from past papers |
+| Syllabus diversity | Per-institute versioned trees are built and working, but both institutes were seeded with the identical tree — capability exists, never exercised |
+| Real past papers | **Zero.** Nothing downloaded from NTA |
+| Mocks 8–14 | 7 papers × 75 questions with **no question text** — labels and right/wrong only |
+| Diagnostic paper | 46 hand-written JEE-style questions, answer keys checked — the only real content |
+| Student answers | 100% synthetic (24,000 + ~2,000 diagnostic) |
+| Competition / rank / percentile | **None.** "AIR < 5000" is a text label never computed against |
+| Public datasets (EdNet etc.) | Planned, never downloaded |
+
+Acceptable for a prototype demonstrating the analysis. Not acceptable for a
+pilot, or for any claim to a director about JEE/NEET coverage. Logged as the
+next real gap: before any pitch, either fix it or state it plainly.
+
+### 2026-10-07 (later) — scope set: JEE Main + NEET, real public data
+
+**Product scope:** JEE Main, JEE Advanced, NEET. **Prototype:** NEET + JEE Main.
+Real coaching data arrives only after a sale, so until then the product must run
+on real *public* data — official syllabi, NCERT, past papers and answer keys.
+
+User expected Gemini to "have all the data". Corrected: an LLM has a *memory* of
+this material, unreliable exactly where it matters (exact wording of past
+questions, answer keys on hard problems, marking rules, cutoffs). Live example
+found while researching: published sources disagree on whether JEE Main
+numerical questions carry negative marking — Gemini learned from that same web.
+
+**Rule adopted: open book, not closed book.** Official documents are the source
+of truth; Gemini is the reader, sorter, tagger and explainer working *from* those
+documents, never from memory. Automatic check that makes this scale: Gemini
+solves each past-paper question independently and is compared with NTA's official
+answer key — agreement is accepted, disagreement goes to a human. People review
+only the disagreements.
+
+Verified facts (Sep 2026 searches): NEET UG 2026 — 180 compulsory MCQs, 720 marks,
++4/−1, Physics 45 · Chemistry 45 · Biology 90 (Botany 45 + Zoology 45), pen and
+paper; NTA released the 2026 syllabus 8 Jan 2026. JEE Main 2026 — 75 questions,
+25 per subject (20 MCQ + 5 numerical), 300 marks, +4/−1; negative marking on
+numericals is reported inconsistently — take it from the official bulletin. NTA
+publishes past papers and official answer keys (2021 onward) via its exam portals.
+
+Proposed plan, awaiting go-ahead: (1) real syllabi + NEET + NCERT links,
+(2) question factory over real past papers with answer-key cross-check,
+(3) real chapter weights from counts, (4) realistic practice students on real
+questions, (5) premium features — NCERT links, target-college ranks, practice
+sets aimed at one mistake. Idea raised for the user to decide: free past-paper
+practice for individual students, to collect real student data before any
+institute signs.
+
+### 2026-10-07 (later) — three agents started on real data
+
+Goal restated by the user: this is a **prototype for a pitch**. What exists is
+good; the aim is to show the product working and explain it convincingly. If
+the real-data work turns out to be too much, fall back to the current prototype
+and invest in explaining it well.
+
+**Storage decided — three shelves**, documented in `data/README.md`:
+1. `data/raw/` — official PDFs as downloaded + `manifest.json` (source, date,
+   checksum). **Not in git.**
+2. `data/extracted/` — what was read out of each PDF, with the cross-check
+   result. **Not in git.**
+3. `data/syllabus/` — official chapter trees with NCERT links. In git (it is
+   structure, not content).
+Then into the database, which is what the product reads. Exam content is kept
+out of git because the GitHub repo is publicly readable.
+
+**Agents running:**
+- **Syllabus** — official JEE Main 2026 + NEET UG 2026 syllabi, every chapter
+  traced to a PDF page, linked to NCERT; NEET added as an exam; loaded as a *new*
+  syllabus version so the existing demo stays bound to version 1.
+- **Question factory** — one real NEET paper + one JEE Main 2026 shift with
+  official answer keys; Gemini reads and independently solves; compared with the
+  official key; disagreements go to review. Owns the Gemini quota.
+- **Frontend** — "How it works" and "Data & trust" pages for the pitch, built on
+  live API data, honest about what is simulated.
+
+Shared-tree rule this round: agents in the main tree may not switch branches or
+commit (earlier rounds lost time to agents moving each other's HEAD).
+
+### 2026-10-07 (later) — syllabus agent landed (verified)
+
+Official trees built from NTA's own PDFs (4 files, all official links, no
+mirrors), every chapter traced to a page. Verified in the database:
+
+```
+JEE_MAIN v1  active  56 chapters  NCERT 0    <- old placeholder, demo still bound here
+JEE_MAIN v2  —       54 chapters  NCERT 51   <- official 2026
+NEET_UG  v1  —       71 chapters  NCERT 68   <- official 2026, new exam
+all four demo batches still on JEE_MAIN v1 — prototype untouched
+```
+
+**What the placeholder got wrong** (evidence it had to go): 43 of 56 chapter
+names exactly right; 2 examined units missing (Experimental Skills, Practical
+Chemistry); 3 units wrongly split into 7, one chapter ("Circles") invented as a
+split; 6 misnamed; 9 of 12 unit groupings invented. All 56 weights were guesses.
+
+**Two facts corrected:**
+- **NEET Botany 45 / Zoology 45 is NOT stated by NTA.** The bulletin says only
+  "Biology (Botany & Zoology), 90 questions". I had stated 45/45 as fact on the
+  strength of coaching websites. Treat it as unconfirmed until checked against an
+  official paper. Biology chapters are tagged Botany/Zoology: 17 by content, 14
+  by coaching convention (flagged).
+- **JEE Main numerical questions do carry −1** for a wrong answer — settled by the
+  official bulletin (pp.17–18, 21), after websites disagreed.
+
+**NCERT:** 51/54 JEE and 68/71 NEET chapters linked to the current rationalised
+books (2026-27 reprint), each link checked against the chapter PDF's first page.
+The 3 unlinked: p-Block Elements (no chapter in any current NCERT book, yet still
+examined), Experimental Skills and Practical Chemistry (lab manuals).
+
+**Blockers before any batch switches to the official trees:** views and
+`seed_demo` hard-code Physics/Chemistry/Maths ("Mathematics" officially; NEET
+adds Botany/Zoology); seeders look up the active syllabus without an exam filter.
+
+**Rule broken, minor:** the agent made 5 Gemini calls while testing the API (a
+diagnosis without `?paper=` misses the cache). Traces 68–72 kept — they are real
+traces, and failures are training data too.
+
+### 2026-10-07 (later) — frontend agent landed: explainer pages
+
+`agent/frontend` @ `8fce1c6`, verified: typecheck clean, 21 tests pass. Not yet
+merged — waiting for the question factory so one commit carries the whole round.
+
+- **How it works** (`/how-it-works`) — the four steps (record · count · AI reads
+  the pattern · teacher checks), each labelled with who does it and each shown
+  on Aarav's live data: his full answer sheet, the counting, the live diagnosis
+  with counter-evidence D22/D23 shown answered right, and the real question
+  panel. If the AI is unreachable, steps 1–2 still render — they need no AI.
+- **Data & trust** (`/trust`) — what's real vs simulated, open book, the
+  answer-key cross-check (labelled "being built now", no figures shown), privacy
+  shown side by side (Aarav's record vs the "S-1" the AI sees), and the system's
+  own sum next to the AI's headline.
+- Nav now scrolls below 1280px; previously the header overflowed at tablet width
+  and the nav vanished below 768px.
+- **Seventh mock-vs-server mismatch** fixed (mock summary pointed at Mock 14 /300
+  instead of paper 17 /184). One left: Aarav's mock score history stops at Mock 14.
+
+**Gap to fix first (for the pitch):** the counter-evidence questions D22/D23 come
+back as words in a sentence, not linked ids — the line that sells the product is
+the one line that cannot open its proof.
+
+### 2026-10-08 — question factory landed: two real papers in (verified)
+
+```
+JEE Main 2026 · 02 Apr · Shift 1 · Official   75 q   66 agreed (88.0%)   9 disagreed    8 diagrams
+NEET UG 2025 · Code 45 · Official            180 q  157 agreed (87.2%)  23 disagreed   24 diagrams
+every question linked to a chapter of the official syllabus; demo data untouched
+```
+
+**No official answer key was wrong.** Of 32 disagreements: 2 were our reading
+errors (JEE Q21 square-root placement, NEET Q44 options scrambled out of a 2×2
+grid) — both caught *only* because of the cross-check, and would otherwise have
+shown wrong content to a director. The rest are the model solving wrongly, or
+figure questions a person should eyeball. This is the open-book rule paying off:
+the AI's answers are checked against the official key, never trusted.
+
+**Sourcing:** JEE paper and key both official NTA. NEET key official, but NTA
+does not openly publish NEET papers — the paper is a Physics Wallah mirror. Its
+booklet code was *proven*, not assumed: matches code 45 on 179/180 against NTA's
+key, other codes at chance (38–43).
+
+**Corrections to what I told the user:**
+- **Free tier is 20 requests per model per day**, not ~500, and 503 "busy"
+  responses appear to count against it. Processing thousands of questions on the
+  free tier is not realistic; a small paid budget or batch processing is.
+- Agreement proves the question and its correct option, not every wrong option
+  (a spot-check found √ signs lost from two wrong options that still agreed).
+
+**Findings worth keeping:** Gemini orders schema fields alphabetically, so the
+solver wrote its answer before its working — forcing working first took the same
+model from 6/10 to 8/10. LaTeX inside JSON was silently corrupted (`\theta`
+arrived as a tab) in 23 of 30 early questions; repaired deterministically.
+
+**Open:** a person must review the 32 disagreements; re-solve them on a full Flash
+model when capacity returns; misconception drafts (657) are unconfirmed and of
+mixed quality; **the console has no maths renderer, so real questions show raw
+LaTeX** — must fix before showing them in a pitch.
+
+Round committed in one commit: syllabus, factory, explainer pages merged.

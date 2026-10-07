@@ -55,9 +55,9 @@ class MappingStatusFilter(admin.SimpleListFilter):
 
 @admin.register(TestPaper)
 class TestPaperAdmin(admin.ModelAdmin):
-    list_display = ("name", "institute", "exam", "held_on", "total_questions",
+    list_display = ("name", "institute", "exam", "source", "held_on", "total_questions",
                     "max_marks", "mapping_progress", "attempts_n")
-    list_filter = ("institute", "exam")
+    list_filter = ("institute", "exam", "source")
     search_fields = ("name",)
     list_select_related = ("institute", "exam")
     date_hierarchy = "held_on"
@@ -112,13 +112,18 @@ class QuestionTopicMapAdmin(admin.ModelAdmin):
     """The mapping review queue."""
 
     list_display = ("question_id", "test_paper", "topic", "topic_path",
-                    "excerpt", "proposed_by", "state", "confirmed_by")
+                    "excerpt", "proposed_by", "state", "confirmed_by",
+                    "source", "verification")
     list_display_links = ("question_id",)
     # Set the topic straight from the changelist — 75 questions mapped
     # without ever leaving the page, which is the only way the per-paper
     # cost stays bearable.
     list_editable = ("topic",)
-    list_filter = (MappingStatusFilter, "institute", "test_paper", "proposed_by")
+    # `verification` is the question factory's review queue: filter to
+    # "disagreed" and a person sees only the questions where the model's
+    # blind answer and NTA's official key differ.
+    list_filter = (MappingStatusFilter, "verification", "source", "has_diagram",
+                   "institute", "test_paper", "proposed_by")
     search_fields = ("question_id", "question_text", "topic__name")
     # Autocomplete rather than raw_id for `topic`: a reviewer knows the
     # chapter name, not its integer id, and the raw_id widget additionally
@@ -134,7 +139,15 @@ class QuestionTopicMapAdmin(admin.ModelAdmin):
     save_on_top = True
     actions = ("confirm_mappings", "unconfirm_mappings")
     fields = ("institute", "test_paper", "question_id", "question_text",
-              "topic", "proposed_by", "confirmed_by", "confirmed_at")
+              "topic", "proposed_by", "confirmed_by", "confirmed_at",
+              "source", "source_ref", "nta_question_id", "subject_name", "chapter_name",
+              "answer_type", "official_answer", "numeric_answer", "model_answer",
+              "verification", "verification_detail", "has_diagram")
+    # Provenance is evidence, not an opinion: it is set by the loader from
+    # the official documents and is not editable by hand.
+    readonly_fields = ("source", "source_ref", "nta_question_id", "official_answer",
+                       "numeric_answer", "model_answer", "verification",
+                       "verification_detail")
 
     @admin.display(description="topic path")
     def topic_path(self, obj):

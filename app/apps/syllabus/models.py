@@ -82,6 +82,16 @@ class Topic(models.Model):
     # Teaching order within the parent.
     position = models.IntegerField(default=0)
 
+    # Where to re-read this chapter in the current (rationalised) NCERT
+    # textbooks. Null = no NCERT counterpart, or not linked yet; otherwise a
+    # list, because one syllabus chapter often spans several NCERT chapters:
+    #   [{"class": 12, "subject": "Chemistry", "book": "Chemistry Part II",
+    #     "chapter": 8, "title": "Aldehydes, Ketones and Carboxylic Acids",
+    #     "pdf": "https://ncert.nic.in/textbook/pdf/lech203.pdf",
+    #     "sections": [...]}]          # "sections" only for a partial match
+    # Loaded from data/syllabus/*.json by `load_official_syllabus`.
+    ncert_ref = models.JSONField(null=True, blank=True)
+
     class Meta:
         ordering = ["syllabus", "position", "name"]
         indexes = [

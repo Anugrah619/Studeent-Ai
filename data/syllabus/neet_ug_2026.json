@@ -1,0 +1,2257 @@
+{
+  "schema": "student-ai/official-syllabus/1",
+  "exam": {
+    "code": "NEET_UG",
+    "name": "NEET (UG)",
+    "year": 2026,
+    "questions": 180,
+    "marks_correct": 4,
+    "marks_wrong": -1,
+    "total_marks": 720,
+    "pattern_source": {
+      "file": "data/raw/syllabus/neet_ug_2026_information_bulletin.pdf",
+      "pages": [
+        7,
+        26
+      ],
+      "page_numbering": "1-based PDF page index (pages 7 and 26 are printed as 2 and 21)",
+      "says": "Physics 45 (180 marks), Chemistry 45 (180), 'Biology (Botany & Zoology)' 90 (360); 180 compulsory MCQs, 720 marks, 180 minutes, pen and paper. Correct +4, incorrect -1, unanswered 0."
+    },
+    "sections": {
+      "as_stated_by_nta": [
+        "Physics",
+        "Chemistry",
+        "Biology (Botany & Zoology)"
+      ],
+      "botany_zoology_split": "The bulletin names Botany and Zoology but gives no per-section question count and does not say which syllabus content belongs to which. The 45 + 45 split is NOT stated in the bulletin; confirm it from an official question paper."
+    }
+  },
+  "source": {
+    "file": "data/raw/syllabus/neet_ug_2026_syllabus.pdf",
+    "sha256": "82bef4c02be2fb0a8a7a942e152a66230787d45061f131fd1e32d0c8209cb346",
+    "url": "https://cdnbbsr.s3waas.gov.in/s37bc1ec1d9c3426357e69acd5bf320061/uploads/2026/01/20260102588210790.pdf",
+    "linked_from": "https://neet.nta.nic.in/ ('Syllabus')",
+    "title_on_document": "SYLLABUS FOR NEET (UG) - 2025",
+    "applies_to_2026_because": "NEET (UG) 2026 Information Bulletin, FAQ on the syllabus (PDF p.81, printed p.76), Q2: 'No, there is no change in the syllabus of NEET (UG) - 2026 with respect to the previous year.' The bulletin's Appendix-III (PDF pp.65-80) reproduces the syllabus as images; pages here refer to the standalone syllabus PDF.",
+    "notified_by": "National Medical Commission (NMC); hosted by NTA",
+    "page_numbering": "page = 1-based page index of the PDF file (equals the printed page number)",
+    "downloaded": "2026-10-07"
+  },
+  "structure": {
+    "rule": "subject -> unit -> chapter. A unit is NTA's 'UNIT n'. Physics and Chemistry units are not subdivided by NTA, so each has one chapter with the same name. Biology units ARE subdivided by NTA into bulleted blocks; each bullet is a chapter.",
+    "biology_chapter_names": "name_source says where each name comes from: 'nta_subheading' = NTA's own words leading the bullet; 'ncert_title' = the bullet has no heading of its own, so it is named after the NCERT chapter it corresponds to. nta_text_start is the bullet's first words, verbatim.",
+    "paper_section": "Every Biology chapter carries paper_section = Botany or Zoology. basis 'content' = the NTA text itself is plant-only or animal/human-only. basis 'convention' = it is not, and the assignment follows coaching convention; verify each one by counting where its questions sit in NTA's published papers.",
+    "name": "NTA's wording, re-cased for display; name_verbatim is exactly as printed.",
+    "weight": "Not recorded. Chapter weights will be counted from past papers, not estimated."
+  },
+  "ncert": {
+    "edition": "Rationalised textbooks, 'Reprint 2026-27' (printed on every page of the files checked)",
+    "source": "https://ncert.nic.in/textbook.php",
+    "how_verified": "Every chapter number, title and PDF link was checked by downloading the chapter PDF from ncert.nic.in on 2026-10-07 and reading its opening page: the printed heading for 104 of the 106 files; for keph107 (Gravitation) and lech104 (d- and f-Block) the heading is an image, so the opening text was read instead. File checksums and headings: data/raw/syllabus/ncert/chapter_pdf_check.tsv; book contents pages: data/raw/syllabus/ncert/*ps.pdf.",
+    "shape": "ncert_ref is null (no counterpart) or a list of {class, subject, book, chapter, title, pdf[, sections]}. 'sections' is present only when a syllabus chapter maps to part of an NCERT chapter. NCERT Chemistry calls its chapters 'Unit n'; 'chapter' holds that n."
+  },
+  "subjects": [
+    {
+      "name": "Physics",
+      "name_verbatim": "PHYSICS",
+      "page": 1,
+      "units": [
+        {
+          "no": 1,
+          "name": "Physics and Measurement",
+          "name_verbatim": "PHYSICS AND MEASUREMENT",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Physics and Measurement",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 1,
+                  "title": "Units and Measurement",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph101.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 2,
+          "name": "Kinematics",
+          "name_verbatim": "KINEMATICS",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Kinematics",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 2,
+                  "title": "Motion in a Straight Line",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph102.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 3,
+                  "title": "Motion in a Plane",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph103.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 3,
+          "name": "Laws of Motion",
+          "name_verbatim": "LAWS OF MOTION",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Laws of Motion",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 4,
+                  "title": "Laws of Motion",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph104.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 4,
+          "name": "Work, Energy, and Power",
+          "name_verbatim": "WORK, ENERGY, AND POWER",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Work, Energy, and Power",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 5,
+                  "title": "Work, Energy and Power",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph105.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 5,
+          "name": "Rotational Motion",
+          "name_verbatim": "ROTATIONAL MOTION",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "chapters": [
+            {
+              "name": "Rotational Motion",
+              "name_source": "nta_unit",
+              "page": 1,
+              "pages": [
+                1
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 6,
+                  "title": "Systems of Particles and Rotational Motion",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph106.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 6,
+          "name": "Gravitation",
+          "name_verbatim": "GRAVITATION",
+          "page": 2,
+          "pages": [
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Gravitation",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 7,
+                  "title": "Gravitation",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph107.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 7,
+          "name": "Properties of Solids and Liquids",
+          "name_verbatim": "PROPERTIES OF SOLIDS AND LIQUIDS",
+          "page": 2,
+          "pages": [
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Properties of Solids and Liquids",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 8,
+                  "title": "Mechanical Properties of Solids",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph201.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 9,
+                  "title": "Mechanical Properties of Fluids",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph202.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 10,
+                  "title": "Thermal Properties of Matter",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph203.pdf"
+                }
+              ],
+              "ncert_note": "NTA folds heat, thermal expansion, calorimetry and heat transfer into this unit, so it spans NCERT's thermal-properties chapter as well as the two mechanical-properties chapters."
+            }
+          ]
+        },
+        {
+          "no": 8,
+          "name": "Thermodynamics",
+          "name_verbatim": "THERMODYNAMICS",
+          "page": 2,
+          "pages": [
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Thermodynamics",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 11,
+                  "title": "Thermodynamics",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph204.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 9,
+          "name": "Kinetic Theory of Gases",
+          "name_verbatim": "KINETIC THEORY OF GASES",
+          "page": 2,
+          "pages": [
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Kinetic Theory of Gases",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 12,
+                  "title": "Kinetic Theory",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph205.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 10,
+          "name": "Oscillations and Waves",
+          "name_verbatim": "OSCILLATIONS AND WAVES",
+          "page": 2,
+          "pages": [
+            2
+          ],
+          "chapters": [
+            {
+              "name": "Oscillations and Waves",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 13,
+                  "title": "Oscillations",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph206.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 14,
+                  "title": "Waves",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/keph207.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 11,
+          "name": "Electrostatics",
+          "name_verbatim": "ELECTROSTATICS",
+          "page": 2,
+          "pages": [
+            2,
+            3
+          ],
+          "chapters": [
+            {
+              "name": "Electrostatics",
+              "name_source": "nta_unit",
+              "page": 2,
+              "pages": [
+                2,
+                3
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 1,
+                  "title": "Electric Charges and Fields",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph101.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 2,
+                  "title": "Electrostatic Potential and Capacitance",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph102.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 12,
+          "name": "Current Electricity",
+          "name_verbatim": "CURRENT ELECTRICITY",
+          "page": 3,
+          "pages": [
+            3
+          ],
+          "chapters": [
+            {
+              "name": "Current Electricity",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 3,
+                  "title": "Current Electricity",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph103.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 13,
+          "name": "Magnetic Effects of Current and Magnetism",
+          "name_verbatim": "MAGNETIC EFFECTS OF CURRENT AND MAGNETISM",
+          "page": 3,
+          "pages": [
+            3
+          ],
+          "chapters": [
+            {
+              "name": "Magnetic Effects of Current and Magnetism",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 4,
+                  "title": "Moving Charges and Magnetism",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph104.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 5,
+                  "title": "Magnetism and Matter",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph105.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 14,
+          "name": "Electromagnetic Induction and Alternating Currents",
+          "name_verbatim": "ELECTROMAGNETIC INDUCTION AND ALTERNATING CURRENTS",
+          "page": 3,
+          "pages": [
+            3
+          ],
+          "chapters": [
+            {
+              "name": "Electromagnetic Induction and Alternating Currents",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 6,
+                  "title": "Electromagnetic Induction",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph106.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 7,
+                  "title": "Alternating Current",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph107.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 15,
+          "name": "Electromagnetic Waves",
+          "name_verbatim": "ELECTROMAGNETIC WAVES",
+          "page": 3,
+          "pages": [
+            3
+          ],
+          "chapters": [
+            {
+              "name": "Electromagnetic Waves",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part I",
+                  "chapter": 8,
+                  "title": "Electromagnetic Waves",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph108.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 16,
+          "name": "Optics",
+          "name_verbatim": "OPTICS",
+          "page": 3,
+          "pages": [
+            3,
+            4
+          ],
+          "chapters": [
+            {
+              "name": "Optics",
+              "name_source": "nta_unit",
+              "page": 3,
+              "pages": [
+                3,
+                4
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 9,
+                  "title": "Ray Optics and Optical Instruments",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph201.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 10,
+                  "title": "Wave Optics",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph202.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 17,
+          "name": "Dual Nature of Matter and Radiation",
+          "name_verbatim": "DUAL NATURE OF MATTER AND RADIATION",
+          "page": 4,
+          "pages": [
+            4
+          ],
+          "chapters": [
+            {
+              "name": "Dual Nature of Matter and Radiation",
+              "name_source": "nta_unit",
+              "page": 4,
+              "pages": [
+                4
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 11,
+                  "title": "Dual Nature of Radiation and Matter",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph203.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 18,
+          "name": "Atoms and Nuclei",
+          "name_verbatim": "ATOMS AND NUCLEI",
+          "page": 4,
+          "pages": [
+            4
+          ],
+          "chapters": [
+            {
+              "name": "Atoms and Nuclei",
+              "name_source": "nta_unit",
+              "page": 4,
+              "pages": [
+                4
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 12,
+                  "title": "Atoms",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph204.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 13,
+                  "title": "Nuclei",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph205.pdf"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 19,
+          "name": "Electronic Devices",
+          "name_verbatim": "ELECTRONIC DEVICES",
+          "page": 4,
+          "pages": [
+            4
+          ],
+          "chapters": [
+            {
+              "name": "Electronic Devices",
+              "name_source": "nta_unit",
+              "page": 4,
+              "pages": [
+                4
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Physics",
+                  "book": "Physics Part II",
+                  "chapter": 14,
+                  "title": "Semiconductor Electronics: Materials, Devices and Simple Circuits",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/leph206.pdf"
+                }
+              ],
+              "ncert_note": "Partial. The rationalised NCERT chapter has sections 14.1-14.7 only, ending at '14.7 Application of Junction Diode as a Rectifier'. NTA also lists logic gates, the Zener diode (and voltage regulator), LED, photodiode and solar cell; a search of the full NCERT chapter text on 2026-10-07 found none of these terms. Those topics have no current NCERT textbook coverage."
+            }
+          ]
+        },
+        {
+          "no": 20,
+          "name": "Experimental Skills",
+          "name_verbatim": "EXPERIMENTAL SKILLS",
+          "page": 4,
+          "pages": [
+            4,
+            5
+          ],
+          "chapters": [
+            {
+              "name": "Experimental Skills",
+              "name_source": "nta_unit",
+              "page": 4,
+              "pages": [
+                4,
+                5
+              ],
+              "ncert_ref": null,
+              "ncert_note": "No NCERT textbook chapter. The listed experiments belong to NCERT's separate laboratory manuals, which are not linked here."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chemistry",
+      "name_verbatim": "CHEMISTRY",
+      "page": 6,
+      "units": [
+        {
+          "no": 1,
+          "name": "Some Basic Concepts in Chemistry",
+          "name_verbatim": "SOME BASIC CONCEPTS IN CHEMISTRY",
+          "page": 6,
+          "pages": [
+            6
+          ],
+          "chapters": [
+            {
+              "name": "Some Basic Concepts in Chemistry",
+              "name_source": "nta_unit",
+              "page": 6,
+              "pages": [
+                6
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 1,
+                  "title": "Some Basic Concepts of Chemistry",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech101.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 2,
+          "name": "Atomic Structure",
+          "name_verbatim": "ATOMIC STRUCTURE",
+          "page": 6,
+          "pages": [
+            6
+          ],
+          "chapters": [
+            {
+              "name": "Atomic Structure",
+              "name_source": "nta_unit",
+              "page": 6,
+              "pages": [
+                6
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 2,
+                  "title": "Structure of Atom",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech102.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 3,
+          "name": "Chemical Bonding and Molecular Structure",
+          "name_verbatim": "CHEMICAL BONDING AND MOLECULAR STRUCTURE",
+          "page": 6,
+          "pages": [
+            6
+          ],
+          "chapters": [
+            {
+              "name": "Chemical Bonding and Molecular Structure",
+              "name_source": "nta_unit",
+              "page": 6,
+              "pages": [
+                6
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 4,
+                  "title": "Chemical Bonding and Molecular Structure",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech104.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 4,
+          "name": "Chemical Thermodynamics",
+          "name_verbatim": "CHEMICAL THERMODYNAMICS",
+          "page": 6,
+          "pages": [
+            6,
+            7
+          ],
+          "chapters": [
+            {
+              "name": "Chemical Thermodynamics",
+              "name_source": "nta_unit",
+              "page": 6,
+              "pages": [
+                6,
+                7
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 5,
+                  "title": "Thermodynamics",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech105.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 5,
+          "name": "Solutions",
+          "name_verbatim": "SOLUTIONS",
+          "page": 7,
+          "pages": [
+            7
+          ],
+          "chapters": [
+            {
+              "name": "Solutions",
+              "name_source": "nta_unit",
+              "page": 7,
+              "pages": [
+                7
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 1,
+                  "title": "Solutions",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech101.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 6,
+          "name": "Equilibrium",
+          "name_verbatim": "EQUILIBRIUM",
+          "page": 7,
+          "pages": [
+            7
+          ],
+          "chapters": [
+            {
+              "name": "Equilibrium",
+              "name_source": "nta_unit",
+              "page": 7,
+              "pages": [
+                7
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 6,
+                  "title": "Equilibrium",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech106.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 7,
+          "name": "Redox Reactions and Electrochemistry",
+          "name_verbatim": "REDOX REACTIONS AND ELECTROCHEMISTRY",
+          "page": 7,
+          "pages": [
+            7
+          ],
+          "chapters": [
+            {
+              "name": "Redox Reactions and Electrochemistry",
+              "name_source": "nta_unit",
+              "page": 7,
+              "pages": [
+                7
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 7,
+                  "title": "Redox Reactions",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech201.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 2,
+                  "title": "Electrochemistry",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech102.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 8,
+          "name": "Chemical Kinetics",
+          "name_verbatim": "CHEMICAL KINETICS",
+          "page": 7,
+          "pages": [
+            7,
+            8
+          ],
+          "chapters": [
+            {
+              "name": "Chemical Kinetics",
+              "name_source": "nta_unit",
+              "page": 7,
+              "pages": [
+                7,
+                8
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 3,
+                  "title": "Chemical Kinetics",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech103.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Physical Chemistry"
+        },
+        {
+          "no": 9,
+          "name": "Classification of Elements and Periodicity in Properties",
+          "name_verbatim": "CLASSIFICATION OF ELEMENTS AND PERIODICITY IN PROPERTIES",
+          "page": 8,
+          "pages": [
+            8
+          ],
+          "chapters": [
+            {
+              "name": "Classification of Elements and Periodicity in Properties",
+              "name_source": "nta_unit",
+              "page": 8,
+              "pages": [
+                8
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 3,
+                  "title": "Classification of Elements and Periodicity in Properties",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech103.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Inorganic Chemistry"
+        },
+        {
+          "no": 10,
+          "name": "p-Block Elements",
+          "name_verbatim": "P- BLOCK ELEMENTS",
+          "page": 8,
+          "pages": [
+            8
+          ],
+          "chapters": [
+            {
+              "name": "p-Block Elements",
+              "name_source": "nta_unit",
+              "page": 8,
+              "pages": [
+                8
+              ],
+              "ncert_ref": null,
+              "ncert_note": "No counterpart in the current rationalised NCERT textbooks: Class XI Chemistry has Units 1-9 and Class XII Chemistry Units 1-10 (Reprint 2026-27 contents pages), and none is a p-block chapter. NTA still examines Groups 13-18. Deliberately not linked to Class XI Unit 3 (periodic trends), which is not a p-block treatment."
+            }
+          ],
+          "group": "Inorganic Chemistry"
+        },
+        {
+          "no": 11,
+          "name": "d- and f-Block Elements",
+          "name_verbatim": "d - and f- BLOCK ELEMENTS",
+          "page": 8,
+          "pages": [
+            8
+          ],
+          "chapters": [
+            {
+              "name": "d- and f-Block Elements",
+              "name_source": "nta_unit",
+              "page": 8,
+              "pages": [
+                8
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 4,
+                  "title": "The d- and f-Block Elements",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech104.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Inorganic Chemistry"
+        },
+        {
+          "no": 12,
+          "name": "Co-ordination Compounds",
+          "name_verbatim": "CO-ORDINATION COMPOUNDS",
+          "page": 8,
+          "pages": [
+            8
+          ],
+          "chapters": [
+            {
+              "name": "Co-ordination Compounds",
+              "name_source": "nta_unit",
+              "page": 8,
+              "pages": [
+                8
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part I",
+                  "chapter": 5,
+                  "title": "Coordination Compounds",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech105.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Inorganic Chemistry"
+        },
+        {
+          "no": 13,
+          "name": "Purification and Characterisation of Organic Compounds",
+          "name_verbatim": "PURIFICATION AND CHARACTERISATION OF ORGANIC COMPOUNDS",
+          "page": 8,
+          "pages": [
+            8,
+            9
+          ],
+          "chapters": [
+            {
+              "name": "Purification and Characterisation of Organic Compounds",
+              "name_source": "nta_unit",
+              "page": 8,
+              "pages": [
+                8,
+                9
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 8,
+                  "title": "Organic Chemistry – Some Basic Principles and Techniques",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech202.pdf",
+                  "sections": [
+                    "8.8 Methods of Purification of Organic Compounds",
+                    "8.9 Qualitative Analysis of Organic Compounds",
+                    "8.10 Quantitative Analysis"
+                  ]
+                }
+              ],
+              "ncert_note": "Covered by three sections of one NCERT unit, not a whole chapter."
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 14,
+          "name": "Some Basic Principles of Organic Chemistry",
+          "name_verbatim": "SOME BASIC PRINCIPLES OF ORGANIC CHEMISTRY",
+          "page": 9,
+          "pages": [
+            9
+          ],
+          "chapters": [
+            {
+              "name": "Some Basic Principles of Organic Chemistry",
+              "name_source": "nta_unit",
+              "page": 9,
+              "pages": [
+                9
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 8,
+                  "title": "Organic Chemistry – Some Basic Principles and Techniques",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech202.pdf",
+                  "sections": [
+                    "8.1 General Introduction",
+                    "8.2 Tetravalence of Carbon: Shapes of Organic Compounds",
+                    "8.3 Structural Representations of Organic Compounds",
+                    "8.4 Classification of Organic Compounds",
+                    "8.5 Nomenclature of Organic Compounds",
+                    "8.6 Isomerism",
+                    "8.7 Fundamental Concepts in Organic Reaction Mechanism"
+                  ]
+                }
+              ],
+              "ncert_note": "Covered by sections 8.1-8.7 of the same NCERT unit that also covers Unit 13."
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 15,
+          "name": "Hydrocarbons",
+          "name_verbatim": "HYDROCARBONS",
+          "page": 9,
+          "pages": [
+            9
+          ],
+          "chapters": [
+            {
+              "name": "Hydrocarbons",
+              "name_source": "nta_unit",
+              "page": 9,
+              "pages": [
+                9
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 9,
+                  "title": "Hydrocarbons",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kech203.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 16,
+          "name": "Organic Compounds Containing Halogens",
+          "name_verbatim": "ORGANIC COMPOUNDS CONTAINING HALOGENS",
+          "page": 9,
+          "pages": [
+            9
+          ],
+          "chapters": [
+            {
+              "name": "Organic Compounds Containing Halogens",
+              "name_source": "nta_unit",
+              "page": 9,
+              "pages": [
+                9
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 6,
+                  "title": "Haloalkanes and Haloarenes",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech201.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 17,
+          "name": "Organic Compounds Containing Oxygen",
+          "name_verbatim": "ORGANIC COMPOUNDS CONTAINING OXYGEN",
+          "page": 9,
+          "pages": [
+            9,
+            10
+          ],
+          "chapters": [
+            {
+              "name": "Organic Compounds Containing Oxygen",
+              "name_source": "nta_unit",
+              "page": 9,
+              "pages": [
+                9,
+                10
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 7,
+                  "title": "Alcohols, Phenols and Ethers",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech202.pdf"
+                },
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 8,
+                  "title": "Aldehydes, Ketones and Carboxylic Acids",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech203.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 18,
+          "name": "Organic Compounds Containing Nitrogen",
+          "name_verbatim": "ORGANIC COMPOUNDS CONTAINING NITROGEN",
+          "page": 10,
+          "pages": [
+            10
+          ],
+          "chapters": [
+            {
+              "name": "Organic Compounds Containing Nitrogen",
+              "name_source": "nta_unit",
+              "page": 10,
+              "pages": [
+                10
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 9,
+                  "title": "Amines",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech204.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 19,
+          "name": "Biomolecules",
+          "name_verbatim": "BIOMOLECULES",
+          "page": 10,
+          "pages": [
+            10
+          ],
+          "chapters": [
+            {
+              "name": "Biomolecules",
+              "name_source": "nta_unit",
+              "page": 10,
+              "pages": [
+                10
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Chemistry",
+                  "book": "Chemistry Part II",
+                  "chapter": 10,
+                  "title": "Biomolecules",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lech205.pdf"
+                }
+              ]
+            }
+          ],
+          "group": "Organic Chemistry"
+        },
+        {
+          "no": 20,
+          "name": "Principles Related to Practical Chemistry",
+          "name_verbatim": "PRINCIPLES RELATED TO PRACTICAL CHEMISTRY",
+          "page": 10,
+          "pages": [
+            10,
+            11
+          ],
+          "chapters": [
+            {
+              "name": "Principles Related to Practical Chemistry",
+              "name_source": "nta_unit",
+              "page": 10,
+              "pages": [
+                10,
+                11
+              ],
+              "ncert_ref": null,
+              "ncert_note": "No NCERT textbook chapter. Salt analysis, titrimetry and preparations belong to NCERT's laboratory manuals, which are not linked here. (Detection of N, S and halogens also appears in Class XI Unit 8 section 8.9, already linked from Unit 13.)"
+            }
+          ],
+          "group": "Organic Chemistry"
+        }
+      ]
+    },
+    {
+      "name": "Biology",
+      "name_verbatim": "BIOLOGY",
+      "page": 12,
+      "units": [
+        {
+          "no": 1,
+          "name": "Diversity in Living World",
+          "name_verbatim": "Diversity in Living World",
+          "page": 12,
+          "pages": [
+            12
+          ],
+          "chapters": [
+            {
+              "name": "The Living World",
+              "name_source": "ncert_title",
+              "nta_text_start": "What is living? ; Biodiversity; Need for classification;; Taxonomy & Systematics",
+              "page": 12,
+              "pages": [
+                12
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 1,
+                  "title": "The Living World",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo101.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "convention",
+                "why": "Taxonomy and nomenclature apply to all organisms; neither plant nor animal content."
+              }
+            },
+            {
+              "name": "Biological Classification",
+              "name_source": "ncert_title",
+              "nta_text_start": "Five kingdom classification; salient features and classification of Monera; Prot",
+              "page": 12,
+              "pages": [
+                12
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 2,
+                  "title": "Biological Classification",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo102.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "convention",
+                "why": "Monera, Protista, Fungi, lichens, viruses: neither plant nor animal content."
+              }
+            },
+            {
+              "name": "Plant Kingdom",
+              "name_source": "ncert_title",
+              "nta_text_start": "Salient features and classification of plants into major groups-Algae, Bryophyte",
+              "page": 12,
+              "pages": [
+                12
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 3,
+                  "title": "Plant Kingdom",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo103.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "content",
+                "why": "NTA's text is the classification of plants."
+              }
+            },
+            {
+              "name": "Animal Kingdom",
+              "name_source": "ncert_title",
+              "nta_text_start": "Salient features and classification of animals-nonchordate up to phyla level and",
+              "page": 12,
+              "pages": [
+                12
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 4,
+                  "title": "Animal Kingdom",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo104.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "content",
+                "why": "NTA's text is the classification of animals."
+              }
+            }
+          ]
+        },
+        {
+          "no": 2,
+          "name": "Structural Organisation in Animals and Plants",
+          "name_verbatim": "Structural Organisation in Animals and Plants",
+          "page": 12,
+          "pages": [
+            12
+          ],
+          "chapters": [
+            {
+              "name": "Morphology and modifications; Tissues; Anatomy and functions of different parts of flowering plants",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Morphology and modifications; Tissues; Anatomy and functions of different parts ",
+              "page": 12,
+              "pages": [
+                12
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 5,
+                  "title": "Morphology of Flowering Plants",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo105.pdf"
+                },
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 6,
+                  "title": "Anatomy of Flowering Plants",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo106.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "content",
+                "why": "NTA's text is about flowering plants."
+              }
+            },
+            {
+              "name": "Structural Organisation in Animals",
+              "name_source": "ncert_title",
+              "nta_text_start": "Animal tissues; Morphology, anatomy and functions of different systems (digestiv",
+              "page": 12,
+              "pages": [
+                12
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 7,
+                  "title": "Structural Organisation in Animals",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo107.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "content",
+                "why": "NTA's text is animal tissues and the frog."
+              }
+            }
+          ]
+        },
+        {
+          "no": 3,
+          "name": "Cell Structure and Function",
+          "name_verbatim": "Cell Structure and Function",
+          "page": 12,
+          "pages": [
+            12
+          ],
+          "chapters": [
+            {
+              "name": "Cell: The Unit of Life",
+              "name_source": "ncert_title",
+              "nta_text_start": "Cell theory and cell as the basic unit of life; Structure of prokaryotic and euk",
+              "page": 12,
+              "pages": [
+                12
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 8,
+                  "title": "Cell: The Unit of Life",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo108.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "convention",
+                "why": "Covers plant and animal cells alike."
+              }
+            },
+            {
+              "name": "Chemical constituents of living cells",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Chemical constituents of living cells: Biomolecules-structure and function of pr",
+              "page": 12,
+              "pages": [
+                12
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 9,
+                  "title": "Biomolecules",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo109.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "convention",
+                "why": "Biomolecules and enzymes are common to all life."
+              }
+            },
+            {
+              "name": "Cell division",
+              "name_source": "nta_subheading",
+              "nta_text_start": "B Cell division: Cell cycle, mitosis, meiosis and their significance.",
+              "page": 12,
+              "pages": [
+                12
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 10,
+                  "title": "Cell Cycle and Cell Division",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo110.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "convention",
+                "why": "Mitosis and meiosis are common to all eukaryotes."
+              }
+            }
+          ]
+        },
+        {
+          "no": 4,
+          "name": "Plant Physiology",
+          "name_verbatim": "Plant Physiology",
+          "page": 12,
+          "pages": [
+            12,
+            13
+          ],
+          "chapters": [
+            {
+              "name": "Photosynthesis",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Photosynthesis: Photosynthesis as a means of Autotrophic nutrition; Site of",
+              "page": 12,
+              "pages": [
+                12,
+                13
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 11,
+                  "title": "Photosynthesis in Higher Plants",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo111.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "content",
+                "why": "Inside NTA's Plant Physiology unit."
+              }
+            },
+            {
+              "name": "Respiration",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Respiration: Exchange gases; Cellular respiration-glycolysis, fermentation (anae",
+              "page": 13,
+              "pages": [
+                13
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 12,
+                  "title": "Respiration in Plants",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo112.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "content",
+                "why": "Inside NTA's Plant Physiology unit."
+              }
+            },
+            {
+              "name": "Plant growth and development",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Plant growth and development: Seed germination; Phases of Plant growth and plant",
+              "page": 13,
+              "pages": [
+                13
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 13,
+                  "title": "Plant Growth and Development",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo113.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "content",
+                "why": "Inside NTA's Plant Physiology unit."
+              }
+            }
+          ]
+        },
+        {
+          "no": 5,
+          "name": "Human Physiology",
+          "name_verbatim": "Human Physiology",
+          "page": 13,
+          "pages": [
+            13
+          ],
+          "chapters": [
+            {
+              "name": "Breathing and Respiration",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Breathing and Respiration: Respiratory organs in animals (recall only); Respirat",
+              "page": 13,
+              "pages": [
+                13
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 14,
+                  "title": "Breathing and Exchange of Gases",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo114.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "content",
+                "why": "Inside NTA's Human Physiology unit."
+              }
+            },
+            {
+              "name": "Body fluids and circulation",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Body fluids and circulation: Composition of blood, blood groups, coagulation of ",
+              "page": 13,
+              "pages": [
+                13
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 15,
+                  "title": "Body Fluids and Circulation",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo115.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "content",
+                "why": "Inside NTA's Human Physiology unit."
+              }
+            },
+            {
+              "name": "Excretory products and their elimination",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Excretory products and their elimination: Modes of excretion- Ammonotelism,",
+              "page": 13,
+              "pages": [
+                13
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 16,
+                  "title": "Excretory Products and their Elimination",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo116.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "content",
+                "why": "Inside NTA's Human Physiology unit."
+              }
+            },
+            {
+              "name": "Locomotion and Movement",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Locomotion and Movement: Types of movement- ciliary, fiagellar, muscular; Skelet",
+              "page": 13,
+              "pages": [
+                13
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 17,
+                  "title": "Locomotion and Movement",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo117.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "content",
+                "why": "Inside NTA's Human Physiology unit."
+              }
+            },
+            {
+              "name": "Neural control and coordination",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Neural control and coordination: Neuron and nerves; Nervous system in humanscent",
+              "page": 13,
+              "pages": [
+                13
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 18,
+                  "title": "Neural Control and Coordination",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo118.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "content",
+                "why": "Inside NTA's Human Physiology unit."
+              }
+            },
+            {
+              "name": "Chemical coordination and regulation",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Chemical coordination and regulation: Endocrine glands and hormones; Human",
+              "page": 13,
+              "pages": [
+                13
+              ],
+              "ncert_ref": [
+                {
+                  "class": 11,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 19,
+                  "title": "Chemical Coordination and Integration",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/kebo119.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "content",
+                "why": "Inside NTA's Human Physiology unit."
+              }
+            }
+          ]
+        },
+        {
+          "no": 6,
+          "name": "Reproduction",
+          "name_verbatim": "Reproduction",
+          "page": 14,
+          "pages": [
+            14
+          ],
+          "chapters": [
+            {
+              "name": "Sexual reproduction in flowering plants",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Sexual reproduction in flowering plants: Flower structure; Development of male a",
+              "page": 14,
+              "pages": [
+                14
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 1,
+                  "title": "Sexual Reproduction in Flowering Plants",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo101.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "content",
+                "why": "NTA's text is about flowering plants."
+              }
+            },
+            {
+              "name": "Human Reproduction",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Human Reproduction: Male and female reproductive systems; Microscopic anatomy of",
+              "page": 14,
+              "pages": [
+                14
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 2,
+                  "title": "Human Reproduction",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo102.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "content",
+                "why": "NTA's text is about humans."
+              }
+            },
+            {
+              "name": "Reproductive health",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Reproductive health: Need for reproductive health and prevention of sexually",
+              "page": 14,
+              "pages": [
+                14
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 3,
+                  "title": "Reproductive Health",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo103.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "content",
+                "why": "NTA's text is about human reproductive health."
+              }
+            }
+          ]
+        },
+        {
+          "no": 7,
+          "name": "Genetics and Evolution",
+          "name_verbatim": "Genetics and Evolution",
+          "page": 14,
+          "pages": [
+            14
+          ],
+          "chapters": [
+            {
+              "name": "Heredity and variation",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Heredity and variation: Mendelian Inheritance; Deviations from Mendelism-",
+              "page": 14,
+              "pages": [
+                14
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 4,
+                  "title": "Principles of Inheritance and Variation",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo104.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "convention",
+                "why": "Mendelian genetics with human, bird and honey-bee examples; not plant-only or animal-only."
+              }
+            },
+            {
+              "name": "Molecular basis of Inheritance",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Molecular basis of Inheritance: Search for genetic material and DNA as genetic",
+              "page": 14,
+              "pages": [
+                14
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 5,
+                  "title": "Molecular Basis of Inheritance",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo105.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "convention",
+                "why": "DNA, replication, transcription, lac operon: common to all life."
+              }
+            },
+            {
+              "name": "Evolution",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Evolution: Origin of life; Biological evolution and evidences for biological evo",
+              "page": 14,
+              "pages": [
+                14
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 6,
+                  "title": "Evolution",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo106.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "convention",
+                "why": "Origin of life, evidence for evolution, human evolution: not plant-only or animal-only."
+              }
+            }
+          ]
+        },
+        {
+          "no": 8,
+          "name": "Biology and Human Welfare",
+          "name_verbatim": "Biology and Human Welfare",
+          "page": 14,
+          "pages": [
+            14,
+            15
+          ],
+          "chapters": [
+            {
+              "name": "Health and Disease",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Health and Disease; Pathogens; parasites causing human diseases (Malaria, Filari",
+              "page": 14,
+              "pages": [
+                14
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 7,
+                  "title": "Human Health and Disease",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo107.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "content",
+                "why": "NTA's text is human disease, immunology and drug abuse."
+              }
+            },
+            {
+              "name": "Microbes in human welfare",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Microbes in human welfare: In household food processing, industrial production,",
+              "page": 15,
+              "pages": [
+                15
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 8,
+                  "title": "Microbes in Human Welfare",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo108.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "convention",
+                "why": "Microbes are neither plants nor animals."
+              }
+            }
+          ]
+        },
+        {
+          "no": 9,
+          "name": "Biotechnology and Its Applications",
+          "name_verbatim": "Biotechnology and Its Applications",
+          "page": 15,
+          "pages": [
+            15
+          ],
+          "chapters": [
+            {
+              "name": "Principles and process of Biotechnology",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Principles and process of Biotechnology: Genetic engineering (Recombinant DNA",
+              "page": 15,
+              "pages": [
+                15
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 9,
+                  "title": "Biotechnology: Principles and Processes",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo109.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "convention",
+                "why": "Recombinant DNA technology: neither plant nor animal content."
+              }
+            },
+            {
+              "name": "Application of Biotechnology in health and agriculture",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Application of Biotechnology in health and agriculture: Human insulin and vaccin",
+              "page": 15,
+              "pages": [
+                15
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 10,
+                  "title": "Biotechnology and its Applications",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo110.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Zoology",
+                "basis": "convention",
+                "why": "Mixes Bt crops (plants) with insulin, gene therapy and transgenic animals."
+              }
+            }
+          ]
+        },
+        {
+          "no": 10,
+          "name": "Ecology and Environment",
+          "name_verbatim": "Ecology and Environment",
+          "page": 15,
+          "pages": [
+            15
+          ],
+          "chapters": [
+            {
+              "name": "Organisms and environment",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Organisms and environmentPopulation interactions-mutualism, competition, predati",
+              "page": 15,
+              "pages": [
+                15
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 11,
+                  "title": "Organisms and Populations",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo111.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "convention",
+                "why": "Population ecology applies to plants and animals alike."
+              }
+            },
+            {
+              "name": "Ecosystem",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Ecosystem: Patterns, components; productivity and decomposition; Energy flow;",
+              "page": 15,
+              "pages": [
+                15
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 12,
+                  "title": "Ecosystem",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo112.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "convention",
+                "why": "Ecosystems contain plants and animals alike."
+              }
+            },
+            {
+              "name": "Biodiversity and its conservation",
+              "name_source": "nta_subheading",
+              "nta_text_start": "Biodiversity and its conservation: Concept of Biodiversity; Patterns of Biodiver",
+              "page": 15,
+              "pages": [
+                15
+              ],
+              "ncert_ref": [
+                {
+                  "class": 12,
+                  "subject": "Biology",
+                  "book": "Biology",
+                  "chapter": 13,
+                  "title": "Biodiversity and Conservation",
+                  "pdf": "https://ncert.nic.in/textbook/pdf/lebo113.pdf"
+                }
+              ],
+              "paper_section": {
+                "section": "Botany",
+                "basis": "convention",
+                "why": "Biodiversity covers plants and animals alike."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "ambiguities": [
+    {
+      "where": "p.1 header",
+      "what": "The document is titled 'SYLLABUS FOR NEET (UG) - 2025' although NTA links it as the syllabus on the NEET 2026 site (uploaded Jan 2026). The 2026 bulletin's FAQ says the syllabus is unchanged from the previous year, so it is used as the 2026 syllabus."
+    },
+    {
+      "where": "p.12 Biology Unit 2",
+      "what": "Says '... of an insect (Frog)'. The 2026 bulletin FAQ (PDF p.81, Q4) says it should be read as 'of an insect and a frog'."
+    },
+    {
+      "where": "p.12 Biology Unit 3, third bullet",
+      "what": "Begins 'B Cell division' — a stray 'B'. Read as 'Cell division'."
+    },
+    {
+      "where": "p.15 Biology Unit 10, first bullet",
+      "what": "'Organisms and environmentPopulation interactions' — separator missing in the PDF. Chapter named 'Organisms and environment'."
+    },
+    {
+      "where": "p.12 Biology Units 1-3",
+      "what": "Seven bullets carry no heading of their own; they are named after the NCERT chapter they correspond to (name_source = 'ncert_title')."
+    },
+    {
+      "where": "Bulletin pp.7, 26",
+      "what": "Biology is 90 questions as 'Biology (Botany & Zoology)'. NTA states no 45/45 split and no mapping of syllabus content to Botany or Zoology. The section on each Biology chapter is therefore marked 'content' or 'convention', never 'official'."
+    },
+    {
+      "where": "p.1 Physics Unit 1",
+      "what": "Named 'Physics and Measurement' here and 'Units and Measurements' in the JEE Main 2026 syllabus for nearly identical content. Each file keeps its own exam's wording."
+    },
+    {
+      "where": "Bulletin p.81",
+      "what": "The NMC link the bulletin gives for the syllabus (nmc.org.in/MCIRest/open/getDocument?path=.../Public%20Notice_NEET_removed.pdf) returned HTTP 404 on 2026-10-07; the NMC copy was not obtained. The NTA-hosted copy is used."
+    },
+    {
+      "where": "p.4 Physics Unit 20, p.10-11 Chemistry Unit 20",
+      "what": "'Experimental Skills' and 'Principles Related to Practical Chemistry' are examinable units with no NCERT textbook chapter; ncert_ref is null."
+    }
+  ]
+}
