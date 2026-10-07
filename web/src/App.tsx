@@ -7,6 +7,8 @@ import { AppShell } from "@/components/layout/AppShell";
 import { DirectorConsole } from "@/routes/DirectorConsole";
 import { Student360 } from "@/routes/Student360";
 import { MockIntelligence } from "@/routes/MockIntelligence";
+import { HowItWorks } from "@/routes/HowItWorks";
+import { DataTrust } from "@/routes/DataTrust";
 import { NotFound } from "@/routes/NotFound";
 import { ThemeProvider } from "@/theme/theme-provider";
 
@@ -43,6 +45,8 @@ export default function App() {
                     path="students/:id/mock/:paperId"
                     element={<MockIntelligence />}
                   />
+                  <Route path="how-it-works" element={<HowItWorks />} />
+                  <Route path="trust" element={<DataTrust />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
               </Routes>

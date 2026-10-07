@@ -318,9 +318,17 @@ export const handlers = [
     return guard(() => HttpResponse.json(envelope(topicStatesFor(id(params)))));
   }),
 
-  http.get("/api/students/:id/attempts/", async ({ params }) => {
+  http.get("/api/students/:id/attempts/", async ({ params, request }) => {
     await settle();
-    return guard(() => HttpResponse.json(envelope(attemptsFor(id(params)))));
+    const raw = new URL(request.url).searchParams.get("paper");
+    const paper = raw === null ? undefined : Number(raw);
+    return guard(() =>
+      HttpResponse.json(
+        envelope(
+          attemptsFor(id(params), Number.isFinite(paper) ? paper : undefined),
+        ),
+      ),
+    );
   }),
 
   /* -------------------------------- marks-lost: a single object, not a list */

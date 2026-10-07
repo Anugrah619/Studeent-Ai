@@ -9,7 +9,21 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/", label: "Director console", end: true },
   { to: "/students/1", label: "Student 360", end: false },
+  // The explanation layer: how a diagnosis is made, and why to trust it. In
+  // the main navigation rather than a footer, because in a pitch they are the
+  // pages a director is shown second, right after the console.
+  { to: "/how-it-works", label: "How it works", end: false },
+  { to: "/trust", label: "Data & trust", end: false },
 ];
+
+function navClass({ isActive }: { isActive: boolean }) {
+  return cn(
+    "shrink-0 rounded-md px-2.5 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
+    isActive
+      ? "bg-secondary text-secondary-foreground"
+      : "text-muted-foreground hover:text-foreground",
+  );
+}
 
 /**
  * The masthead names the institute the signed-in account actually belongs to.
@@ -48,21 +62,9 @@ export function AppShell() {
             </div>
           </div>
 
-          <nav aria-label="Primary" className="ml-4 hidden items-center gap-1 md:flex">
+          <nav aria-label="Primary" className="ml-4 hidden items-center gap-1 xl:flex">
             {NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  cn(
-                    "rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-secondary text-secondary-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )
-                }
-              >
+              <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
                 {item.label}
               </NavLink>
             ))}
@@ -75,6 +77,24 @@ export function AppShell() {
           </div>
         </div>
       </header>
+
+      {/* Below `xl` four inline links, the fixture badge and the student
+          switcher do not fit one 56px bar — at tablet width the masthead
+          pushed the page sideways. Below `md` the nav used to simply vanish,
+          so on a phone nothing but the console was reachable. A scrolling row
+          under the masthead fixes both, without a menu to open first. */}
+      <nav
+        aria-label="Primary"
+        className="sticky top-14 z-20 border-b border-border bg-background/85 backdrop-blur xl:hidden"
+      >
+        <div className="mx-auto flex max-w-[1440px] gap-1 overflow-x-auto px-4 py-1.5">
+          {NAV.map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
 
       <main id="main" className="mx-auto max-w-[1440px] px-4 pb-16 sm:px-6">
         <Outlet />

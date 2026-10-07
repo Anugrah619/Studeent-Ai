@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 import type { Flag } from "@/api/types";
 import {
   useBatches,
@@ -82,7 +84,14 @@ export function DirectorConsole() {
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Week of {longDate(new Date().toISOString())}. Every row below is a
             student the system can justify interrupting your week for — with the
-            evidence that raised it.
+            evidence that raised it.{" "}
+            <Link
+              to="/how-it-works"
+              className="inline-flex items-center gap-0.5 font-medium whitespace-nowrap text-foreground underline-offset-4 hover:underline"
+            >
+              How it works
+              <ArrowRight aria-hidden className="size-3.5" />
+            </Link>
           </p>
         </div>
 

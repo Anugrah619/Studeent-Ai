@@ -1,5 +1,6 @@
 import {
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
   type UseQueryOptions,
@@ -15,6 +16,7 @@ import {
 } from "./diagnosis";
 import { fetchQuestion, type QuestionDetail } from "./questions";
 import type {
+  Attempt,
   Batch,
   DashboardSummary,
   Flag,
@@ -59,6 +61,8 @@ export const qk = {
   topicStates: (id: number) => ["students", id, "topic-states"] as const,
   marksLost: (id: number, paper: number) =>
     ["students", id, "marks-lost", paper] as const,
+  attempts: (id: number, paper: number) =>
+    ["students", id, "attempts", paper] as const,
   flags: (filters: FlagFilters) => ["flags", filters] as const,
   plan: ["my", "plan"] as const,
   diagnosis: (id: number, paper?: number) =>
@@ -183,6 +187,28 @@ export function useMarksLost(id: number, paper: number) {
 }
 
 /**
+ * One student's answer sheet for one paper — every attempt, right or wrong.
+ *
+ * Always scoped by `?paper=`. Unscoped, the route returns practice attempts
+ * too (~490 rows a student on the seeded data, over ten pages), and the only
+ * reader so far — the "How it works" page — wants one sitting, not a history.
+ * `apiGetRows` follows `next` regardless, so a long paper is never truncated
+ * into a sheet that quietly has fewer questions than the paper.
+ */
+export function useAttempts(id: number, paper: number | undefined) {
+  return useQuery<Attempt[], Error>({
+    queryKey: qk.attempts(id, paper ?? NaN),
+    queryFn: ({ signal }) =>
+      apiGetRows("/api/students/{id}/attempts/", {
+        path: { id },
+        query: { paper },
+        signal,
+      }),
+    enabled: Number.isFinite(id) && paper !== undefined && Number.isFinite(paper),
+  });
+}
+
+/**
  * Flags, narrowed at the server where the contract lets us.
  *
  * `?open=` and `?student=` are declared now, so Student 360 asks for one
@@ -278,6 +304,26 @@ export function useQuestion(
     // A question and its tagged distractors do not change inside a sitting, and
     // re-opening the same chip should be instant.
     staleTime: 10 * 60_000,
+  });
+}
+
+/**
+ * Several cited questions at once, as one student answered them.
+ *
+ * Same key and same fetcher as `useQuestion`, so a chip the reader has
+ * already opened costs nothing here and vice versa — the cache is shared with
+ * every `QuestionPanel` on the page.
+ */
+export function useQuestionsFor(questionIds: number[], studentId: number | undefined) {
+  return useQueries({
+    queries: questionIds.map((questionId) => ({
+      queryKey: qk.question(questionId, studentId),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchQuestion(questionId, studentId, signal),
+      enabled: Number.isFinite(questionId),
+      retry: false,
+      staleTime: 10 * 60_000,
+    })),
   });
 }
 
