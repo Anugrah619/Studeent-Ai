@@ -8,8 +8,10 @@ Three rules this module enforces so nothing above it has to remember them:
    happens locally, after the call.
 2. **Every call is traced.** A trace not captured is a training example
    gone forever.
-3. **Identical state never regenerates.** The free tier allows 500 requests
-   a day; a demo that re-reasons on every page load burns that in an hour.
+3. **Identical state never regenerates.** The free tier allows only about
+   20 requests per model per day (Google's own error text says "limit: 20",
+   and 503 "busy" responses appear to count against it); a demo that
+   re-reasons on every page load burns that in minutes.
 
 If no API key is configured the client replays a cached trace when one
 exists and otherwise raises. It never fabricates a result — a made-up

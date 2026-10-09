@@ -20,34 +20,25 @@ And every time Gemini does that reasoning, **we keep the transcript** — so tha
 
 ---
 
-## Where we are today — honest version
+## Where we are today — honest version (10 Oct 2026)
 
-**Built:** the filing cabinet and the calculator.
-**Not built:** the brain.
+**A working prototype.** The AI diagnosis runs live, on simulated students, and the console shows it.
 
-| ✅ Done | ❌ Not started |
-|---|---|
-| Database, 21 tables, privacy walls between institutes | **Any LLM reasoning** |
-| Fake data: 24,000 answers, scores, timings | **Question content — text, options, answers** |
-| Counting engine — accuracy per student per topic | Misconception system |
-| 8 rule-based checks (weak topic, overconfidence, burnout…) | Training pipeline |
-| Teacher dashboard + student detail screens | |
-| 68 automatic tests, all passing | |
+| ✅ Built and working | 🟡 Built, with a limit | ❌ Not built |
+|---|---|---|
+| AI diagnosis (Gemini) — found the right mistake for **4 of 4** test students | Runs on **simulated** students, 46 shown on screen | Upload screen for an institute's result files |
+| Diagnostic paper: 46 questions, every wrong option labelled with its mistake (15 mistakes) | Diagnosis runs on our own paper, **not yet on the real ones** | NEET or Biology on any screen |
+| Real papers loaded: **NEET 2025** (180 q) and **JEE Main 2026, 2 Apr S1** (75 q), checked against NTA's official keys (87–88% agreement, key upheld every time) | 32 cross-check disagreements reviewed by an agent, **not yet by a person** | Training our own model |
+| Official JEE Main + NEET 2026 syllabi, linked to NCERT | Demo still uses the old placeholder JEE chapter list | Hosting — runs on this laptop |
+| Director console, student page, clickable evidence, question panel, "How it works", "Data & trust" | Gemini free tier is **~20 requests per model per day** | |
+| Privacy walls between institutes; no names sent to the AI | | |
+| 190 backend + 21 frontend automatic tests, all passing | | |
 
-### The one blocker
+### What changed the outcome
 
-We store *"student got Q17 wrong, topic = Rotational Motion."*
-We do **not** store the question, the options, or **which option they picked**.
+We used to store only *"student got Q17 wrong, topic = Rotational Motion"* — and from that any model can only say *"revise the chapter."* Recording **which option the student chose**, and what each wrong option means, is what made a real diagnosis possible. **The ceiling was the input, not the model.**
 
-```
-Attempt.chosen_option      → does not exist
-question_text populated    → 0 of 525
-options / solutions        → do not exist
-```
-
-Give any model only that, and the best it can produce is *"revise Rotational Motion."* Generic and worthless.
-
-**This is an input problem, not a model problem.** Fixing it is step one of everything below.
+**Studying for a pitch?** Read [`STUDY_NOTES.md`](STUDY_NOTES.md).
 
 ---
 
@@ -180,3 +171,4 @@ Admin: `localhost:8000/admin/` · API docs: `localhost:8000/api/docs/`
 | `TASKS.md` | What to do next |
 | `PROJECT_LOG.md` | Every decision and why |
 | `LEARNING_PATH.md` | Skills and free resources |
+| `STUDY_NOTES.md` | Founder's pitch preparation — the concepts in plain words, demo script, real vs simulated, verified numbers, 40 client questions with honest answers |

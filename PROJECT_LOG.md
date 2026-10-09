@@ -483,3 +483,121 @@ mixed quality; **the console has no maths renderer, so real questions show raw
 LaTeX** — must fix before showing them in a pitch.
 
 Round committed in one commit: syllabus, factory, explainer pages merged.
+
+### 2026-10-10 — plain-language status recap
+
+User asked for a simple "how it works now / what next". No code changes. Pending
+decision unchanged: run the NEET demo round (maths rendering, Biology on screens,
+simulated students on the real NEET 2025 paper, clickable counter-evidence) or
+pitch with the current prototype plus the explainer pages.
+
+### 2026-10-10 (later) — `TECHNICAL_DOC.md` re-baselined to v3.0 against the code
+
+User asked for the whole codebase and every `.md` file to be read, and the
+technical doc updated to match what the project actually does. Four read-only
+audit agents ran in parallel (backend core · content/AI pipeline · frontend ·
+docs-and-history); I then re-verified every number I put in the doc myself.
+
+**The doc was 15 days stale** (v2.0, 25 Sep): it still said "Tier B not started",
+"question content is the blocker", "21 tables", "68 tests", "console has never
+touched the live API". All five were false. Rewritten as v3.0 with a status
+legend (built / built-with-a-limit / model-only / not started).
+
+Verified facts now in the doc: **25 tables** (Django registry) · **28 paths / 29
+operations** in `openapi.yaml` · **190 backend tests, all passing** (run this
+session) · 21 frontend tests (counted, not run) · 15 misconception codes.
+
+What the audit found that was **not** in any document before:
+- **The question factory** (`manage.py factory …`) — the largest built subsystem
+  — was in no spec. Now §8.1.
+- **Mock-file ingestion (§8 in v2.0) is not built.** No parser, no column
+  mapping, no student matching — only the two models. v2.0 presented it as the
+  workflow. Now §8.2, marked not built.
+- **Only 1 of 6 Tier B tasks runs.** The other five are enum constants.
+- **Free tier is ~20 requests per model per day**, not 500.
+- **Taxonomy is fragmenting:** the factory proposed "new" codes for 496/514 NEET
+  and 153/162 JEE distractors (~490 distinct drafts) against a 15-code vocabulary.
+- **Invariants are weaker than stated:** append-only is convention (DB role can
+  UPDATE/DELETE); syllabus immutability is not enforced; `ingestion_questionoption`
+  has no RLS policy; django-q2 is not installed (no scheduler at all).
+- **A real bug:** the Intervene dialog says it closes the flag; the server
+  deliberately does not, the UI never calls `/resolve/`, and only the MSW mock
+  closes it. An eighth mock-vs-server mismatch, same shape as the first seven.
+
+**One audit finding was wrong and was not carried into the doc:** the frontend
+agent flagged `import { cn } from "cn"` as a bug. It is shadcn's own official `cn`
+package, deliberately. Worth remembering that agent reports are claims to check.
+
+**Not changed, and still stale:** `README.md` (says "Not built: the brain", 68
+tests, 21 tables, "0 of 525") and `TASKS.md` (says the Gemini key is the next
+step, 89 tests, "never touched live API"). The three docs now disagree, and
+`TECHNICAL_DOC.md` is the one that matches the code. Also stale: code comments
+that cite old TECHNICAL_DOC section numbers (§6.1–6.4, §8, §12.5, §14), and the
+log's own "Current Status" block (still reads "Next step: Stage 1", 17 Sep).
+
+### 2026-10-10 (later) — pitch preparation: study notes + git audit
+
+User wants to be "strong in the concepts" and ready for any client question.
+Two agents started:
+- **Study notes** → `STUDY_NOTES.md`: how it works in five steps, key ideas
+  explained simply, demo script, benefits by audience (director / teacher /
+  student / parent), real vs simulated, verified numbers, 30+ client questions
+  with honest answers, what not to claim, roadmap, glossary. Told to verify every
+  number against the live database rather than the docs, and not to call Gemini.
+- **Git audit** (read-only) → what's committed, pushed, left to commit; that
+  `.env`, `data/raw/`, `data/extracted/` were never in history; and what exists
+  only on this machine (real papers, DB contents) — i.e. what is lost if the
+  laptop dies.
+
+### 2026-10-10 (later) — git audit landed; data backed up
+
+**Code is safe:** local `main` = GitHub `main` = `ab01c30`, 33 commits, nothing
+unpushed. `app/.env`, `data/raw/`, `data/extracted/` were never in any commit;
+full-history scan for API keys found none.
+
+**The real risk was the data:** real papers, extracted questions and the whole
+database existed only on this laptop, with no dump anywhere. The 195 Gemini
+reasoning traces (the demo's offline cache) and the one mentor verdict could not
+be recreated at all. `seed_demo --flush` would also wipe the traces, since they
+cascade from students. **Backed up** to `E:\Student_AI_backups\` (outside the
+repo): DB dump verified restorable (34 tables), plus `data/raw` and
+`data/extracted` — 58 MB. Still on the same disk: needs copying off-machine to
+protect against the laptop itself.
+
+**My mistake, recorded:** 19 of 33 commits carry a `Co-Authored-By: Claude`
+trailer. 9 predate the user's no-attribution rule; **10 came after it — all made
+by subagents, because I never passed the rule into their briefs.** Already public.
+Rewriting needs a force-push to a public repo — the user's decision. Saved as a
+memory so every future agent brief carries the rule.
+
+Other findings: `data/raw/manifest.json` (provenance + checksums, no exam
+content) is ignored with the rest of `data/raw/` — worth committing via
+`/data/raw/*` + `!/data/raw/manifest.json`. Five merged agent branches are stale.
+The concept-note PDF and a work email are in public history.
+
+### 2026-10-10 (later) — study notes landed; docs brought in line
+
+`STUDY_NOTES.md` (733 lines) written for pitch preparation: the pitch, the
+problem, five steps, key ideas, a 9-step demo script, benefits by audience,
+real-vs-simulated, verified numbers, 40 client questions, what not to say,
+roadmap, glossary. Every number checked against the live database; no Gemini
+calls (hero diagnoses read from stored traces).
+
+**What the notes agent corrected — including things I had said:**
+- **46** students on screen, not 49 (49 spans both institutes).
+- Of 26,024 answers, only **2,024** record the chosen option and can feed a
+  diagnosis; the 525 questions in Mocks 8–14 have no text.
+- **No upload screen exists** — so "it works from the results you already have"
+  is the design, not a built feature. In a pilot we load the files ourselves.
+- **Opening any non-hero student triggers a live Gemini call** — a real demo trap
+  on a ~20/day free tier.
+- Tanvi's and Ishita's totals (40, 35) exceed their headlines (25, 20) because of
+  weaker secondary findings; lead with Aarav and Kunal.
+- The 32 cross-check disagreements were reviewed by an agent, **not a person**.
+- "Loop closed 100%" and Priya's 44%→67% are seeded, not real outcomes.
+- The "Data & trust" page understates reality ("being added now").
+
+`TECHNICAL_DOC.md` was rewritten to **v3.0** (re-baselined against the code) by
+someone outside this chat — most likely the user's parallel session; kept as is.
+`README.md` status, `TASKS.md` status/next steps/demo traps, and the
+`gemini.py` free-tier comment (said 500/day) updated to match reality.

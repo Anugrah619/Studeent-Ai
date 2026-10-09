@@ -17,18 +17,26 @@ A task that doesn't serve that doesn't belong on this list.
 ## Where we are
 
 ```
-✅ Filing cabinet    22 tables, tenant isolation verified (incl. ReasoningTrace)
+✅ Filing cabinet    tenant isolation verified (incl. ReasoningTrace)
 ✅ Calculator        counting engine, 8 checks, 5-bucket marks attribution
-✅ Content           46 questions · 15 misconceptions · 63 tagged distractors
+✅ Content           46-question diagnostic paper · 15 misconceptions · 63 tagged options
 ✅ Patterns          hero signatures verified at p ≤ 0.01, control fails
-✅ The brain         diagnose_misconception built, PII-stripped, traced
-✅ Screens           AI Diagnosis card + all failure states
-✅ Safety net        89 tests passing
-⏸  Live reasoning    needs a GEMINI_API_KEY — nothing else blocks it
-❌ Training          0 traces (accumulates once the key is in)
+✅ The brain         diagnose_misconception live — 4/4 heroes correct
+✅ Screens           live API · diagnosis card · question panel · How it works · Data & trust
+✅ Real data         official JEE Main + NEET 2026 syllabi (NCERT-linked);
+                     NEET 2025 + JEE Main 2026 papers, cross-checked vs NTA keys
+✅ Safety net        190 backend + 21 frontend tests
+🟡 Training data     195 traces, 1 mentor verdict (a test click) — corpus has started
+❌ NEET on screen    syllabus and paper loaded, no screen shows Biology yet
 ```
 
-**One thing stands between this and a working pitch demo: an API key.**
+**Pitch-ready today on the JEE diagnostic demo.** The NEET demo round (below) is what moves the pitch onto a real exam paper.
+
+### ⚠ Demo traps — know these before a meeting
+- **Only open the four hero students** (Aarav, Kunal, Tanvi, Ishita). Any other student triggers a *live* Gemini call, and the free tier is ~20 requests per model per day — the card may come back "AI unavailable".
+- Lead with **Aarav and Kunal**: Tanvi's and Ishita's cards add weaker secondary findings, so their totals read higher than their headlines.
+- The "Mock intelligence" screen has no menu link (`/students/1/mock/7`).
+- "Loop closed" and Priya Nair's "44% → 67%" are **seeded examples**, not real outcomes.
 
 ---
 
@@ -53,13 +61,17 @@ The control is the single strongest clump across all **280 student × misconcept
 
 ---
 
-## 🔴 NEXT — one step, and it is not code
+## 🔴 NEXT — the NEET demo round (awaiting go-ahead)
 
-- [ ] **Get a Gemini API key** → https://aistudio.google.com/apikey → put it in `app/.env` as `GEMINI_API_KEY=…`
-- [ ] Run `GET /api/students/1/diagnosis/?paper=<Mock 15 id>` and read what comes back
-- [ ] If the wording is weak, iterate on `SYSTEM_PROMPT` in `apps/reasoning/services/diagnose.py` — *that prompt is now the product*
+Moves the pitch onto a real exam: *"This is the actual NEET 2025 paper — here's what the system found about three students who sat it."*
 
-Until the key is in, the endpoint returns a **clean 503 with an explanation**. There is deliberately no fallback that invents a diagnosis: fake AI output presented as real is the one failure this product could not survive.
+- [ ] **Render maths** — real questions are stored as LaTeX; the console shows `$\theta$` raw
+- [ ] **Biology on screen** — several views hard-code Physics/Chemistry/Maths; NEET has Botany + Zoology
+- [ ] **Simulated students sit the real NEET paper** — planted misconceptions, clearly labelled simulated; use only the 157 key-agreed questions
+- [ ] **Clickable counter-evidence** — D22/D23 arrive as words in a sentence, not linked question ids
+- [ ] Correct the "Data & trust" page — it still says real papers are "being added now"
+
+**Before any pilot:** a person reviews the 32 cross-check disagreements; back up `E:\Student_AI_backups\` off this machine; replace demo passwords.
 
 ---
 
@@ -90,7 +102,7 @@ Cannot start before ~5,000 traces exist. That's Phase 3 running for a while.
 | Medium | `weak_topic` shows a *lifetime* marks total next to a 20-attempt decayed mastery | `derived/services/features.py` |
 | Medium | `accuracy_30d` null for 86% of rows, degenerate 0/1 where present | `derived/services/features.py` |
 | Low | Neglect chart labels detach from short bars | `web/src/components/charts/` |
-| — | Console has never touched the live API — MSW mocks only | `web/` |
+| ~~—~~ | ~~Console has never touched the live API~~ — fixed 30 Sep | `web/` |
 
 ---
 
