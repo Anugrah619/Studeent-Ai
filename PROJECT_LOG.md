@@ -1011,3 +1011,68 @@ Asked to push to the main branch. Fetched first: `origin/main` was still at
 other laptop: `git pull` on `main`, then `manage.py migrate` (tenancy 0004,
 ingestion 0005) and `npm install` in `web/`. `.claude/` is still untracked and
 was not pushed.
+
+### 2026-10-18 — the identity pass, merged onto package B
+
+The user asked for a design pass on the whole console with no brief, and chose
+"whole console identity". I built it on `design/marking-desk` (from `149ff5e`)
+without knowing `origin/main` had moved on: package B, the student API and the
+sign-in work (`93295e3`). The two redesigns overlapped in 32 files. The user's
+call: **port the identity onto package B and push straight to main.** So
+`origin/main` is the base, and B's code, tests and behaviour stand. My layer
+was re-applied file by file in a merge commit, so both histories are kept.
+
+**The identity, as rules** (so the next change extends it instead of guessing):
+1. Two typefaces. Archivo (variable, width axis) for the system and every
+   figure. Source Serif 4 for language about the subject: a question stem, a
+   belief, a remedy, the AI's headline and claims. A reader can tell what a
+   model wrote from what the system counted.
+2. Only answers are round. `components/brand/Bubble.tsx` is the OMR circle:
+   filled is the student's pick, ringed is the correct answer, and three of
+   them in a row are a confidence. Tags, chips and number badges are square,
+   and `--radius` is 0.375rem.
+3. Text, rules and input borders are tinted from the ink colour. Input borders
+   hold 3:1.
+4. The brand colour is chrome: buttons, links, focus, the nav bubble, and the
+   header and verdict bands of the diagnosis card. It never marks a status or
+   a value.
+5. 13px is the smallest type. No all-caps labels, no dot-joined meta strings,
+   no trailing arrows on links, no single word picked out in a headline.
+6. One orchestrated moment of motion (the diagnosis's margin rule draws down
+   and the cited bubbles fill in), plus motion that answers a click.
+7. The diagnosis card is a page with a margin: the prose on the left, what the
+   system counted on the right, divided by a rule. The time-to-fix band sits
+   beside "Do this week" now, not under the headline.
+
+**Kit API changes.** Anything written against package B before this needs
+them. `PageHeadline` lost `Accent` and `backdrop`; `TextLink` lost `arrow`;
+`AnchorLink` lost `direction`; `Reveal` and `RevealItem` render their children
+with no entrance; `AnimatedNumber` only counts up with `animateOnMount`
+(`KpiCard`: `animate`); `KpiCard` has `variant="cell"` for use inside the new
+`FigureBand`. The unused `bg-hero`, `bg-grid-faint` and `text-brand-gradient`
+utilities are gone. The font packages changed from Geist and Geist Mono to
+Archivo and Source Serif 4, so run `npm install` in `web/`.
+
+**Where the two branches disagreed, B's wording won when it was more honest.**
+The belief block says "The belief behind choosing (C)". Mine said "in his own
+words", which the catalogue text is not, and B's test forbids it. The verdict
+copy says the answer is saved as a teacher-checked label and changes nothing;
+mine said it trains the system, which it does not. Dropped from B to keep to
+one moment of motion: the marker stroke under the key insight and the fade-up
+entrances. Kept from B: the clickable question labels in the prose, the sheet
+check, the weaker-findings group, and every state it handled (503, 422, no
+pattern, an unresolved citation).
+
+**Checked.** Typecheck clean. 36 of 36 tests pass: B's 36 unchanged, plus four
+assertions in the question-panel test that the pick is a filled bubble and the
+right answer a ringed one. `npm run build` passes, the two fonts are bundled,
+and nothing loads from a CDN. `npm ci --dry-run` accepts the hand-merged
+lockfile. Screenshots in light and dark of the console, the student page, the
+question panel, the mock page, both explainers, sign-in, the password-change
+screen and the student holding page. No horizontal overflow at 390px on any of
+the five main pages. Every text pair in the new bands and tints is at least
+4.5:1 in both themes.
+
+**Not checked.** Live mode against the Django server: this was mock mode only.
+The focus rings on text links are the stock 50% tint, about 2:1 on white. Form
+controls also change their border, so they hold 3:1. Left as B had them.

@@ -5,7 +5,7 @@ interface SectionProps {
   title?: ReactNode;
   /** One sentence on what the reader is looking at, under the title. */
   description?: ReactNode;
-  /** Small uppercase label above the title. */
+  /** A short line above the title. */
   eyebrow?: ReactNode;
   /** Right-aligned slot: a count, a filter, a "see all" link. */
   actions?: ReactNode;
@@ -47,7 +47,7 @@ export function Section({
         <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div className="min-w-0">
             {eyebrow ? (
-              <div className="mb-1.5 text-[11px] font-semibold tracking-[0.08em] text-brand-ink uppercase">
+              <div className="mb-1.5 text-sm font-medium text-muted-foreground">
                 {eyebrow}
               </div>
             ) : null}
@@ -63,7 +63,7 @@ export function Section({
               </Heading>
             ) : null}
             {description ? (
-              <div className="mt-1 max-w-prose text-sm leading-relaxed text-muted-foreground">
+              <div className="mt-1 max-w-[62ch] text-sm leading-relaxed text-muted-foreground">
                 {description}
               </div>
             ) : null}

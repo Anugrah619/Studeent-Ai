@@ -95,7 +95,7 @@ export function EvidenceList({ evidence }: { evidence: unknown }) {
       <Pairs entries={shown} emphasis />
       {folded.length ? (
         <details className="group">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-sm text-[11px] font-medium text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-sm text-xs font-medium text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
             All recorded evidence ({primitives.length})
             <ChevronDown
               aria-hidden
@@ -119,7 +119,7 @@ function Pairs({ entries, emphasis = false }: { entries: Entry[]; emphasis?: boo
           key={key}
           className="flex items-baseline justify-between gap-2 border-b border-border/60 pb-1"
         >
-          <dt className="text-[11px] text-muted-foreground">{label}</dt>
+          <dt className="text-xs text-muted-foreground">{label}</dt>
           <dd
             className={
               emphasis

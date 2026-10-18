@@ -45,11 +45,11 @@ export function IdeaCard({
     >
       <div className="flex h-full flex-col p-5">
         <div className="flex items-start justify-between gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-foreground">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground">
             <Icon aria-hidden className="size-4.5" />
           </span>
           {status ? (
-            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <span className="rounded-sm border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {status}
             </span>
           ) : null}
@@ -64,7 +64,7 @@ export function IdeaCard({
           {to.startsWith("#") ? (
             <AnchorLink href={to as `#${string}`}>{cta}</AnchorLink>
           ) : (
-            <TextLink to={to} arrow className="text-sm">
+            <TextLink to={to} className="text-sm">
               {cta}
             </TextLink>
           )}

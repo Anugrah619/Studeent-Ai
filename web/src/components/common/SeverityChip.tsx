@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
  * Severity is never colour alone. Every chip carries an icon and the word, so
  * it survives greyscale print, a projector with the contrast wound down, and a
  * director with deuteranopia.
+ *
+ * A chip is a small tab with square corners, not a pill: round is reserved for
+ * answers, so a circle on screen always means an option.
  */
 export function SeverityChip({
   severity,
@@ -27,8 +30,8 @@ export function SeverityChip({
       className={cn(
         // Inset ring, so a chip sits in a table row at exactly its text
         // height and never nudges the row taller than its neighbours.
-        "inline-flex items-center gap-1 rounded-full font-semibold tracking-tight whitespace-nowrap ring-inset",
-        size === "sm" ? "h-5 px-2 text-[11px]" : "h-6 px-2.5 text-xs",
+        "inline-flex items-center gap-1.5 rounded-sm font-semibold tracking-tight whitespace-nowrap ring-inset",
+        size === "sm" ? "h-6 px-2 text-xs" : "h-7 px-2.5 text-sm",
         token.chip,
         className,
       )}
@@ -36,7 +39,7 @@ export function SeverityChip({
       <Icon
         aria-hidden
         strokeWidth={2.25}
-        className={size === "sm" ? "size-3" : "size-3.5"}
+        className={size === "sm" ? "size-3.5" : "size-4"}
       />
       {label ?? token.label}
     </span>
@@ -64,12 +67,16 @@ export function RiskChip({
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 rounded-full bg-muted font-semibold tracking-tight whitespace-nowrap text-muted-foreground ring-1 ring-border ring-inset",
-          size === "sm" ? "h-5 px-2 text-[11px]" : "h-6 px-2.5 text-xs",
+          "inline-flex items-center gap-1.5 rounded-sm bg-muted font-semibold tracking-tight whitespace-nowrap text-muted-foreground ring-1 ring-border ring-inset",
+          size === "sm" ? "h-6 px-2 text-xs" : "h-7 px-2.5 text-sm",
           className,
         )}
       >
-        <CircleDashed aria-hidden strokeWidth={2.25} className={size === "sm" ? "size-3" : "size-3.5"} />
+        <CircleDashed
+          aria-hidden
+          strokeWidth={2.25}
+          className={size === "sm" ? "size-3.5" : "size-4"}
+        />
         Not scored
       </span>
     );

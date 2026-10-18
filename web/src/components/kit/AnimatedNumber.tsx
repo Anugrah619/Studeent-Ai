@@ -21,7 +21,12 @@ export interface AnimatedNumberProps {
   digits?: number;
   prefix?: string;
   suffix?: string;
-  /** Count up from zero when first scrolled into view. On by default. */
+  /**
+   * Count up from zero when first scrolled into view. Off by default: a screen
+   * gets one moment of motion, and a figure that rolls in is spending it. A
+   * figure that is already on screen still rolls when its value changes — that
+   * motion answers something the reader just did.
+   */
   animateOnMount?: boolean;
   className?: string;
 }
@@ -89,7 +94,7 @@ export function AnimatedNumber({
   digits,
   prefix = "",
   suffix = "",
-  animateOnMount = true,
+  animateOnMount = false,
   className,
 }: AnimatedNumberProps) {
   const ref = useRef<HTMLSpanElement>(null);

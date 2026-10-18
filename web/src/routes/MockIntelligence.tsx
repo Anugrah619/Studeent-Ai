@@ -6,8 +6,9 @@ import type { MarksLost } from "@/api/types";
 import { useMarksLost, useMockScores, useStudent } from "@/api/queries";
 import { MarksLostBar } from "@/components/charts/MarksLostBar";
 import { EmptyState, ErrorState, PanelSkeleton } from "@/components/common/States";
+import { FigureBand } from "@/components/common/StatTile";
 import { KpiCard } from "@/components/kit/KpiCard";
-import { Accent, PageHeadline } from "@/components/kit/PageHeadline";
+import { PageHeadline } from "@/components/kit/PageHeadline";
 import { Section } from "@/components/kit/Section";
 import { causeSlices, marksLostTotals, type MarksLostTotals } from "@/lib/causes";
 import { firstName } from "@/lib/explainer";
@@ -107,21 +108,21 @@ export function MockIntelligence() {
       <div>
         <Link
           to={`/students/${id}`}
-          className="inline-flex items-center gap-1 rounded-sm text-xs text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="inline-flex items-center gap-1 rounded-sm text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          <ChevronLeft aria-hidden className="size-3.5" />
+          <ChevronLeft aria-hidden className="size-4" />
           {student.data?.name ?? "Student"} · 360
         </Link>
 
         <PageHeadline
           className="pt-5 pb-0 sm:pt-6"
-          eyebrow={row ? `Mock intelligence · ${row.paper_name}` : "Mock intelligence"}
+          eyebrow={row ? `Mock intelligence for ${row.paper_name}` : "Mock intelligence"}
           title={noSheet ? `No answer sheet for ${name} on this paper.` : headline.title}
           support={noSheet ? undefined : headline.support}
           meta={
             <span className="tnum text-muted-foreground">
               {student.data?.name ?? "—"}
-              {row ? ` · held ${longDate(row.held_on)}` : ""}
+              {row ? `, held ${longDate(row.held_on)}` : ""}
             </span>
           }
           actions={picker}
@@ -151,7 +152,10 @@ export function MockIntelligence() {
       ) : (
         <>
           <section aria-label="The figures behind the headline" className="space-y-3">
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            {/* One band, so the hero leads it. At two columns the hero fills the
+                first row and the last cell fills the third; at five, the hero
+                takes two and the others one each — no row ever ends short. */}
+            <FigureBand className="grid-cols-2 lg:grid-cols-5">
               {/* The one hero figure on this view.
                   The denominator here is `attributed_lost`, never `total_lost`.
                   "61 of the 90 we can explain" is a claim the engine can defend;
@@ -159,7 +163,9 @@ export function MockIntelligence() {
                   also understood, which is the thing it was changed to stop
                   doing. */}
               <KpiCard
+                variant="cell"
                 size="hero"
+                animate
                 className="col-span-2"
                 label="Recoverable without learning anything new"
                 value={marksLost.data.recoverable}
@@ -171,12 +177,14 @@ export function MockIntelligence() {
                 }
               />
               <KpiCard
+                variant="cell"
                 label="Conceptual gap"
                 value={marksLost.data.conceptual_gap}
                 unit="marks"
                 caption="The only part that needs teaching"
               />
               <KpiCard
+                variant="cell"
                 label="Not attributed"
                 value={totals.unattributed}
                 unit={`of ${num(totals.totalLost)} lost`}
@@ -187,12 +195,14 @@ export function MockIntelligence() {
                   denominator is worse than one that shows up half a second
                   later. */}
               <KpiCard
+                variant="cell"
+                className="max-lg:col-span-2"
                 label="Score on this paper"
                 value={marksLost.data.score ?? row?.total ?? null}
                 unit={maxMarks ? `of ${num(maxMarks)}` : undefined}
                 caption={`${num(totals.totalLost)} marks lost in all — split below`}
               />
-            </div>
+            </FigureBand>
 
             {totals.unattributed > 0 ? (
               <p className="flex max-w-3xl gap-2.5 px-1 text-sm leading-relaxed text-muted-foreground">
@@ -229,15 +239,15 @@ export function MockIntelligence() {
               {causeSlices(marksLost.data).map((slice) => (
                 <li
                   key={slice.key}
-                  className="flex flex-col rounded-xl bg-card p-4 shadow-card ring-1 ring-border"
+                  className="flex flex-col rounded-xl bg-card p-5 shadow-card ring-1 ring-border"
                 >
                   <div className="flex items-center gap-2">
                     <span
                       aria-hidden
-                      className="size-2.5 shrink-0 rounded-xs"
+                      className="size-3 shrink-0 rounded-xs"
                       style={{ background: slice.color }}
                     />
-                    <h3 className="text-[13px] font-medium text-muted-foreground">
+                    <h3 className="text-sm font-medium text-foreground">
                       {slice.label}
                     </h3>
                   </div>
@@ -273,19 +283,20 @@ export function MockIntelligence() {
               title="By subject"
               description="What each subject contributed to this paper's total."
             >
-              <ul aria-label="Subject scores in this paper" className="grid gap-3 sm:grid-cols-3">
+              <FigureBand
+                role="list"
+                aria-label="Subject scores in this paper"
+                className="sm:grid-cols-3"
+              >
                 {SUBJECT_LIST.map((subject) => (
-                  <li
-                    key={subject.key}
-                    className="rounded-xl bg-card px-4 py-3.5 shadow-card ring-1 ring-border"
-                  >
+                  <div key={subject.key} role="listitem" className="bg-card px-5 py-4">
                     <div className="flex items-center gap-2">
                       <span
                         aria-hidden
-                        className="size-2.5 shrink-0 rounded-xs"
+                        className="size-3 shrink-0 rounded-xs"
                         style={{ background: subject.color }}
                       />
-                      <span className="text-[13px] font-medium text-muted-foreground">
+                      <span className="text-xs font-medium text-muted-foreground">
                         {subject.label}
                       </span>
                     </div>
@@ -294,17 +305,17 @@ export function MockIntelligence() {
                         184 does not split into thirds of 100 either. The share
                         of the paper's own total is a number we can stand
                         behind. */}
-                    <p className="tnum mt-1.5 text-2xl leading-none font-semibold">
+                    <p className="tnum mt-2 text-2xl leading-none font-semibold">
                       {num(row[subject.key])}
                       {row.total > 0 ? (
-                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
                           {pct((row[subject.key] / row.total) * 100)} of the paper
                         </span>
                       ) : null}
                     </p>
-                  </li>
+                  </div>
                 ))}
-              </ul>
+              </FigureBand>
             </Section>
           ) : null}
         </>
@@ -329,8 +340,8 @@ function mockHeadline(
     return {
       title: (
         <>
-          None of the <Accent>{num(totals.totalLost)} marks</Accent> lost on{" "}
-          {paperName} can be called yet.
+          None of the {num(totals.totalLost)} marks lost on {paperName} can be
+          called yet.
         </>
       ),
       support: `They come from chapters ${name} has barely attempted, so naming a cause would be a guess.`,
@@ -341,8 +352,8 @@ function mockHeadline(
     return {
       title: (
         <>
-          <Accent>{num(data.recoverable)} marks</Accent> on {paperName} were
-          recoverable without learning anything new.
+          {num(data.recoverable)} marks on {paperName} were recoverable without
+          learning anything new.
         </>
       ),
       support: (
@@ -362,8 +373,8 @@ function mockHeadline(
   return {
     title: (
       <>
-        <Accent>{num(data.conceptual_gap)} marks</Accent> on {paperName} went to
-        chapters where {name}&rsquo;s mastery is low.
+        {num(data.conceptual_gap)} marks on {paperName} went to chapters where{" "}
+        {name}&rsquo;s mastery is low.
       </>
     ),
     support: (

@@ -77,9 +77,9 @@ export function Student360() {
       <div className="space-y-5">
         <Link
           to="/"
-          className="inline-flex items-center gap-1 rounded-sm text-xs text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="inline-flex items-center gap-1 rounded-sm text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          <ChevronLeft aria-hidden className="size-3.5" />
+          <ChevronLeft aria-hidden className="size-4" />
           Director console
         </Link>
 
@@ -139,7 +139,7 @@ export function Student360() {
             <TabsTrigger value="flags" className="px-3">
               Open flags
               {flags.data ? (
-                <span className="tnum rounded-full bg-muted px-1.5 text-[11px] font-semibold text-muted-foreground ring-1 ring-border">
+                <span className="tnum rounded-sm bg-muted px-1.5 text-xs font-semibold text-muted-foreground ring-1 ring-border">
                   {studentFlags.length}
                 </span>
               ) : null}

@@ -45,13 +45,13 @@ export function Figure({
         className,
       )}
     >
-      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 px-5 pt-5 pb-3">
+      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 px-6 pt-5 pb-4">
         <div className="min-w-0 flex-1 basis-64">
-          <h3 className="font-heading text-[15px] leading-snug font-semibold tracking-tight text-foreground">
+          <h3 className="text-base leading-snug font-semibold tracking-tight text-foreground">
             {title}
           </h3>
           {subtitle ? (
-            <p className="mt-1 max-w-prose text-[13px] leading-relaxed text-muted-foreground">
+            <p className="mt-1 max-w-[46ch] text-sm leading-relaxed text-muted-foreground">
               {subtitle}
             </p>
           ) : null}
@@ -61,14 +61,14 @@ export function Figure({
           <div
             role="group"
             aria-label="View as"
-            className="flex items-center rounded-lg bg-muted p-0.5 ring-1 ring-border/60"
+            className="flex items-center rounded-md border border-border bg-card p-0.5"
           >
             <ViewButton
               active={view === "chart"}
               onClick={() => setView("chart")}
               controls={panelId}
               pillId={`${panelId}-pill`}
-              icon={<BarChart3 aria-hidden className="size-3.5" />}
+              icon={<BarChart3 aria-hidden className="size-4" />}
               label="Chart"
             />
             <ViewButton
@@ -76,18 +76,18 @@ export function Figure({
               onClick={() => setView("table")}
               controls={panelId}
               pillId={`${panelId}-pill`}
-              icon={<Table2 aria-hidden className="size-3.5" />}
+              icon={<Table2 aria-hidden className="size-4" />}
               label="Table"
             />
           </div>
         </div>
       </header>
 
-      {legend ? <div className="px-5 pb-4">{legend}</div> : null}
+      {legend ? <div className="px-6 pb-4">{legend}</div> : null}
 
       {/* A flex column, so a chart that wants the figure's full height (the
           trend line, in a two-up row) can take it with `flex-1`. */}
-      <div id={panelId} className="flex min-w-0 flex-1 flex-col px-5 pb-5">
+      <div id={panelId} className="flex min-w-0 flex-1 flex-col px-6 pb-5">
         {view === "chart" ? (
           children
         ) : (
@@ -95,7 +95,7 @@ export function Figure({
             variants={fadeIn}
             initial="hidden"
             animate="show"
-            className="overflow-x-auto"
+            className="relative overflow-x-auto"
           >
             {table}
           </motion.div>
@@ -103,7 +103,7 @@ export function Figure({
       </div>
 
       {footnote ? (
-        <footer className="rounded-b-xl border-t border-border bg-muted/40 px-5 py-3.5 text-[13px] leading-relaxed text-muted-foreground">
+        <footer className="rounded-b-xl border-t border-border bg-muted/40 px-6 py-3.5 text-sm leading-relaxed text-muted-foreground">
           {footnote}
         </footer>
       ) : null}
@@ -134,9 +134,9 @@ function ViewButton({
       aria-pressed={active}
       aria-controls={controls}
       className={cn(
-        "relative flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+        "relative flex items-center gap-1.5 rounded-sm px-2.5 py-1.5 text-sm font-medium outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
         active
-          ? "text-foreground"
+          ? "text-primary-foreground"
           : "text-muted-foreground hover:text-foreground",
       )}
     >
@@ -145,7 +145,7 @@ function ViewButton({
           layoutId={pillId}
           transition={transition.layout}
           aria-hidden
-          className="absolute inset-0 rounded-md bg-card shadow-card ring-1 ring-foreground/10"
+          className="absolute inset-0 rounded-sm bg-foreground"
         />
       ) : null}
       <span className="relative flex items-center gap-1.5">
@@ -177,7 +177,7 @@ export function Legend({
   return (
     <ul className={cn("flex flex-wrap items-center gap-x-5 gap-y-1.5", className)}>
       {items.map((item) => (
-        <li key={item.label} className="flex items-center gap-2 text-xs">
+        <li key={item.label} className="flex items-center gap-2 text-sm">
           <span
             aria-hidden
             className={cn(
@@ -187,8 +187,8 @@ export function Legend({
                 : item.shape === "dot"
                   ? "size-2.5 rounded-full"
                   : item.wide
-                    ? "h-2.5 w-7 rounded-[2px]"
-                    : "size-2.5 rounded-[2px]",
+                    ? "h-3 w-7 rounded-[2px]"
+                    : "size-3 rounded-[2px]",
             )}
             style={{ background: item.color }}
           />
@@ -211,9 +211,9 @@ export function FigureTable({
   children: ReactNode;
 }) {
   return (
-    <table className="w-full text-xs">
+    <table className="w-full text-sm">
       <thead>
-        <tr className="border-b border-border text-left text-muted-foreground">
+        <tr className="border-b border-border text-left text-xs text-muted-foreground">
           {head}
         </tr>
       </thead>

@@ -1,10 +1,8 @@
 import { Link } from "react-router-dom";
-import { motion } from "motion/react";
 import type { Flag, Outcome } from "@/api/types";
 import { SeverityChip } from "@/components/common/SeverityChip";
 import { EmptyState } from "@/components/common/States";
 import { daysAgo } from "@/lib/format";
-import { fadeUp, stagger } from "@/lib/motion";
 import { detectorLabel } from "@/lib/severity";
 
 const OUTCOME: Record<Outcome, { label: string; severity: "improving" | "critical" | "watch" }> =
@@ -21,6 +19,11 @@ const OUTCOME: Record<Outcome, { label: string; severity: "improving" | "critica
  * Deliberately quieter than the triage table above it — no card shadow, no
  * actions, smaller type. Nothing here asks the director to do anything; the
  * outcome chip is the only thing on a row meant to be read from a distance.
+ *
+ * Its last column has a fixed width. Each row is its own grid, so an
+ * `auto`-width column took the width of its own chip — "Recovered" is narrower
+ * than "Outcome unknown" — and the sentence column began somewhere different on
+ * every row.
  */
 export function ClosedLoopPanel({ flags }: { flags: Flag[] }) {
   if (!flags.length) {
@@ -33,22 +36,16 @@ export function ClosedLoopPanel({ flags }: { flags: Flag[] }) {
   }
 
   return (
-    <motion.ul
-      variants={stagger(0.04)}
-      initial="hidden"
-      animate="show"
-      className="divide-y divide-border overflow-hidden rounded-xl bg-muted/25 ring-1 ring-border"
-    >
+    <ul className="divide-y divide-border overflow-hidden rounded-xl bg-muted/25 ring-1 ring-border">
       {flags.map((flag) => {
         const outcome =
           flag.outcome && flag.outcome in OUTCOME
             ? OUTCOME[flag.outcome as Outcome]
             : OUTCOME.unknown;
         return (
-          <motion.li
+          <li
             key={flag.id}
-            variants={fadeUp}
-            className="grid gap-x-6 gap-y-1.5 px-5 py-3.5 transition-colors duration-150 hover:bg-muted/40 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] sm:items-center"
+            className="grid gap-x-6 gap-y-1.5 px-5 py-3.5 transition-colors duration-150 hover:bg-muted/40 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_15rem] sm:items-center"
           >
             <div className="min-w-0">
               <Link
@@ -57,23 +54,22 @@ export function ClosedLoopPanel({ flags }: { flags: Flag[] }) {
               >
                 {flag.student_name}
               </Link>
-              <div className="text-xs text-muted-foreground">
-                {flag.batch_name} · {detectorLabel(flag.type)}
+              <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                <span>{flag.batch_name}</span>
+                <span>{detectorLabel(flag.type)}</span>
               </div>
             </div>
-            <p className="text-[13px] leading-snug text-muted-foreground">
-              {flag.headline}
-            </p>
+            <p className="text-sm leading-snug text-muted-foreground">{flag.headline}</p>
             <div className="flex items-center gap-3 sm:justify-end">
               <SeverityChip severity={outcome.severity} label={outcome.label} />
               <span className="text-xs whitespace-nowrap text-muted-foreground sm:w-20 sm:text-right">
                 closed {daysAgo(flag.resolved_at)}
               </span>
             </div>
-          </motion.li>
+          </li>
         );
       })}
-    </motion.ul>
+    </ul>
   );
 }
 

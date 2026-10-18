@@ -12,9 +12,8 @@ import {
   Hand,
   Lock,
   Minus,
-  Quote,
   Scale,
-  Sparkles,
+  PenLine,
   Tag,
   UserCheck,
   X,
@@ -37,6 +36,7 @@ import {
   useQuestionsFor,
   useStudent,
 } from "@/api/queries";
+import { Bubble } from "@/components/brand/Bubble";
 import {
   ConfidenceMeter,
   EvidenceChip,
@@ -51,7 +51,7 @@ import {
 import { IdeaCard } from "@/components/explainer/IdeaCard";
 import { Pipeline, type PipelineStop } from "@/components/explainer/Pipeline";
 import { RuleBeam } from "@/components/explainer/RuleBeam";
-import { Accent, PageHeadline } from "@/components/kit/PageHeadline";
+import { PageHeadline } from "@/components/kit/PageHeadline";
 import { Reveal, RevealItem } from "@/components/kit/Reveal";
 import { Section } from "@/components/kit/Section";
 import { TextLink } from "@/components/kit/TextLink";
@@ -176,7 +176,7 @@ export function HowItWorks() {
               line: "Recorded and counted by the system. Exact, every time.",
             },
             {
-              icon: Sparkles,
+              icon: PenLine,
               title: "The AI",
               line: (
                 <>
@@ -296,7 +296,7 @@ export function HowItWorks() {
               n={3}
               id="step-reason"
               who="The AI"
-              icon={<Sparkles aria-hidden className="size-3.5" />}
+              icon={<PenLine aria-hidden className="size-3.5" />}
               title="The AI reads the pattern"
               promise="The line that matters is what he got right — because that is what narrows a weak chapter down to one fixable trigger."
               lede={
@@ -394,12 +394,10 @@ interface Ctx {
 function Intro({ ctx, pending }: { ctx: Ctx; pending: boolean }) {
   return (
     <PageHeadline
-      backdrop="hero"
       eyebrow="How it works"
       title={
         <>
-          The system counts. The AI explains.{" "}
-          <Accent gradient>A teacher decides.</Accent>
+          The system counts. The AI explains. A teacher decides.
         </>
       }
       support={
@@ -424,13 +422,13 @@ function Intro({ ctx, pending }: { ctx: Ctx; pending: boolean }) {
       }
       meta={
         <>
-          <span className="inline-flex items-start gap-1.5 rounded-lg border border-border bg-card/80 px-2.5 py-1.5 text-xs leading-snug text-muted-foreground">
-            <Database aria-hidden className="mt-px size-3.5 shrink-0" />
+          <span className="inline-flex items-start gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm leading-snug text-muted-foreground">
+            <Database aria-hidden className="mt-0.5 size-4 shrink-0" />
             {capitalise(ctx.who)} is one of this demo&rsquo;s simulated students,
             answering with a mistake pattern built in, and the paper is our own;
             the AI&rsquo;s diagnosis of that pattern is real.
           </span>
-          <TextLink to="/trust" arrow className="text-sm">
+          <TextLink to="/trust" className="text-sm">
             What&rsquo;s real and what&rsquo;s simulated
           </TextLink>
         </>
@@ -442,7 +440,7 @@ function Intro({ ctx, pending }: { ctx: Ctx; pending: boolean }) {
 const RAIL = [
   { id: "step-record", verb: "Record", who: "The system", icon: ClipboardList },
   { id: "step-count", verb: "Count", who: "Plain arithmetic", icon: Calculator },
-  { id: "step-reason", verb: "Explain", who: "The AI", icon: Sparkles },
+  { id: "step-reason", verb: "Explain", who: "The AI", icon: PenLine },
   { id: "step-check", verb: "Check", who: "A teacher", icon: UserCheck },
 ] as const;
 
@@ -466,7 +464,7 @@ function StepRail() {
                 step.id === "step-reason" ? "border-brand-line" : "border-border",
               )}
             >
-              <span className="tnum flex size-7 shrink-0 items-center justify-center rounded-full border border-foreground/25 text-xs font-semibold text-foreground">
+              <span className="tnum flex size-7 shrink-0 items-center justify-center rounded-sm border border-foreground/25 text-xs font-semibold text-foreground">
                 {i + 1}
               </span>
               <span className="min-w-0">
@@ -475,7 +473,7 @@ function StepRail() {
                 </span>
                 <span
                   className={cn(
-                    "flex items-center gap-1 text-[11px]",
+                    "flex items-center gap-1 text-xs",
                     step.id === "step-reason" ? "text-brand-ink" : "text-muted-foreground",
                   )}
                 >
@@ -526,10 +524,10 @@ function Step({
       <Reveal className="grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,8fr)] lg:gap-10">
         <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           <div className="flex items-center gap-2.5">
-            <span className="tnum flex size-7 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">
+            <span className="tnum flex size-7 items-center justify-center rounded-sm bg-foreground text-xs font-semibold text-background">
               {n}
             </span>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
               {icon}
               {who}
             </span>
@@ -540,7 +538,7 @@ function Step({
           >
             {title}
           </h2>
-          <p className="mt-3 max-w-prose border-l-2 border-brand pl-3 text-[0.9375rem] leading-relaxed font-medium text-foreground">
+          <p className="mt-3 max-w-prose border-l-2 border-brand pl-3 text-sm leading-relaxed font-medium text-foreground">
             {promise}
           </p>
           <div className="mt-3.5 max-w-prose space-y-2.5 text-sm leading-relaxed text-muted-foreground">
@@ -702,9 +700,8 @@ function pipelineStops({
               <Code>{tag.code}</Code> <Strong>{tag.name}</Strong>
             </p>
             {tag.description ? (
-              <blockquote className="mt-2.5 flex gap-2 text-muted-foreground">
-                <Quote aria-hidden className="mt-1 size-3.5 shrink-0" />
-                <span>{tag.description}</span>
+              <blockquote className="mt-2.5 border-l-2 border-foreground/30 pl-3 font-serif text-muted-foreground">
+                {tag.description}
               </blockquote>
             ) : null}
           </>
@@ -739,7 +736,7 @@ function pipelineStops({
             {repeat.questions.map((q) => (
               <span
                 key={q.questionId}
-                className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+                className="rounded-sm bg-muted px-1.5 py-0.5 text-xs font-semibold text-foreground"
               >
                 {q.label}
                 <span className="text-muted-foreground"> chose {q.chose}</span>
@@ -765,7 +762,7 @@ function pipelineStops({
       id: "judge",
       title: "Gemini's judgement",
       actor: "ai",
-      icon: Sparkles,
+      icon: PenLine,
       explain: (
         <>
           <p>
@@ -781,16 +778,15 @@ function pipelineStops({
       ),
       example: diagnosis ? (
         <>
-          <p className="font-semibold text-balance">
+          <p className="font-serif font-semibold text-balance">
             {diagnosis.headline || "No diagnosis text was returned for this paper."}
           </p>
           {lead?.counter_evidence ? (
-            <div className="mt-2.5 border-l-[3px] border-status-good pl-3">
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide uppercase">
-                <Scale aria-hidden className="size-3.5" />
+            <div className="mt-2.5 border-l-[3px] border-foreground pl-3">
+              <p className="text-xs font-semibold text-foreground">
                 The counter-evidence
               </p>
-              <p className="mt-1 text-muted-foreground">{lead.counter_evidence}</p>
+              <p className="mt-1 font-serif text-muted-foreground">{lead.counter_evidence}</p>
             </div>
           ) : null}
           {confirmed.length ? (
@@ -826,10 +822,10 @@ function pipelineStops({
       ),
       example: diagnosis?.recommended_action ? (
         <>
-          <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          <p className="text-xs font-semibold text-muted-foreground">
             The AI suggests
           </p>
-          <p className="mt-1">{diagnosis.recommended_action}</p>
+          <p className="mt-1 font-serif">{diagnosis.recommended_action}</p>
           {band ? (
             <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock aria-hidden className="size-3.5" />
@@ -904,17 +900,17 @@ function Strong({ children }: { children: ReactNode }) {
 
 function Code({ children }: { children: ReactNode }) {
   return (
-    <code className="rounded border border-border bg-muted px-1 py-px font-mono text-[11px] text-foreground">
+    <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs font-semibold tracking-wide text-foreground">
       {children}
-    </code>
+    </span>
   );
 }
 
 /** One answer-sheet cell, in words and an icon — never the tint alone. */
 function SheetMark({ row }: { row: Attempt }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded border border-border bg-background px-1.5 py-0.5">
-      <span className="tnum font-mono text-[11px] text-foreground">{row.question_id}</span>
+    <span className="inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 font-semibold">
+      <span className="tnum text-xs text-foreground">{row.question_id}</span>
       {row.status === "correct" ? (
         <Check aria-hidden className="size-3.5 text-status-good" />
       ) : (
@@ -969,7 +965,7 @@ function KeyIdeas({
                           +
                         </span>
                       ) : null}
-                      <span className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+                      <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs font-semibold text-foreground">
                         {row.label}
                         <span className="text-muted-foreground"> {num(row.marks_at_stake)}</span>
                       </span>
@@ -1114,33 +1110,54 @@ function RecordExhibit({
 
 const STATUS_MARK: Record<
   Attempt["status"],
-  { icon: typeof Check; word: string; cell: string; ink: string }
+  { icon: typeof Check; word: string; cell: string; ink: string; mark: string }
 > = {
+  // A tick in a ring: the way a teacher marks a right answer.
   correct: {
     icon: Check,
     word: "right",
     cell: "border-border bg-background",
     ink: "text-status-good",
+    mark: "border-[1.5px] border-foreground text-status-good",
   },
+  // A cross in a filled disc: the one mark on the sheet that is meant to catch
+  // the eye, because a wrong answer is what this page is about.
   wrong: {
     icon: X,
     word: "wrong",
     cell: "border-status-critical/45 bg-status-critical/[0.07]",
     ink: "text-status-critical",
+    mark: "border-[1.5px] border-status-critical bg-status-critical text-card",
   },
   blank: {
     icon: Minus,
     word: "skipped",
     cell: "border-dashed border-border bg-muted/40",
     ink: "text-muted-foreground",
+    mark: "border-[1.5px] border-dashed border-muted-foreground text-muted-foreground",
   },
   not_reached: {
     icon: Clock,
     word: "not reached",
     cell: "border-dashed border-border bg-muted/40",
     ink: "text-muted-foreground",
+    mark: "border-[1.5px] border-dashed border-muted-foreground text-muted-foreground",
   },
 };
+
+/** The sheet's mark for one status — round, because it is a judgement on an answer. */
+function SheetDot({ status }: { status: Attempt["status"] }) {
+  const mark = STATUS_MARK[status];
+  const Icon = mark.icon;
+  return (
+    <span
+      aria-hidden
+      className={cn("grid size-4.5 shrink-0 place-items-center rounded-full", mark.mark)}
+    >
+      <Icon className="size-3" strokeWidth={3} />
+    </span>
+  );
+}
 
 /**
  * Every question on the paper, one cell each.
@@ -1161,22 +1178,21 @@ function AnswerSheet({ rows, highlight }: { rows: Attempt[]; highlight?: string 
       >
         {rows.map((row) => {
           const mark = STATUS_MARK[row.status];
-          const Icon = mark.icon;
           const ringed = row.question_id === highlight;
           return (
             <li
               key={row.id}
               title={`${row.question_id} · ${row.topic_name} · ${mark.word}${row.time_spent != null ? ` · ${row.time_spent}s` : ""}`}
               className={cn(
-                "flex h-10 flex-col items-center justify-center rounded-md border",
+                "flex h-12 flex-col items-center justify-center gap-1 rounded-md border",
                 mark.cell,
                 ringed && "ring-2 ring-foreground ring-offset-1 ring-offset-card",
               )}
             >
-              <span className="tnum font-mono text-[10px] leading-none text-muted-foreground">
+              <span className="tnum text-xs leading-none font-medium text-muted-foreground">
                 {row.question_id}
               </span>
-              <Icon aria-hidden className={cn("mt-1 size-3.5", mark.ink)} />
+              <SheetDot status={row.status} />
               <span className="sr-only">
                 {`${row.topic_name}: ${mark.word}`}
                 {ringed ? " — opened below" : ""}
@@ -1205,10 +1221,9 @@ function SheetLegend({ tally }: { tally: SheetTally }) {
         .filter((item) => item.n > 0 || item.status !== "not_reached")
         .map((item) => {
           const mark = STATUS_MARK[item.status];
-          const Icon = mark.icon;
           return (
-            <span key={item.status} className="inline-flex items-center gap-1">
-              <Icon aria-hidden className={cn("size-3.5", mark.ink)} />
+            <span key={item.status} className="inline-flex items-center gap-1.5">
+              <SheetDot status={item.status} />
               <span className="tnum font-medium text-foreground">{num(item.n)}</span>{" "}
               {mark.word}
             </span>
@@ -1225,11 +1240,11 @@ function AnswerRecord({ question, who }: { question: QuestionDetail; who: string
     <div>
       <Eyebrow>
         One answer, as the system stores it ·{" "}
-        <span className="font-mono normal-case tracking-normal text-foreground">
+        <span className="font-semibold text-foreground">
           {question.label}
         </span>
       </Eyebrow>
-      <p className="mt-2 max-w-[60ch] text-sm leading-relaxed font-medium text-foreground">
+      <p className="mt-2 max-w-[60ch] font-serif text-base leading-relaxed text-foreground">
         {question.question_text || "This question has no text on file."}
       </p>
 
@@ -1240,31 +1255,27 @@ function AnswerRecord({ question, who }: { question: QuestionDetail; who: string
             <li
               key={option.label}
               className={cn(
-                "flex flex-wrap items-baseline gap-x-2.5 gap-y-1 rounded-md border px-2.5 py-1.5 text-sm",
+                "flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-md px-2.5 py-2 text-sm",
                 option.is_correct
-                  ? "border-status-good/45 bg-status-good/[0.06]"
+                  ? "bg-status-good/8"
                   : picked
-                    ? "border-status-critical/45 bg-status-critical/[0.06]"
-                    : "border-border",
+                    ? "bg-status-critical/8"
+                    : undefined,
               )}
             >
-              <span
-                aria-hidden
-                className={cn(
-                  "tnum flex size-5 shrink-0 items-center justify-center self-center rounded border font-mono text-[10px] font-semibold",
-                  picked
-                    ? "border-transparent bg-foreground text-background"
-                    : "border-border bg-muted text-muted-foreground",
-                )}
-              >
-                {option.label}
-              </span>
-              <span className="min-w-0 flex-1 text-foreground">
+              <Bubble
+                letter={option.label}
+                filled={picked}
+                ringed={option.is_correct}
+                size="sm"
+                className="self-center"
+              />
+              <span className="min-w-0 flex-1 font-serif text-base text-foreground">
                 <span className="sr-only">Option {option.label}: </span>
                 {option.text}
               </span>
               {option.is_correct ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold tracking-wide text-status-good uppercase">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-status-good">
                   <Check aria-hidden className="size-3.5" />
                   Correct
                 </span>
@@ -1272,7 +1283,7 @@ function AnswerRecord({ question, who }: { question: QuestionDetail; who: string
               {picked ? (
                 <span
                   className={cn(
-                    "inline-flex items-center gap-1 text-[11px] font-semibold tracking-wide uppercase",
+                    "inline-flex items-center gap-1 text-xs font-semibold",
                     option.is_correct ? "text-foreground" : "text-status-critical",
                   )}
                 >
@@ -1281,11 +1292,11 @@ function AnswerRecord({ question, who }: { question: QuestionDetail; who: string
                 </span>
               ) : null}
               {option.misconception ? (
-                <span className="basis-full pl-7.5 text-xs text-muted-foreground">
+                <span className="basis-full pl-8 text-xs text-muted-foreground">
                   Labelled in advance:{" "}
-                  <code className="rounded border border-border bg-muted px-1 py-px font-mono text-[10px] text-foreground">
+                  <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs font-semibold tracking-wide text-foreground">
                     {option.misconception.code}
-                  </code>{" "}
+                  </span>{" "}
                   {option.misconception.name}
                 </span>
               ) : null}
@@ -1321,7 +1332,7 @@ function RecordField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="tnum font-mono text-sm font-medium text-foreground">{value}</dd>
+      <dd className="tnum text-sm font-medium text-foreground">{value}</dd>
     </div>
   );
 }
@@ -1505,7 +1516,7 @@ function ChapterLosses({ marksLost }: { marksLost: MarksLost }) {
         ))}
       </ul>
       {rest > 0 ? (
-        <p className="mt-1.5 text-[11px] text-muted-foreground">
+        <p className="mt-1.5 text-xs text-muted-foreground">
           and {plural(rest, "more chapter")}
         </p>
       ) : null}
@@ -1541,9 +1552,9 @@ function Repeats({
           {repeats.map((entry) => (
             <li key={entry.misconception.code} className="text-xs leading-relaxed">
               <p className="text-foreground">
-                <code className="rounded border border-border bg-muted px-1 py-px font-mono text-[10px]">
+                <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs font-semibold tracking-wide text-foreground">
                   {entry.misconception.code}
-                </code>{" "}
+                </span>{" "}
                 <span className="font-medium">{entry.misconception.name}</span>
                 <span className="text-muted-foreground">
                   {" "}
@@ -1554,7 +1565,7 @@ function Repeats({
                 {entry.questions.map((q) => (
                   <span
                     key={q.questionId}
-                    className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+                    className="rounded-sm bg-muted px-1.5 py-0.5 text-xs font-semibold text-foreground"
                   >
                     {q.label}
                     <span className="text-muted-foreground"> chose {q.chose}</span>
@@ -1563,7 +1574,7 @@ function Repeats({
               </p>
             </li>
           ))}
-          <li className="text-[11px] leading-relaxed text-muted-foreground">
+          <li className="text-xs leading-relaxed text-muted-foreground">
             Read from the label on the option he chose, one question at a time —
             over the answers the diagnosis cites.
             {unchecked > 0
@@ -1633,31 +1644,40 @@ function ReasonExhibit({
         <ExhibitSkeleton lines={6} />
       ) : (
         <div>
-          <p className="max-w-[48ch] text-lg leading-snug font-semibold tracking-tight text-balance text-foreground sm:text-xl">
+          <p className="max-w-[40ch] font-serif text-2xl leading-[1.15] font-semibold tracking-tight text-balance text-foreground">
             {diagnosis.headline || "No diagnosis text was returned for this paper."}
           </p>
 
           {lead ? (
             <>
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                <code className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-foreground">
+                <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs font-semibold tracking-wide text-foreground">
                   {lead.misconception_code}
-                </code>
+                </span>
                 <ConfidenceMeter level={lead.confidence} />
               </div>
-              <p className="mt-2 max-w-prose text-sm leading-relaxed text-foreground">
+              <p className="mt-3 max-w-prose font-serif text-base leading-relaxed text-foreground">
                 {lead.claim}
               </p>
 
               {lead.counter_evidence ? (
-                <div className="mt-4 border-l-[3px] border-status-good bg-status-good/[0.07] py-3 pr-3.5 pl-3.5">
-                  <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-foreground uppercase">
-                    <Scale aria-hidden className="size-3.5" />
+                <div className="mt-5 border-l-[3px] border-foreground pl-5">
+                  <p className="flex items-center gap-2.5 text-sm font-semibold text-foreground">
+                    <span
+                      aria-hidden
+                      className="inline-grid size-5 place-items-center rounded-full border-[1.5px] border-foreground"
+                    >
+                      {counterEvidenceNarrows(lead.counter_evidence) ? (
+                        <Check className="size-3" strokeWidth={3} />
+                      ) : (
+                        <Minus className="size-3" strokeWidth={3} />
+                      )}
+                    </span>
                     {counterEvidenceNarrows(lead.counter_evidence)
                       ? "Why it’s one trigger, not a weak chapter"
                       : "Not narrowed to one trigger yet"}
                   </p>
-                  <p className="mt-1.5 max-w-prose text-[0.9375rem] leading-relaxed text-foreground">
+                  <p className="mt-2 max-w-prose font-serif text-lg leading-relaxed text-foreground">
                     {lead.counter_evidence}
                   </p>
                   {confirmed.length ? (
@@ -1668,9 +1688,9 @@ function ReasonExhibit({
                       {confirmed.map((row) => (
                         <span
                           key={row.id}
-                          className="inline-flex items-center gap-1 rounded border border-border bg-background px-1.5 py-0.5"
+                          className="inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 font-semibold"
                         >
-                          <span className="tnum font-mono text-[11px] text-foreground">
+                          <span className="tnum text-xs text-foreground">
                             {row.question_id}
                           </span>
                           {row.status === "correct" ? (
@@ -1695,18 +1715,13 @@ function ReasonExhibit({
             </p>
           )}
 
-          <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <p className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
             {diagnosis.total_marks_at_stake > 0 ? (
               <span>
                 <span className="tnum font-semibold text-foreground">
                   {num(diagnosis.total_marks_at_stake)} marks
                 </span>{" "}
                 at stake
-              </span>
-            ) : null}
-            {diagnosis.total_marks_at_stake > 0 && band ? (
-              <span aria-hidden className="text-border">
-                ·
               </span>
             ) : null}
             {band ? (
@@ -1716,15 +1731,10 @@ function ReasonExhibit({
               </span>
             ) : null}
             {diagnosis.hypotheses.length > 1 ? (
-              <>
-                <span aria-hidden className="text-border">
-                  ·
-                </span>
-                <span>
-                  {plural(diagnosis.hypotheses.length - 1, "more finding")} on{" "}
-                  {ctx.who}&rsquo;s page
-                </span>
-              </>
+              <span>
+                {plural(diagnosis.hypotheses.length - 1, "more finding")} on{" "}
+                {ctx.who}&rsquo;s page
+              </span>
             ) : null}
           </p>
         </div>
@@ -1811,18 +1821,17 @@ function CheckExhibit({
           {spotlight && belief ? (
             <section
               aria-labelledby="explainer-belief"
-              className="rounded-lg border border-foreground/20 bg-muted/40 px-4 py-3.5"
+              className="border-l-[3px] border-foreground pl-5"
             >
               <h3
                 id="explainer-belief"
-                className="text-[11px] font-semibold tracking-[0.06em] text-foreground uppercase"
+                className="text-sm font-semibold text-foreground"
               >
                 The belief behind choosing ({spotlight.chosen_label ?? "?"}) on{" "}
                 {spotlight.label}
               </h3>
-              <blockquote className="mt-2 flex gap-2.5">
-                <Quote aria-hidden className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                <p className="max-w-[56ch] text-[0.9375rem] leading-relaxed text-foreground">
+              <blockquote className="mt-2">
+                <p className="max-w-[56ch] font-serif text-lg leading-relaxed text-foreground">
                   {belief.description}
                 </p>
               </blockquote>
@@ -1836,7 +1845,7 @@ function CheckExhibit({
           {diagnosis.recommended_action ? (
             <div>
               <Eyebrow>The one action the AI suggests</Eyebrow>
-              <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-foreground">
+              <p className="mt-1.5 max-w-prose font-serif text-base leading-relaxed text-foreground">
                 {diagnosis.recommended_action}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -1848,7 +1857,7 @@ function CheckExhibit({
 
           <VerdictLoop diagnosis={diagnosis} />
 
-          <TextLink to={`/students/${ctx.studentId}`} arrow className="text-sm">
+          <TextLink to={`/students/${ctx.studentId}`} className="text-sm">
             Agree or disagree on {ctx.who}&rsquo;s page
           </TextLink>
         </div>
@@ -1956,21 +1965,19 @@ function NextSteps({ studentId, who }: { studentId: number; who: string }) {
 function NextLink({ to, title, body }: { to: string; title: string; body: string }) {
   return (
     <motion.div {...hoverLift} className="rounded-xl">
-    <Link
-      to={to}
-      className="group flex h-full items-start justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3.5 shadow-card transition-shadow outline-none hover:shadow-raised focus-visible:ring-3 focus-visible:ring-ring/50"
-    >
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold text-foreground">{title}</span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-          {body}
+      <Link
+        to={to}
+        className="group flex h-full items-start justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-card transition-shadow outline-none hover:shadow-raised focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-foreground underline decoration-transparent underline-offset-4 transition-colors group-hover:decoration-foreground/40">
+            {title}
+          </span>
+          <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">
+            {body}
+          </span>
         </span>
-      </span>
-      <ArrowRight
-        aria-hidden
-        className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-      />
-    </Link>
+      </Link>
     </motion.div>
   );
 }

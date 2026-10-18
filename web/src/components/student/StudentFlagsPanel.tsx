@@ -31,15 +31,13 @@ export function StudentFlagsPanel({
         >
           <div className="flex flex-wrap items-center gap-2">
             <SeverityChip severity={flag.severity} />
-            <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-              {detectorLabel(flag.type)}
-            </span>
+            <span className="text-sm text-muted-foreground">{detectorLabel(flag.type)}</span>
             <span className="ml-auto text-xs text-muted-foreground">
               {daysAgo(flag.raised_at)}
             </span>
           </div>
 
-          <p className="mt-2.5 text-[15px] leading-snug font-medium text-foreground">
+          <p className="mt-2.5 text-sm leading-snug font-medium text-foreground">
             {flag.headline}
           </p>
 
@@ -48,8 +46,9 @@ export function StudentFlagsPanel({
           </div>
 
           <div className="mt-4 flex items-center justify-between gap-2">
-            <span className="truncate text-xs text-muted-foreground">
-              {flag.topic_name} · {flag.mentor_name}
+            <span className="flex min-w-0 flex-wrap gap-x-3 text-xs text-muted-foreground">
+              <span className="truncate">{flag.topic_name}</span>
+              <span className="truncate">{flag.mentor_name}</span>
             </span>
             <Button size="sm" variant="outline" onClick={() => onIntervene(flag)}>
               Log intervention

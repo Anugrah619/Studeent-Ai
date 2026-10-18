@@ -46,9 +46,9 @@ export interface KpiCardProps {
   delta?: KpiDelta;
   caption?: ReactNode;
   /**
-   * Status of the figure. Shown as a rail, an icon and — when given —
-   * `toneLabel` in words. Uses the reserved status colours, so only for a
-   * real judgement about the number, never for decoration.
+   * Status of the figure. Shown as an icon and — when given — `toneLabel` in
+   * words. Uses the reserved status colours, so only for a real judgement
+   * about the number, never for decoration.
    */
   tone?: KpiTone;
   toneLabel?: string;
@@ -58,6 +58,18 @@ export interface KpiCardProps {
   badge?: ReactNode;
   /** `hero` is the ONE figure a screen leads with: 48px and up. */
   size?: "default" | "hero";
+  /**
+   * `card` is a sheet of its own. `cell` is one compartment of a `FigureBand`:
+   * no border, no shadow, no corners — the band is the sheet and the one-pixel
+   * gaps between cells are the rules.
+   */
+  variant?: "card" | "cell";
+  /**
+   * Count up from zero the first time the figure is seen. Off by default: a
+   * screen gets one moment of motion, and a row of six figures all rolling in
+   * at once is six. Spend it on the figure the screen leads with.
+   */
+  animate?: boolean;
   loading?: boolean;
   /** Native tooltip on the whole card. */
   hint?: string;
@@ -69,26 +81,20 @@ export interface KpiCardProps {
 
 const TONES: Record<
   Exclude<KpiTone, "neutral">,
-  { icon: LucideIcon; text: string; rail: string; chip: string; name: string }
+  { icon: LucideIcon; chip: string; name: string }
 > = {
   good: {
     icon: CircleCheck,
-    text: "text-status-good",
-    rail: "bg-status-good",
     chip: "bg-status-good/10 text-status-good ring-status-good/25",
     name: "good",
   },
   warn: {
     icon: AlertTriangle,
-    text: "text-status-warn",
-    rail: "bg-status-warn",
     chip: "bg-status-warn/10 text-status-warn ring-status-warn/25",
     name: "needs attention",
   },
   critical: {
     icon: OctagonAlert,
-    text: "text-status-critical",
-    rail: "bg-status-critical",
     chip: "bg-status-critical/10 text-status-critical ring-status-critical/25",
     name: "critical",
   },
@@ -112,6 +118,10 @@ const DELTA_ICON = {
  *
  * Figures line up across a row because every card puts the label first and
  * the figure directly under it, and pushes the caption to the bottom.
+ *
+ * Status is the chip — an icon and a word — and nothing else. It used to be
+ * that plus a coloured rail down the card's left edge, which said the same
+ * thing a third time in a colour the chip already carries.
  */
 export function KpiCard({
   label,
@@ -129,6 +139,8 @@ export function KpiCard({
   trend,
   badge,
   size = "default",
+  variant = "card",
+  animate = false,
   loading,
   hint,
   to,
@@ -136,34 +148,16 @@ export function KpiCard({
   className,
 }: KpiCardProps) {
   const hero = size === "hero";
+  const cell = variant === "cell";
   const t = tone === "neutral" ? null : TONES[tone];
   const captionText = caption ?? delta?.caption;
   const DeltaIcon = delta?.direction ? DELTA_ICON[delta.direction] : null;
 
-  const card = (
-    <Card
-      title={hint}
-      className={cn(
-        "relative h-full min-w-0 gap-0 py-0",
-        to && "transition-shadow duration-200 group-hover/kpi:shadow-raised",
-        className,
-      )}
-    >
-      {t ? (
-        <span
-          aria-hidden
-          className={cn("absolute inset-y-3 left-0 w-[3px] rounded-r-full", t.rail)}
-        />
-      ) : null}
-
-      <div className={cn("flex flex-1 flex-col", hero ? "p-5" : "p-4")}>
+  const body = (
+    <>
+      <div className={cn("flex flex-1 flex-col", hero ? "p-6" : "px-5 py-4")}>
         <div className="flex min-h-6 items-start justify-between gap-2">
-          <span
-            className={cn(
-              "pt-0.5 font-medium text-muted-foreground",
-              hero ? "text-sm" : "text-[13px] leading-snug",
-            )}
-          >
+          <span className="pt-0.5 text-xs font-medium text-muted-foreground">
             {label}
           </span>
           {t || badge || trend ? (
@@ -171,11 +165,11 @@ export function KpiCard({
               {t ? (
                 <span
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
+                    "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset",
                     t.chip,
                   )}
                 >
-                  <t.icon aria-hidden className="size-3" />
+                  <t.icon aria-hidden className="size-3.5" />
                   {toneLabel ?? <span className="sr-only">{t.name}</span>}
                 </span>
               ) : null}
@@ -186,7 +180,7 @@ export function KpiCard({
         </div>
 
         {loading ? (
-          <Skeleton className={cn("mt-3", hero ? "h-14 w-28" : "h-8 w-20")} />
+          <Skeleton className={cn("mt-3", hero ? "h-14 w-28" : "h-9 w-24")} />
         ) : (
           <div
             className={cn(
@@ -197,7 +191,7 @@ export function KpiCard({
             <span
               className={cn(
                 "leading-none font-semibold tracking-tight text-foreground",
-                hero ? "text-5xl sm:text-6xl" : "text-[30px]",
+                hero ? "text-5xl" : "text-3xl",
               )}
             >
               {display !== undefined ? (
@@ -209,6 +203,7 @@ export function KpiCard({
                   digits={digits}
                   prefix={prefix}
                   suffix={suffix}
+                  animateOnMount={animate}
                 />
               )}
             </span>
@@ -220,11 +215,11 @@ export function KpiCard({
             {delta ? (
               <span
                 className={cn(
-                  "inline-flex items-center gap-0.5 text-xs font-semibold",
+                  "inline-flex items-center gap-0.5 text-sm font-semibold",
                   DELTA_TEXT[delta.tone],
                 )}
               >
-                {DeltaIcon ? <DeltaIcon aria-hidden className="size-3.5" /> : null}
+                {DeltaIcon ? <DeltaIcon aria-hidden className="size-4" /> : null}
                 {delta.text}
               </span>
             ) : null}
@@ -246,10 +241,34 @@ export function KpiCard({
       </div>
 
       {footer ? (
-        <div className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+        <div className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
           {footer}
         </div>
       ) : null}
+    </>
+  );
+
+  if (cell) {
+    return (
+      <div
+        title={hint}
+        className={cn("relative flex h-full min-w-0 flex-col bg-card", className)}
+      >
+        {body}
+      </div>
+    );
+  }
+
+  const card = (
+    <Card
+      title={hint}
+      className={cn(
+        "relative h-full min-w-0 gap-0 py-0",
+        to && "transition-shadow duration-200 group-hover/kpi:shadow-raised",
+        className,
+      )}
+    >
+      {body}
     </Card>
   );
 

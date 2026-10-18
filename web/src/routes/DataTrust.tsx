@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import {
-  ArrowRight,
   BookOpen,
   Building2,
   Calculator,
@@ -14,7 +13,7 @@ import {
   Lock,
   Minus,
   ShieldCheck,
-  Sparkles,
+  PenLine,
   UserRound,
   X,
 } from "lucide-react";
@@ -44,7 +43,7 @@ import {
 } from "@/components/explainer/importRecords";
 import { AnimatedNumber } from "@/components/kit/AnimatedNumber";
 import { KpiCard } from "@/components/kit/KpiCard";
-import { Accent, PageHeadline } from "@/components/kit/PageHeadline";
+import { PageHeadline } from "@/components/kit/PageHeadline";
 import { Reveal, RevealItem } from "@/components/kit/Reveal";
 import { Section } from "@/components/kit/Section";
 import {
@@ -95,12 +94,11 @@ export function DataTrust() {
   return (
     <div className="pb-6">
       <PageHeadline
-        backdrop="grid"
         eyebrow="Data & trust"
         title={
           <>
-            What&rsquo;s real, what&rsquo;s simulated, and{" "}
-            <Accent gradient>how each claim can be checked</Accent>
+            What&rsquo;s real, what&rsquo;s simulated, and how each claim can be
+            checked
           </>
         }
         support={
@@ -115,12 +113,12 @@ export function DataTrust() {
         }
         meta={
           <nav aria-label="On this page">
-            <ol className="flex flex-wrap gap-1.5 text-xs">
+            <ol className="flex flex-wrap gap-2 text-sm">
               {QUESTIONS.map((q) => (
                 <li key={q.id}>
                   <a
                     href={`#${q.id}`}
-                    className="inline-flex rounded-full border border-border bg-card/80 px-2.5 py-1 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                    className="inline-flex rounded-sm border border-border bg-card px-2.5 py-1 text-muted-foreground transition-colors outline-none hover:border-foreground/40 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
                     {q.ask}
                   </a>
@@ -320,21 +318,17 @@ export function DataTrust() {
         <motion.div {...hoverLift} className="inline-block rounded-xl">
           <Link
             to="/how-it-works"
-            className="group inline-flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3.5 shadow-card transition-shadow outline-none hover:shadow-raised focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="group inline-flex items-start gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-card transition-shadow outline-none hover:shadow-raised focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <span>
-              <span className="block text-sm font-semibold text-foreground">
+              <span className="block text-sm font-semibold text-foreground underline decoration-transparent underline-offset-4 group-hover:decoration-foreground/40">
                 How it works
               </span>
-              <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+              <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
                 The four steps from an answer sheet to a teaching decision, on one
                 worked example.
               </span>
             </span>
-            <ArrowRight
-              aria-hidden
-              className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-            />
           </Link>
         </motion.div>
       </nav>
@@ -534,8 +528,8 @@ function Question({
     >
       <Reveal className="grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-10">
         <div className="min-w-0">
-          <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.06em] text-brand-ink uppercase">
-            <Icon aria-hidden className="size-3.5" />
+          <p className="inline-flex items-center gap-2 text-sm font-semibold text-brand-ink">
+            <Icon aria-hidden className="size-4" />
             {ask}
           </p>
           <h2
@@ -550,7 +544,7 @@ function Question({
           {more ? (
             <Accordion type="single" collapsible className="mt-2 max-w-prose">
               <AccordionItem value="more">
-                <AccordionTrigger className="py-2 text-xs text-foreground">
+                <AccordionTrigger className="py-2 text-sm text-foreground">
                   Why we label it this way
                 </AccordionTrigger>
                 <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
@@ -590,7 +584,7 @@ const STATUS: Record<Status, { label: string; icon: typeof Check; tone: string }
   },
   real: {
     label: "Real",
-    icon: Sparkles,
+    icon: PenLine,
     tone: "border-status-good/45 bg-status-good/[0.08] text-foreground",
   },
   not_yet: {
@@ -777,7 +771,7 @@ function ProvenanceExhibit({
             here
           </caption>
           <thead>
-            <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
+            <tr className="border-b border-border text-left text-xs text-muted-foreground">
               <th scope="col" className="pr-3 pb-2 font-medium">
                 What
               </th>
@@ -821,7 +815,7 @@ function StatusChip({ status }: { status: Status }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
         tone,
       )}
     >
@@ -928,7 +922,7 @@ function BookCard({
 function AnswerKeyExhibit() {
   const steps = [
     {
-      icon: Sparkles,
+      icon: PenLine,
       title: "The AI solves it alone",
       body: "Each past-paper question, answered without the key in sight.",
       state: "Done",
@@ -996,13 +990,13 @@ function AnswerKeyExhibit() {
                   grows once, as a transform, so reduced motion makes it instant. */}
               <motion.div
                 aria-hidden
-                className="mt-2 h-2 overflow-hidden rounded-full bg-foreground/8"
+                className="mt-2 h-2 overflow-hidden rounded-sm bg-foreground/8"
                 initial="hidden"
                 whileInView="show"
                 viewport={{ once: true, amount: 0.5 }}
               >
                 <motion.div
-                  className="h-full origin-left rounded-full bg-foreground/55"
+                  className="h-full origin-left rounded-sm bg-foreground/55"
                   style={{ width: `${share}%` }}
                   variants={{
                     hidden: { scaleX: 0 },
@@ -1028,7 +1022,7 @@ function AnswerKeyExhibit() {
               {/* Decorative: the list itself carries the order. */}
               <span
                 aria-hidden
-                className="tnum flex size-5 shrink-0 items-center justify-center rounded-full border border-foreground/25 text-[10px] font-semibold"
+                className="tnum flex size-5 shrink-0 items-center justify-center rounded-sm border border-foreground/25 text-xs font-semibold"
               >
                 {i + 1}
               </span>
@@ -1037,7 +1031,7 @@ function AnswerKeyExhibit() {
             <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{step.body}</p>
             <p
               className={cn(
-                "mt-2 inline-flex items-center gap-1 text-[11px] font-medium",
+                "mt-2 inline-flex items-center gap-1 text-xs font-medium",
                 step.done ? "text-status-good" : "text-muted-foreground",
               )}
             >
@@ -1193,7 +1187,7 @@ function InstituteBox({ name, yours }: { name: string; yours?: boolean }) {
         <Building2 className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="truncate">{name}</span>
       </p>
-      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">
         {yours ? "Its students, answers and diagnoses" : "Never visible from yours"}
       </p>
     </div>
@@ -1250,10 +1244,12 @@ function MathsExhibit({
         <div className="space-y-4">
           <div>
             <Eyebrow className="flex items-center gap-1.5">
-              <Sparkles aria-hidden className="size-3" />
+              <PenLine aria-hidden className="size-3" />
               Written by the AI
             </Eyebrow>
-            <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-foreground">
+            {/* In the serif — this panel is where the rule that separates the two
+                voices is stated, so it follows it. */}
+            <p className="mt-2 max-w-prose font-serif text-lg leading-snug font-semibold text-foreground">
               &ldquo;{diagnosis.headline}&rdquo;
             </p>
           </div>
@@ -1273,7 +1269,7 @@ function MathsExhibit({
                           +
                         </span>
                       ) : null}
-                      <span className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px]">
+                      <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs font-semibold">
                         {row.label}
                         <span className="text-muted-foreground"> {num(row.marks_at_stake)}</span>
                       </span>
@@ -1321,7 +1317,6 @@ function CountLink() {
       className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-ink underline decoration-brand-line underline-offset-4 outline-none hover:decoration-brand-ink focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       See the full count, step by step
-      <ArrowRight aria-hidden className="size-4" />
     </Link>
   );
 }

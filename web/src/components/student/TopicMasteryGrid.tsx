@@ -86,7 +86,7 @@ export function TopicMasteryGrid({ states }: { states: TopicState[] }) {
         <div
           role="group"
           aria-label="Filter chapters"
-          className="flex flex-wrap gap-1 rounded-lg bg-muted p-0.75"
+          className="flex flex-wrap rounded-md border border-border bg-card p-0.5"
         >
           {FILTERS.map((item) => (
             <button
@@ -95,9 +95,9 @@ export function TopicMasteryGrid({ states }: { states: TopicState[] }) {
               aria-pressed={filter === item.key}
               onClick={() => setFilter(item.key)}
               className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                "rounded-sm px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                 filter === item.key
-                  ? "bg-card text-foreground shadow-card"
+                  ? "bg-foreground text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -124,18 +124,20 @@ export function TopicMasteryGrid({ states }: { states: TopicState[] }) {
                   key={subject.key}
                   className="overflow-hidden rounded-xl bg-card shadow-card ring-1 ring-border"
                 >
-                  <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+                  <div className="flex items-center gap-2 border-b border-border px-5 py-3.5">
                     <span
                       aria-hidden
                       className="size-2.5 shrink-0 rounded-xs"
                       style={{ background: subject.color }}
                     />
                     <h3 className="text-sm font-semibold">{subject.label}</h3>
-                    <span className="tnum ml-auto text-xs text-muted-foreground">
-                      {weak > 0 ? `${weak} below floor · ` : ""}
-                      {shown.length < rows.length
-                        ? `${shown.length} of ${rows.length} shown`
-                        : `${rows.length} shown`}
+                    <span className="tnum ml-auto flex gap-x-3 text-xs text-muted-foreground">
+                      {weak > 0 ? <span>{weak} below floor</span> : null}
+                      <span>
+                        {shown.length < rows.length
+                          ? `${shown.length} of ${rows.length} shown`
+                          : `${rows.length} shown`}
+                      </span>
                     </span>
                   </div>
                   <ul className="divide-y divide-border">
@@ -143,7 +145,7 @@ export function TopicMasteryGrid({ states }: { states: TopicState[] }) {
                       <TopicRow key={state.id} state={state} color={subject.color} />
                     ))}
                     {rows.length === 0 ? (
-                      <li className="px-4 py-6 text-center text-xs text-muted-foreground">
+                      <li className="px-5 py-6 text-center text-xs text-muted-foreground">
                         Nothing in {subject.label}
                       </li>
                     ) : null}
@@ -188,14 +190,14 @@ function TopicRow({ state, color }: { state: TopicState; color: string }) {
     Date.now() - Date.parse(state.last_revised) > STALE_DAYS * 86_400_000;
 
   return (
-    <li className="px-4 py-2.5">
+    <li className="px-5 py-3">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
           {state.topic.name}
         </span>
         <span
           className={cn(
-            "tnum text-[13px] font-semibold",
+            "tnum text-sm font-semibold",
             weak ? "text-status-critical" : "text-foreground",
           )}
         >
@@ -204,7 +206,7 @@ function TopicRow({ state, color }: { state: TopicState; color: string }) {
       </div>
 
       <Meter
-        className="mt-1.5"
+        className="mt-2"
         value={mastery}
         color={weak ? "var(--status-critical)" : color}
         label={
@@ -214,7 +216,7 @@ function TopicRow({ state, color }: { state: TopicState; color: string }) {
         }
       />
 
-      <div className="tnum mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+      <div className="tnum mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>
           {num(state.correct_n)}/{num(state.attempts_n)} correct
         </span>

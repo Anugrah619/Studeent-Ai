@@ -16,7 +16,7 @@ import {
 import { ClosedLoopPanel } from "@/components/director/ClosedLoopPanel";
 import { InterveneDialog } from "@/components/director/InterveneDialog";
 import { ErrorState, PanelSkeleton, Refetching } from "@/components/common/States";
-import { Accent, PageHeadline } from "@/components/kit/PageHeadline";
+import { PageHeadline } from "@/components/kit/PageHeadline";
 import { Section } from "@/components/kit/Section";
 import { TextLink } from "@/components/kit/TextLink";
 import {
@@ -96,7 +96,7 @@ export function DirectorConsole() {
   const groups = useMemo(() => groupByStudent(rows), [rows]);
 
   /**
-   * The headline, the hero card and the table are three views of one count.
+   * The headline, the hero cell and the table are three views of one count.
    * Students, not flags: Aarav with two open flags is one student to call.
    */
   const counts = useMemo<TriageCounts>(() => {
@@ -134,7 +134,7 @@ export function DirectorConsole() {
     <div className="space-y-10 pb-6">
       <PageHeadline
         className="pb-0"
-        eyebrow={<>Director console · Week of {longDate(new Date().toISOString())}</>}
+        eyebrow={<>Week of {longDate(new Date().toISOString())}</>}
         title={
           triageError ? (
             "This week’s flags could not be loaded."
@@ -154,18 +154,17 @@ export function DirectorConsole() {
         }
         meta={
           <>
-            <TextLink to="/how-it-works" arrow>
-              How it works
-            </TextLink>
+            <TextLink to="/how-it-works">How it works</TextLink>
             {summary.data ? (
-              <span className="tnum text-muted-foreground">
-                <span aria-hidden className="mr-3 hidden text-border sm:inline">
-                  |
+              <span className="tnum flex flex-wrap gap-x-4 text-muted-foreground">
+                <span>
+                  {summary.data.batch_name ?? "Institute"} roster{" "}
+                  {num(summary.data.total_students)}
                 </span>
-                {summary.data.batch_name ?? "Institute"} roster{" "}
-                {num(summary.data.total_students)} ·{" "}
-                {num(summary.data.active_students)} active ·{" "}
-                {num(summary.data.total_students - summary.data.active_students)} exited
+                <span>{num(summary.data.active_students)} active</span>
+                <span>
+                  {num(summary.data.total_students - summary.data.active_students)} exited
+                </span>
               </span>
             ) : null}
           </>
@@ -177,14 +176,14 @@ export function DirectorConsole() {
               Batch
             </Label>
             <Select value={batch} onValueChange={setBatch}>
-              <SelectTrigger id="batch-filter" className="w-55 bg-card">
+              <SelectTrigger id="batch-filter" className="w-55">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All batches</SelectItem>
                 {(batches.data ?? []).map((item) => (
                   <SelectItem key={item.id} value={String(item.id)}>
-                    {item.name} · {item.exam_code} {item.year} ({item.student_count})
+                    {item.name}, {item.exam_code} {item.year} ({item.student_count})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -218,10 +217,14 @@ export function DirectorConsole() {
         description="Worst severity first, then longest open. One row per student; a student's other open flags fold underneath."
         actions={
           triageLoading ? null : (
-            <span className="tnum">
-              {num(counts.flags)} open {counts.flags === 1 ? "flag" : "flags"} ·{" "}
-              {num(counts.students)} {counts.students === 1 ? "student" : "students"}
-              {shownBatch !== undefined ? " in this batch" : ""}
+            <span className="tnum flex gap-x-4">
+              <span>
+                {num(counts.flags)} open {counts.flags === 1 ? "flag" : "flags"}
+              </span>
+              <span>
+                {num(counts.students)} {counts.students === 1 ? "student" : "students"}
+                {shownBatch !== undefined ? " in this batch" : ""}
+              </span>
             </span>
           )
         }
@@ -268,8 +271,13 @@ export function DirectorConsole() {
 
 /**
  * The one sentence a director reads first. Worded from the same counts as the
- * hero card and the table, and never further than they go: "need you" is an
+ * hero cell and the table, and never further than they go: "need you" is an
  * open flag, "critical" is a student whose worst open flag is critical.
+ *
+ * It is one colour from end to end. It used to set the critical count in the
+ * brand's accent, picking one phrase out of the sentence — but the sentence
+ * already says "critical" in words, and the critical chip beside the figure
+ * below says it again in the one colour reserved for it.
  */
 function Headline({ counts, scope }: { counts: TriageCounts; scope?: string }) {
   const where = scope ? ` in ${scope}` : "";
@@ -279,17 +287,15 @@ function Headline({ counts, scope }: { counts: TriageCounts; scope?: string }) {
   const one = counts.students === 1;
   const c = counts.critical;
   const tail =
-    c === 0 ? (
-      one ? "It is not critical." : "None is critical."
-    ) : one ? (
-      <Accent>It is critical.</Accent>
-    ) : c === counts.students ? (
-      <Accent>All {num(c)} are critical.</Accent>
-    ) : (
-      <Accent>
-        {num(c)} {c === 1 ? "is" : "are"} critical.
-      </Accent>
-    );
+    c === 0
+      ? one
+        ? "It is not critical."
+        : "None is critical."
+      : one
+        ? "It is critical."
+        : c === counts.students
+          ? `All ${num(c)} are critical.`
+          : `${num(c)} ${c === 1 ? "is" : "are"} critical.`;
   return (
     <>
       {num(counts.students)} {one ? "student" : "students"}
