@@ -51,6 +51,64 @@ export function installDom(url = "http://localhost/"): JSDOM {
     }),
   });
 
+  /**
+   * Everything is "in view" at once. Motion's `whileInView` and
+   * `onViewportEnter` (the kit's Reveal, the charts) construct an
+   * IntersectionObserver unguarded, so without one a screen that uses them
+   * fails to render at all; with this, they settle to their final state.
+   *
+   * The `useInView` hook never fires here, and that is expected: it hands the
+   * element to motion's `resolveElements`, which tests `instanceof
+   * EventTarget` against Node's own EventTarget, and a jsdom element is not
+   * one. AnimatedNumber does not depend on it in this run — NumberFlow is not
+   * registered, so the plain figure is printed — and in a browser it has a
+   * timed fallback of its own.
+   */
+  class StubIntersectionObserver {
+    readonly root = null;
+    readonly rootMargin = "0px";
+    readonly thresholds = [0];
+    private callback: IntersectionObserverCallback;
+    constructor(callback: IntersectionObserverCallback) {
+      this.callback = callback;
+    }
+    observe(target: Element) {
+      queueMicrotask(() =>
+        this.callback(
+          [
+            {
+              target,
+              isIntersecting: true,
+              intersectionRatio: 1,
+              boundingClientRect: target.getBoundingClientRect(),
+              intersectionRect: target.getBoundingClientRect(),
+              rootBounds: null,
+              time: Date.now(),
+            } as IntersectionObserverEntry,
+          ],
+          this as unknown as IntersectionObserver,
+        ),
+      );
+    }
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  }
+
+  /**
+   * React Flow reads the viewport's zoom with `new DOMMatrixReadOnly(transform)`
+   * on every measure; jsdom has no DOMMatrix. Only `m22` (the y scale) is read.
+   */
+  class StubDOMMatrixReadOnly {
+    readonly m22: number;
+    constructor(transform?: string) {
+      const scale = transform?.match(/scale\(([\d.]+)\)/)?.[1];
+      this.m22 = scale !== undefined ? Number(scale) : 1;
+    }
+  }
+
   // Radix primitives reach for APIs jsdom does not implement.
   for (const [name, value] of [
     ["hasPointerCapture", () => false],
@@ -64,6 +122,26 @@ export function installDom(url = "http://localhost/"): JSDOM {
       value,
     });
   }
+
+  // React Flow sizes an edge label with getBBox, which jsdom's SVG lacks.
+  if (!("getBBox" in window.SVGElement.prototype)) {
+    Object.defineProperty(window.SVGElement.prototype, "getBBox", {
+      configurable: true,
+      writable: true,
+      value: () => ({ x: 0, y: 0, width: 40, height: 12 }),
+    });
+  }
+
+  // AppShell scrolls to the top on a forward navigation. jsdom's scrollTo only
+  // logs "not implemented", which buries a real error in the output.
+  window.scrollTo = (() => {}) as typeof window.scrollTo;
+
+  // Set on the jsdom window too, not only on globalThis: React Flow reads
+  // `window.DOMMatrixReadOnly`, motion reads the bare global.
+  Object.assign(window, {
+    IntersectionObserver: StubIntersectionObserver,
+    DOMMatrixReadOnly: StubDOMMatrixReadOnly,
+  });
 
   // Copy every constructor and helper jsdom defines (HTMLFormElement, DOMRect,
   // MutationObserver, …) rather than naming them one at a time — Radix reaches
@@ -92,6 +170,8 @@ export function installDom(url = "http://localhost/"): JSDOM {
       setTimeout(() => cb(Date.now()), 0) as unknown as number,
     cancelAnimationFrame: (handle: number) => clearTimeout(handle),
     ResizeObserver: StubResizeObserver,
+    IntersectionObserver: StubIntersectionObserver,
+    DOMMatrixReadOnly: StubDOMMatrixReadOnly,
     matchMedia: (query: string) => ({
       matches: false,
       media: query,

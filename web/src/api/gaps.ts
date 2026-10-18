@@ -87,10 +87,14 @@ export const API_GAPS = {
   /**
    * Nothing in the contract says where a question or paper came from — an
    * official past paper (NEET, JEE Main), our own diagnostic paper, or a
-   * generated one. "Data & trust" therefore shows static text, and no count,
-   * for official past papers. When `TestPaper` / `QuestionDetail` carry a
-   * `source`, the row in `routes/DataTrust.tsx: PROVENANCE` gets a live count
-   * from `usePapers()` and this entry is deleted.
+   * generated one. So no route can count them, and "Data & trust" prints the
+   * syllabus, past-paper and answer-key cross-check figures from
+   * `components/explainer/importRecords.ts` instead: counted when the
+   * documents were imported, checked by hand, and tagged "Import records"
+   * wherever they appear so they are never read as live. When `TestPaper` /
+   * `QuestionDetail` carry a `source`, `ProvenanceExhibit` in
+   * `routes/DataTrust.tsx` counts `usePapers()` by it, `importRecords.ts`
+   * shrinks to what the API still cannot say, and this entry is deleted.
    */
   QUESTION_PROVENANCE:
     "TestPaper / QuestionDetail carry no source (official past paper / ours / generated)",

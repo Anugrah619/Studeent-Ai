@@ -62,6 +62,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/password/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Replace my password. For a new student this is the end of first sign-in.
+         *
+         *     Needs the current password even though the caller is signed in: a
+         *     session left open on a shared phone should not be enough to take over
+         *     the account. On success the session survives (the hash that ties a
+         *     session to a password is refreshed) and `must_change_password` clears, so
+         *     the same tab carries straight on into the app.
+         */
+        post: operations["auth_password_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/batches/": {
         parameters: {
             query?: never;
@@ -275,6 +300,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/flags/{id}/interventions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description What has been done about this flag, newest first.
+         *
+         *     Until this route interventions were write-only: a mentor could log
+         *     one (`intervene`, or the note on `resolve`) and nothing could show
+         *     it back, so the closed-loop panel could say a flag was closed but not
+         *     what anyone did. The loop is the product's claim — flag, act,
+         *     outcome — and the middle step was invisible.
+         */
+        get: operations["flags_interventions_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/flags/{id}/resolve/": {
         parameters: {
             query?: never;
@@ -304,6 +354,106 @@ export interface paths {
          *     is worth more to the model than a polite blank.
          */
         post: operations["flags_resolve_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest/batches/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Every results file that has been imported, newest first.
+         *
+         *     There is deliberately no delete. Attempts are an append-only log, and a
+         *     batch is the receipt for the ones it wrote; removing the receipt would
+         *     leave the attempts with nothing saying where they came from.
+         */
+        get: operations["ingest_batches_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest/batches/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Every results file that has been imported, newest first.
+         *
+         *     There is deliberately no delete. Attempts are an append-only log, and a
+         *     batch is the receipt for the ones it wrote; removing the receipt would
+         *     leave the attempts with nothing saying where they came from.
+         */
+        get: operations["ingest_batches_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest/mappings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Saved column renamings — so the second upload of a format is automatic.
+         *
+         *     An institute's export names its columns however its software does
+         *     (`Candidate No`, `Seat`), and the same software names them the same way
+         *     next month. Save the mapping once and name it on later uploads.
+         */
+        get: operations["ingest_mappings_list"];
+        put?: never;
+        /**
+         * @description Saved column renamings — so the second upload of a format is automatic.
+         *
+         *     An institute's export names its columns however its software does
+         *     (`Candidate No`, `Seat`), and the same software names them the same way
+         *     next month. Save the mapping once and name it on later uploads.
+         */
+        post: operations["ingest_mappings_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest/results/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Upload a class's results for one paper. Run it with `dry_run` first.
+         *
+         *     A dry run does everything an import does except write, and returns the
+         *     same report — which students would fail and why, which questions the
+         *     blueprint is missing, how many answers are new. The cheapest way to find
+         *     out a file is wrong is to ask before it is real.
+         */
+        post: operations["ingest_results_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -402,6 +552,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/my/attempts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Every answer I have given — the way into reviewing my mistakes.
+         *
+         *     Each row carries `question_pk`, which `GET /api/my/questions/{id}/` opens
+         *     onto the question, the correct answer and the worked solution. Ordered by
+         *     paper then question label.
+         */
+        get: operations["my_attempts_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/confidence/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description How confident I am in a chapter — the write path that did not exist.
+         *
+         *     Overconfidence detection compares this against measured mastery, and
+         *     until now `ConfidenceRating` had no way in except the seeder. Append
+         *     only: rating a chapter again adds a row, and the latest by `ts` wins in
+         *     `TopicState.self_rating`, so the history of how someone's confidence
+         *     moved is kept rather than overwritten. `ts` is stamped by the server.
+         *
+         *     Ordered by `ts` descending.
+         */
+        get: operations["my_confidence_list"];
+        put?: never;
+        /**
+         * @description How confident I am in a chapter — the write path that did not exist.
+         *
+         *     Overconfidence detection compares this against measured mastery, and
+         *     until now `ConfidenceRating` had no way in except the seeder. Append
+         *     only: rating a chapter again adds a row, and the latest by `ts` wins in
+         *     `TopicState.self_rating`, so the history of how someone's confidence
+         *     moved is kept rather than overwritten. `ts` is stamped by the server.
+         *
+         *     Ordered by `ts` descending.
+         */
+        post: operations["my_confidence_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/marks-lost/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Why I lost marks on one paper, by cause.
+         *
+         *     A paper I did not sit is a 404 — including a paper that exists but
+         *     that only other students sat. This route never confirms that.
+         */
+        get: operations["my_marks_lost_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/mock-scores/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Per-subject totals for every paper I sat, oldest first.
+         *
+         *     The `paper_id` here is what `GET /api/my/marks-lost/?paper=` takes.
+         */
+        get: operations["my_mock_scores_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/my/plan/": {
         parameters: {
             query?: never;
@@ -415,7 +669,8 @@ export interface paths {
          *     Scoped by the account, not by a path parameter: there is no way to
          *     ask for another student's plan. A caller with no linked `Student`
          *     gets an empty list rather than a 403, because a mentor opening the
-         *     student PWA is a navigation mistake, not an attack.
+         *     student PWA is a navigation mistake, not an attack. (A mentor who wants
+         *     a student's plan asks `GET /api/students/{id}/plan/`.)
          *
          *     Ordered by `start_time` ascending.
          */
@@ -437,17 +692,159 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * @description Today's plan for the logged-in student.
-         *
-         *     Scoped by the account, not by a path parameter: there is no way to
-         *     ask for another student's plan. A caller with no linked `Student`
-         *     gets an empty list rather than a 403, because a mentor opening the
-         *     student PWA is a navigation mistake, not an attack.
-         *
-         *     Ordered by `start_time` ascending.
-         */
+        /** @description Tick a block off. Idempotent: ticking a done block changes nothing. */
         post: operations["my_plan_complete_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/plan/{id}/uncomplete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Undo a tick. Idempotent. For the mis-tap, which `complete` alone made permanent. */
+        post: operations["my_plan_uncomplete_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/plan/generate/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Make my plan for a day — three explicit rules, each block saying which.
+         *
+         *     **Rules, not a model.** Overdue revisions first, then my weakest
+         *     *taught* chapters, then one chapter taught but never attempted; sized
+         *     to what I actually log on a typical day. Every block's `reason_text`
+         *     names the rule that chose it, so the plan can be argued with. See
+         *     `apps/derived/services/planner.py` for the rules and for why blocks
+         *     carry no start time.
+         *
+         *     Idempotent: if a plan already exists it is returned as it stands
+         *     (200). `replace: true` rebuilds it, keeping anything I have ticked.
+         *     An empty `blocks` with 201/200 is a real answer — nothing qualifies
+         *     yet — not an error.
+         */
+        post: operations["my_plan_generate_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/profile/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Who I am: name, batch, mentor, target, and how I am progressing.
+         *
+         *     `progress` is the student-safe slice of `StudentState` — no
+         *     `risk_score`. See `MyProgressSerializer` for what is withheld and
+         *     why.
+         */
+        get: operations["my_profile_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/questions/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description A question I answered: the stem, what I chose, the right answer, the working.
+         *
+         *     **Only questions I have an answer recorded for.** Showing the stem,
+         *     key and solution of a paper I have not sat would hand out the answers to
+         *     a test still to come, so anything else is a 404 — the same 404 as a
+         *     question that does not exist, so the route cannot be used to ask what
+         *     papers an institute holds. Retrieve only, like the console's.
+         */
+        get: operations["my_questions_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/revisions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description My scheduled revisions, soonest first — overdue ones lead.
+         *
+         *     Marking one done (`complete`) is the single permitted change to a row in
+         *     the event log, and it is permitted because of its shape: `done_at` goes
+         *     from null to a timestamp **once** and never moves again. That keeps what
+         *     the append-only rule is for — replaying history reproduces exactly what
+         *     happened, because the row says both *that* it was done and *when*. What
+         *     the rule forbids is overwriting facts; a deadline that was open and then
+         *     closed once is not one.
+         */
+        get: operations["my_revisions_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/revisions/{id}/complete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description I did this revision. Write-once and idempotent.
+         *
+         *     The first call records when; any later call returns the revision as it
+         *     stands and does not move the timestamp. The conditional `UPDATE … WHERE
+         *     done_at IS NULL` is what makes that true under two simultaneous
+         *     requests, which a read-then-write would not be.
+         *
+         *     Also refreshes my derived state (`revision_debt`, `last_revised`,
+         *     `retention`) so the screen reflects it straight away; see
+         *     `refresh_derived_state` for why that cannot fail the request.
+         */
+        post: operations["my_revisions_complete_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -467,6 +864,10 @@ export interface paths {
          *     Ordered by `ts` descending, most recent first. Append-only by
          *     construction: there is no update or delete route, matching the
          *     append-only rule the admin enforces on `StudyLog` itself.
+         *
+         *     The `topic` must be a chapter of the student's own syllabus
+         *     (`GET /api/my/topics/`), `minutes` is 1–720, and `ts` may be in the past
+         *     but not the future. A mentor posting here is a 403; it used to be a 500.
          */
         get: operations["my_study_logs_list"];
         put?: never;
@@ -476,8 +877,75 @@ export interface paths {
          *     Ordered by `ts` descending, most recent first. Append-only by
          *     construction: there is no update or delete route, matching the
          *     append-only rule the admin enforces on `StudyLog` itself.
+         *
+         *     The `topic` must be a chapter of the student's own syllabus
+         *     (`GET /api/my/topics/`), `minutes` is 1–720, and `ts` may be in the past
+         *     but not the future. A mentor posting here is a 403; it used to be a 500.
          */
         post: operations["my_study_logs_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/subject-breakdown/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Where my study time goes against where my marks go. Three rows, fixed order. */
+        get: operations["my_subject_breakdown_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/topic-states/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description My per-chapter mastery, weakest first.
+         *
+         *     `mastery` is null below the evidence floor — null is "not enough
+         *     attempts to say", never zero.
+         */
+        get: operations["my_topic_states_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/topics/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The chapters of my syllabus, in teaching order.
+         *
+         *     The pick-list for `POST /api/my/study-logs/` and
+         *     `POST /api/my/confidence/`, both of which take a chapter id that
+         *     nothing else in the API could previously produce. Chapters only —
+         *     study time and confidence are recorded at chapter grain.
+         */
+        get: operations["my_topics_list"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -498,10 +966,23 @@ export interface paths {
          *     `TestPaper.Meta.ordering`. The first element is therefore the paper
          *     `/api/dashboard/summary/` reports `batch_mock_avg` for, which is what
          *     lets the console label the KPI without a second request.
+         *
+         *     `POST` makes the institute's own mock — the first step of getting its
+         *     results in. Next: `POST /api/papers/{id}/blueprint/`, then
+         *     `POST /api/ingest/results/`.
          */
         get: operations["papers_list"];
         put?: never;
-        post?: never;
+        /**
+         * @description Create the institute's own mock paper.
+         *
+         *     Marked `source: institute` — not an official paper, not ours — and
+         *     belongs to the caller's institute whatever the body says. Marking
+         *     defaults to the exam's own scheme. A paper with the same name on the
+         *     same date is refused: the usual cause is a double-submit, and two
+         *     "Mock 15"s on the same day make every later upload ambiguous.
+         */
+        post: operations["papers_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -522,10 +1003,38 @@ export interface paths {
          *     `TestPaper.Meta.ordering`. The first element is therefore the paper
          *     `/api/dashboard/summary/` reports `batch_mock_avg` for, which is what
          *     lets the console label the KPI without a second request.
+         *
+         *     `POST` makes the institute's own mock — the first step of getting its
+         *     results in. Next: `POST /api/papers/{id}/blueprint/`, then
+         *     `POST /api/ingest/results/`.
          */
         get: operations["papers_retrieve"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/papers/{id}/blueprint/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Set which chapter each question tests and what its right answer is.
+         *
+         *     Once per paper, before any results. All or nothing: one bad row and
+         *     nothing is written, with every problem listed at once. 200 means applied
+         *     (or, with `dry_run`, that it would be); 422 means it was not and why.
+         *     Idempotent — uploading the same blueprint again changes nothing.
+         */
+        post: operations["papers_blueprint_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -598,6 +1107,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/students/{id}/account/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Issue this student a login: their roll number and a temporary password.
+         *
+         *     The institute provides the credentials; the student signs in with
+         *     their **roll number** and must choose their own password before they
+         *     can do anything else. The temporary password comes back **once**, in
+         *     this response — hand it over, don't store it. Lost? `reset-password`.
+         *
+         *     409 if the student already has a login, and deliberately so: issuing
+         *     is not "make sure they can sign in", because re-sending it for a
+         *     student who had already chosen a password would not be harmless.
+         *     Students who have left the institute (`exited_at`) are refused.
+         */
+        post: operations["students_account_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/students/{id}/account/reset-password/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Give this student a new temporary password, and make them change it.
+         *
+         *     For a forgotten password or a lost phone. It also signs the student
+         *     out everywhere — a changed password invalidates every session that
+         *     held the old one — and re-activates a disabled login. 409 if the
+         *     student has no login yet; issue one instead.
+         */
+        post: operations["students_account_reset_password_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/students/{id}/attempts/": {
         parameters: {
             query?: never;
@@ -616,6 +1178,28 @@ export interface paths {
          *     more.
          */
         get: operations["students_attempts_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/students/{id}/confidence/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description How strong this student rates themselves, chapter by chapter, newest first.
+         *
+         *     The full history rather than the latest: how a rating moved is part
+         *     of the story. The latest per chapter is `TopicState.self_rating`.
+         */
+        get: operations["students_confidence_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -731,6 +1315,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/students/{id}/plan/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description This student's plan for one day — what a mentor sees on Student 360.
+         *
+         *     The student's own copy is `GET /api/my/plan/`, which answers for
+         *     whoever is signed in and so gives a mentor an empty list. That is
+         *     correct for the student app and was the wrong thing to build a
+         *     mentor's panel on: Student 360 asked it for a student's plan and
+         *     was told, truthfully, that the mentor had none. This is the same
+         *     rows, addressed by student id.
+         *
+         *     Ordered by `start_time`, as the student sees it. An unknown or
+         *     cross-institute student id returns an empty page, like every other
+         *     sub-resource here.
+         */
+        get: operations["students_plan_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/students/{id}/revisions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description This student's scheduled revisions, soonest first, so overdue ones lead. */
+        get: operations["students_revisions_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/students/{id}/study-logs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description What this student says they studied, most recent first.
+         *
+         *     Self-reported, so treat it as the least reliable data in the system
+         *     (`StudyLog`): `ts` is when they say they studied, and the gap to the
+         *     time they logged it is what shows a week entered on a Sunday.
+         */
+        get: operations["students_study_logs_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/students/{id}/subject-breakdown/": {
         parameters: {
             query?: never;
@@ -815,6 +1469,33 @@ export interface components {
         };
         /** @enum {unknown} */
         BlankEnum: "";
+        BlueprintReport: {
+            dry_run: boolean;
+            /** @description No errors; a real run would apply this file. */
+            ok: boolean;
+            paper_id: number;
+            questions_in_file: number;
+            /** @description `total_questions` on the paper. Fewer in the file is a warning, not an error. */
+            expected_questions: number;
+            created: number;
+            updated: number;
+            unchanged: number;
+            errors_total: number;
+            /** @description At most the first 100. */
+            errors: components["schemas"]["IngestRowError"][];
+        };
+        BlueprintUploadRequest: {
+            /**
+             * Format: binary
+             * @description CSV: question_id, chapter, correct_option (or answer for a numeric question).
+             */
+            file: string;
+            /**
+             * @description Check the file and report what would happen without saving anything.
+             * @default false
+             */
+            dry_run: boolean;
+        };
         /**
          * @description * `conceptual_gap` - conceptual_gap
          *     * `execution_error` - execution_error
@@ -824,6 +1505,23 @@ export interface components {
          * @enum {string}
          */
         CauseEnum: "conceptual_gap" | "execution_error" | "time_exhaustion" | "avoidable_skip" | "insufficient_evidence";
+        ColumnMappingProfile: {
+            readonly id: number;
+            name: string;
+            /** @description `{the column's name in the file: the field it holds}`. */
+            mapping: {
+                [key: string]: "answer" | "batch" | "ignore" | "question_id" | "roll_no" | "time_spent";
+            };
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        ColumnMappingProfileRequest: {
+            name: string;
+            /** @description `{the column's name in the file: the field it holds}`. */
+            mapping: {
+                [key: string]: "answer" | "batch" | "ignore" | "question_id" | "roll_no" | "time_spent";
+            };
+        };
         /**
          * @description * `high` - high
          *     * `medium` - medium
@@ -831,6 +1529,40 @@ export interface components {
          * @enum {string}
          */
         ConfidenceEnum: "high" | "medium" | "low";
+        /**
+         * @description How strong the student *thinks* they are in one chapter.
+         *
+         *     Compared against measured mastery to find overconfidence (see
+         *     `TopicState.confidence_gap`), so the value has to be the student's own
+         *     honest answer *now*. That is why there is no `ts` on the request: the
+         *     server stamps it. The feature store takes the latest rating by `ts`, so a
+         *     client that could send its own timestamp could pin a rating for ever by
+         *     dating it in the future.
+         */
+        ConfidenceRating: {
+            readonly id: number;
+            topic: number;
+            readonly topic_name: string;
+            /** @description 1 = not confident at all, 5 = fully confident. */
+            self_rating: number;
+            /** Format: date-time */
+            readonly ts: string;
+        };
+        /**
+         * @description How strong the student *thinks* they are in one chapter.
+         *
+         *     Compared against measured mastery to find overconfidence (see
+         *     `TopicState.confidence_gap`), so the value has to be the student's own
+         *     honest answer *now*. That is why there is no `ts` on the request: the
+         *     server stamps it. The feature store takes the latest rating by `ts`, so a
+         *     client that could send its own timestamp could pin a rating for ever by
+         *     dating it in the future.
+         */
+        ConfidenceRatingRequest: {
+            topic: number;
+            /** @description 1 = not confident at all, 5 = fully confident. */
+            self_rating: number;
+        };
         /**
          * @description Director's KPI strip.
          *
@@ -931,11 +1663,21 @@ export interface components {
              *     * `term_long` - term_long
              */
             time_to_fix: components["schemas"]["TimeToFixEnum"];
+            /** @description The pseudonym the model was sent in place of the student's name (`S-{id}`). Echoed so the privacy claim can be read off the response — this is the only identity the model ever saw — instead of restated by the client. */
+            student_ref: string;
+            tally: components["schemas"]["DiagnosisTally"];
             /** @description Feed back agreement/disagreement against this id. */
             trace_id: number;
             /** @description True if replayed rather than freshly generated. */
             from_cache: boolean;
-            human_verdict: string;
+            /**
+             * @description What a mentor has said about this diagnosis. **`unreviewed` is a value, not an absence**: nobody has answered yet, which is not the same as having disagreed. A client that treats any non-`agreed` string as a disagreement tells a teacher who never answered that they did.
+             *
+             *     * `agreed` - agreed
+             *     * `disagreed` - disagreed
+             *     * `unreviewed` - unreviewed
+             */
+            human_verdict: components["schemas"]["HumanVerdictEnum"];
         };
         /**
          * @description One cited question, resolved so the console can actually open it.
@@ -970,6 +1712,12 @@ export interface components {
             /** @description `evidence_questions`, resolved. One entry per cited label, in the order the model gave them. */
             evidence: components["schemas"]["DiagnosisEvidence"][];
             /**
+             * @description The questions `counter_evidence` names, resolved — the correct answers the argument leans on, now linkable. Until this existed the strongest line on the card was the one line that could not open the question behind it.
+             *
+             *     Found by matching whole labels in the sentence against the counter-evidence candidates **the server derived** for this misconception, so a label the model invented is never offered. `marks_at_stake` is 0 on every entry: these are questions the student got right. Empty when the sentence names none.
+             */
+            counter_evidence_questions: components["schemas"]["DiagnosisEvidence"][];
+            /**
              * @description The correct answers that narrow this finding — the strongest thing on the card, because it is what separates 'weak at this chapter' from 'fails only when the condition is implicit'.
              *
              *     **Never blank and never null.** The prompt already tells the model to say plainly that there is no counter-evidence on this paper when there is none; the server now guarantees it. If the model returns nothing, one of two sentences is substituted — 'no counter-evidence on this paper, the weakness may be chapter-wide' when none was available to it, or 'the model did not state the counter-evidence, treat this finding as un-narrowed' when some was. The second is deliberately not disguised as the first: they are different claims and only one of them is good news.
@@ -981,6 +1729,31 @@ export interface components {
              *     Only the model's own figure survives if *no* citation resolved, in which case there is nothing better to offer and `evidence` will show why.
              */
             marks_at_stake: number;
+        };
+        /**
+         * @description The counting done in code before the model was asked anything.
+         *
+         *     Step two of the pipeline is "we count, exactly": tagged wrong options are
+         *     tallied deterministically and the model reasons over the result. This is
+         *     that tally for **every** wrong answer on the paper, not just the ones the
+         *     diagnosis cites, so a reader can hold the model's story against the
+         *     arithmetic it was given.
+         */
+        DiagnosisTally: {
+            /** @description Questions with a recorded choice. */
+            answered: number;
+            wrong: number;
+            /** @description Wrong answers whose chosen option carries a misconception tag. The rest are wrong for a reason the taxonomy has not described — real losses, and nothing a diagnosis can say about. */
+            wrong_with_known_cause: number;
+            /** @description Largest cost first. */
+            by_misconception: components["schemas"]["DiagnosisTallyRow"][];
+        };
+        DiagnosisTallyRow: {
+            misconception_code: string;
+            /** @description Wrong answers whose chosen option is tagged with this misconception. */
+            wrong_answers: number;
+            /** @description What those cost, at the diagnosis's per-wrong rate. */
+            marks: number;
         };
         /**
          * @description A mentor agreeing or disagreeing. This is what creates training data.
@@ -1079,6 +1852,40 @@ export interface components {
             /** @description Optional. If given, also logged as an Intervention. */
             note?: string;
         };
+        /**
+         * @description * `agreed` - agreed
+         *     * `disagreed` - disagreed
+         *     * `unreviewed` - unreviewed
+         * @enum {string}
+         */
+        HumanVerdictEnum: "agreed" | "disagreed" | "unreviewed";
+        IngestBatch: {
+            readonly id: number;
+            filename: string;
+            readonly paper_id: number | null;
+            readonly paper_name: string;
+            row_count?: number;
+            rows_ok?: number;
+            rows_failed?: number;
+            status?: components["schemas"]["IngestBatchStatusEnum"];
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /**
+         * @description * `pending` - Pending
+         *     * `done` - Done
+         *     * `failed` - Failed
+         * @enum {string}
+         */
+        IngestBatchStatusEnum: "pending" | "done" | "failed";
+        IngestRowError: {
+            /** @description Line in the file, counting the header as line 1. */
+            row: number;
+            roll_no?: string;
+            question_id?: string;
+            /** @description A sentence for the person who sent the file. */
+            message: string;
+        };
         Institute: {
             readonly id: number;
             name: string;
@@ -1107,9 +1914,19 @@ export interface components {
          */
         KindEnum: "subject" | "unit" | "chapter";
         LoginRequest: {
+            /** @description A staff username, **or a student's roll number**. One field because the login form has one box; the password decides which account it was. */
             username: string;
             password: string;
+            /** @description Optional institute code (its slug). Roll numbers are only unique within a batch, so this narrows the search for a student whose number exists elsewhere; sign-in works without it. */
+            institute?: string;
         };
+        /**
+         * @description * `none` - none
+         *     * `awaiting_first_sign_in` - awaiting_first_sign_in
+         *     * `active` - active
+         * @enum {string}
+         */
+        LoginStatusEnum: "none" | "awaiting_first_sign_in" | "active";
         /** @description Where the marks actually went, by chapter. */
         LossTopic: {
             topic_id: number | null;
@@ -1220,6 +2037,8 @@ export interface components {
             student_id: number | null;
             is_staff: boolean;
             is_superuser: boolean;
+            /** @description True while this account is signed in on a temporary password. Until it is changed (`POST /api/auth/password/`) every other route answers 403 with `code: password_change_required`, so a client should route straight to the change-password screen. */
+            must_change_password: boolean;
         };
         /**
          * @description Who a flag can be routed to. Backs the intervention dialog.
@@ -1272,6 +2091,156 @@ export interface components {
          * @enum {string}
          */
         ModeEnum: "learn" | "practice" | "revise";
+        /** @description One answer of mine. `question_pk` opens the question behind it. */
+        MyAttempt: {
+            readonly id: number;
+            readonly paper_id: number | null;
+            readonly paper_name: string;
+            question_id: string;
+            /** @description Id for `GET /api/my/questions/{id}/`. Null when the paper has no question content on file (an imported mock with scores only) — there is then nothing to open. */
+            readonly question_pk: number | null;
+            readonly topic_name: string;
+            status: components["schemas"]["StatusEnum"];
+            chosen_option?: string;
+            /** Format: double */
+            marks?: number;
+            time_spent?: number | null;
+            source?: components["schemas"]["SourceEnum"];
+            /** Format: date-time */
+            ts: string;
+        };
+        /** @description Who the signed-in student is, and where they stand. */
+        MyProfile: {
+            readonly id: number;
+            name: string;
+            roll_no: string;
+            target?: string;
+            /** Format: date */
+            joined_at: string;
+            readonly batch: components["schemas"]["Batch"];
+            readonly mentor_name: string;
+            readonly progress: components["schemas"]["MyProgress"] | null;
+        };
+        /**
+         * @description The slice of `StudentState` a student is shown about themselves.
+         *
+         *     `risk_score`, `load_index` and `balance_index` are withheld. They are
+         *     inputs to a mentor's triage, not feedback for a seventeen-year-old: a
+         *     number that says "critical" with no conversation around it is a poor way
+         *     to learn it. Nothing is hidden that the student cannot see another way —
+         *     `/api/my/subject-breakdown/` carries the balance in plain terms. Whether
+         *     students should see a risk band at all is a product decision, and showing
+         *     less first is the one that can be undone.
+         */
+        MyProgress: {
+            /**
+             * Format: double
+             * @description Study regularity, 0–1. Share of recent days with any logged study.
+             */
+            readonly consistency: number | null;
+            /** @description Count of revision cycles now past due and not done. */
+            readonly revision_debt: number;
+            /**
+             * Format: double
+             * @description Mean total marks across this student's papers.
+             */
+            readonly mock_avg: number | null;
+            /**
+             * Format: double
+             * @description Marks gained or lost across recent papers. **Signed marks, not a percentage** — negative is a decline, and -40 is the point where the decline component of `risk_score` saturates.
+             */
+            readonly mock_trend: number | null;
+            /**
+             * Format: double
+             * @description Share of the *batch's* chapters marked taught, 0–100. A batch property, not a student one: a student cannot be behind on a chapter nobody has taught yet.
+             */
+            readonly syllabus_pct: number | null;
+            /** Format: date-time */
+            readonly computed_at: string;
+        };
+        /** @description A question I answered, with the correct answer and the working. */
+        MyQuestion: {
+            readonly id: number;
+            /** @description The question as the paper prints it — `"D16"`. Unique within a paper, **not** across papers, which is why `id` and not this is what `DiagnosisEvidence.question_id` carries. Stored as `QuestionTopicMap.question_id`. */
+            readonly label: string;
+            readonly paper_id: number;
+            readonly paper_name: string;
+            /** @description Chapter. Null on a question nobody has mapped yet. */
+            readonly topic: string | null;
+            readonly subject: string | null;
+            difficulty?: components["schemas"]["DifficultyEnum"] | components["schemas"]["BlankEnum"];
+            question_text?: string;
+            /** @description The worked method, not just the final answer. */
+            solution?: string;
+            readonly options: components["schemas"]["MyQuestionOption"][];
+            /** @description The option letter this student picked. Null when `?student=` was not given, and also when it was but the student left this question blank or never reached it — `status` distinguishes those. */
+            readonly chosen_label: string | null;
+            /**
+             * @description What became of this question for this student. A closed set, because `blank` and `not_reached` are the distinction the whole marks-lost taxonomy rests on — choosing to skip and running out of time need opposite advice. Null when `?student=` was not given, or when this student has no attempt recorded here.
+             *
+             *     * `correct` - Correct
+             *     * `wrong` - Wrong
+             *     * `blank` - Skipped deliberately
+             *     * `not_reached` - Ran out of time
+             */
+            readonly status: (components["schemas"]["StatusEnum"] | components["schemas"]["NullEnum"]) | null;
+            /**
+             * Format: double
+             * @description Marks scored on this question after negative marking. Null as above.
+             */
+            readonly marks: number | null;
+            /** @description Seconds spent. Often genuinely absent even when the attempt exists. */
+            readonly time_spent: number | null;
+            source?: components["schemas"]["PaperSourceEnum"];
+            source_ref?: string;
+        };
+        /**
+         * @description An option as the student who answered it sees it: no misconception.
+         *
+         *     `QuestionOptionSerializer` explains *why a wrong option was tempting* —
+         *     "reverses the directing-effect rule". That is the diagnosis, written for
+         *     the mentor who decides how to say it. A student reviewing a mistake gets
+         *     the question, the answer and the worked solution; whether they are also
+         *     told which belief the system thinks they hold is the product decision
+         *     recorded in `MyProgressSerializer`, and is held back for the same reason.
+         */
+        MyQuestionOption: {
+            label: string;
+            text: string;
+            is_correct?: boolean;
+            readonly chosen: boolean;
+        };
+        /** @description One scheduled revision cycle: R1, R2, R3 of a chapter. */
+        MyRevision: {
+            readonly id: number;
+            readonly topic: components["schemas"]["Topic"];
+            cycle: number;
+            /** Format: date */
+            scheduled_for: string;
+            /** Format: date-time */
+            done_at?: string | null;
+            /** @description Scheduled before today and not yet done. */
+            readonly is_overdue: boolean;
+        };
+        /**
+         * @description A chapter as the student's pick-list shows it.
+         *
+         *     `ncert_ref` is the point of the extra weight: where to re-read the
+         *     chapter in the current NCERT textbooks, loaded from the official
+         *     syllabus documents. Until this route nothing returned it, so the links
+         *     existed in the database and nowhere a student could follow them.
+         */
+        MyTopic: {
+            readonly id: number;
+            name: string;
+            kind: components["schemas"]["KindEnum"];
+            /** Format: double */
+            weight?: number;
+            readonly subject: string;
+            readonly unit: string;
+            /** @description Where to re-read this chapter in the NCERT textbooks: a list of `{class, subject, book, chapter, title, pdf, sections?}`. Null when the chapter has no NCERT counterpart or has not been linked yet. `sections` appears only when just part of the NCERT chapter applies. */
+            readonly ncert_ref: unknown;
+        };
         /** @enum {unknown} */
         NullEnum: null;
         PaginatedAttemptList: {
@@ -1304,6 +2273,36 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["Batch"][];
         };
+        PaginatedColumnMappingProfileList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["ColumnMappingProfile"][];
+        };
+        PaginatedConfidenceRatingList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["ConfidenceRating"][];
+        };
         PaginatedFlagList: {
             /** @example 123 */
             count: number;
@@ -1318,6 +2317,36 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["Flag"][];
+        };
+        PaginatedIngestBatchList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["IngestBatch"][];
+        };
+        PaginatedInterventionList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["Intervention"][];
         };
         PaginatedMentorList: {
             /** @example 123 */
@@ -1348,6 +2377,51 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["MockScore"][];
+        };
+        PaginatedMyAttemptList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["MyAttempt"][];
+        };
+        PaginatedMyRevisionList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["MyRevision"][];
+        };
+        PaginatedMyTopicList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["MyTopic"][];
         };
         PaginatedPlanBlockList: {
             /** @example 123 */
@@ -1439,6 +2513,21 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["TopicState"][];
         };
+        /**
+         * @description * `official_pyq` - Official past paper
+         *     * `demo` - Demo (written by us)
+         *     * `generated` - Generated
+         *     * `institute` - Institute's own mock
+         * @enum {string}
+         */
+        PaperSourceEnum: "official_pyq" | "demo" | "generated" | "institute";
+        /** @description Replace my password. The first sign-in of a new student ends here. */
+        PasswordChangeRequest: {
+            /** @description The password I signed in with — the temporary one, the first time. */
+            current_password: string;
+            /** @description At least 8 characters; not a common password, not all digits, not like my name, and not my roll number. */
+            new_password: string;
+        };
         PlanBlock: {
             readonly id: number;
             /** Format: date */
@@ -1452,6 +2541,25 @@ export interface components {
             readonly reason_code: string;
             reason_text?: string;
             completed?: boolean;
+        };
+        PlanGenerateRequestRequest: {
+            /**
+             * Format: date
+             * @description The day to plan, `YYYY-MM-DD`: today (the default) up to a week ahead. Further out, the state the plan is built from will have moved.
+             */
+            date?: string;
+            /**
+             * @description Rebuild a plan that already exists. Only blocks not yet ticked are replaced; anything completed stays. Without it, an existing plan is returned as it is.
+             * @default false
+             */
+            replace: boolean;
+        };
+        PlanGeneration: {
+            /** Format: date */
+            date: string;
+            /** @description True if this call made blocks. False if the plan already existed, or if nothing qualifies yet — `blocks` then says which: empty means there was nothing to plan, not that the call failed. */
+            generated: boolean;
+            blocks: components["schemas"]["PlanBlock"][];
         };
         /**
          * @description One question, in full — what a director sees on clicking an evidence chip.
@@ -1501,6 +2609,8 @@ export interface components {
             readonly marks: number | null;
             /** @description Seconds spent. Often genuinely absent even when the attempt exists. */
             readonly time_spent: number | null;
+            source?: components["schemas"]["PaperSourceEnum"];
+            source_ref?: string;
         };
         /**
          * @description One lettered option, and what choosing it would reveal.
@@ -1520,6 +2630,65 @@ export interface components {
             readonly chosen: boolean | null;
             /** @description The wrong belief that produces this option. Always null on the correct option, and null on wrong options nobody has explained yet. */
             readonly misconception: components["schemas"]["Misconception"] | null;
+        };
+        /**
+         * @description What happened to a results file — every student accounted for.
+         *
+         *     A student is ingested completely or not at all, so
+         *     `students_ingested + students_already_recorded + students_failed` is
+         *     `students_in_file`, with nobody half-counted.
+         */
+        ResultsReport: {
+            dry_run: boolean;
+            /** @description A real run would write something (or has nothing left to). */
+            ok: boolean;
+            paper_id: number;
+            /** @description `wide` (a column per question) or `long` (a row per answer). */
+            layout: string;
+            batch_id: number | null;
+            students_in_file: number;
+            students_ingested: number;
+            /** @description Every answer in their row was already on file. Counted, not doubled. */
+            students_already_recorded: number;
+            students_failed: number;
+            attempts_created: number;
+            attempts_already_recorded: number;
+            /** @description Questions in the file the paper's blueprint does not know. Non-empty means nothing was written. */
+            unmapped_questions: string[];
+            /** @description Questions with no answer key. Non-empty means nothing was written. */
+            unkeyed_questions: string[];
+            ignored_columns: string[];
+            /** @description Paper questions the file does not cover. A warning: a partial sitting is real. */
+            questions_not_in_file: string[];
+            /** @description On a dry run: this exact file was already imported as this batch. */
+            duplicate_of_batch: number | null;
+            /** @description Counts were recomputed for the students this file touched. */
+            derived_refreshed: boolean;
+            /** @description Flags the detectors raised for those students afterwards. */
+            flags_raised: number | null;
+            errors_total: number;
+            /** @description At most the first 100. */
+            errors: components["schemas"]["IngestRowError"][];
+        };
+        ResultsUploadRequest: {
+            /**
+             * Format: binary
+             * @description CSV. Either one row per student with a column per question (`roll_no, Q1, Q2, …`), or one row per answer (`roll_no, question_id, answer`).
+             */
+            file: string;
+            /** @description The `TestPaper.id` the file is the results of. */
+            paper: number;
+            /**
+             * @description Check the file and report what would happen without saving anything.
+             * @default false
+             */
+            dry_run: boolean;
+            /** @description A saved column mapping (`/api/ingest/mappings/`) to apply. */
+            mapping_profile?: number;
+            /** @description JSON object renaming this file's columns, e.g. `{"Candidate No": "roll_no", "Seat": "ignore"}`. Fields: answer, batch, ignore, question_id, roll_no, time_spent. Wins over a saved profile. */
+            column_map?: string;
+            /** @description With `column_map`: save it under this name for the next upload. */
+            save_mapping_as?: string;
         };
         /**
          * @description * `mentor` - mentor
@@ -1550,6 +2719,35 @@ export interface components {
          * @enum {string}
          */
         StatusEnum: "correct" | "wrong" | "blank" | "not_reached";
+        /**
+         * @description What staff are handed after issuing or resetting a student's login.
+         *
+         *     **Shown once.** `temporary_password` is not stored anywhere in a form
+         *     that can be read back, so there is no endpoint to fetch it again; the
+         *     only recovery is a reset. The response is sent with `Cache-Control:
+         *     no-store`.
+         */
+        StudentCredential: {
+            student_id: number;
+            name: string;
+            /** @description What the student types into the username box. */
+            roll_no: string;
+            temporary_password: string;
+            /** @description Always true: the student must choose their own at first sign-in. */
+            must_change_password: boolean;
+        };
+        StudentCredentialRequestRequest: {
+            /** @description Optional. Use this password as the temporary one instead of a generated one — at least 6 characters. Omit it to have a random one made, which is the better default. */
+            password?: string;
+        };
+        /**
+         * @description Whether a student can sign in yet — so staff know which button to show.
+         *
+         *     `none` has no login (offer to issue one); `awaiting_first_sign_in` has
+         *     one but has not yet replaced the temporary password (the credentials slip
+         *     is still live); `active` has chosen their own. Only the state is exposed:
+         *     nothing here can be used to sign in.
+         */
         StudentDetail: {
             readonly id: number;
             name: string;
@@ -1562,6 +2760,7 @@ export interface components {
             readonly batch: components["schemas"]["Batch"];
             readonly mentor: components["schemas"]["Mentor"];
             readonly state: components["schemas"]["StudentState"];
+            readonly login_status: components["schemas"]["LoginStatusEnum"];
         };
         /**
          * @description Row in the director's triage table.
@@ -1603,6 +2802,7 @@ export interface components {
             readonly open_flags: number;
             /** Format: date */
             exited_at?: string | null;
+            readonly login_status: components["schemas"]["LoginStatusEnum"];
         };
         /**
          * @description The per-student rollup behind Student 360's health header.
@@ -1659,16 +2859,35 @@ export interface components {
             /** Format: date-time */
             readonly computed_at: string;
         };
+        /**
+         * @description A self-reported study session, as the student enters it.
+         *
+         *     Tier-1 data — see `StudyLog`. Backdating is allowed and expected (people
+         *     log in the evening for the afternoon); the model keeps `logged_at`
+         *     separately so a week entered on Sunday is visible as one signal rather
+         *     than seven. Only the future is refused.
+         */
         StudyLogCreate: {
             readonly id: number;
             topic: number;
+            readonly topic_name: string;
+            /** @description Minutes studied, 1–720. */
             minutes: number;
             mode: components["schemas"]["ModeEnum"];
             /** Format: date-time */
             ts: string;
         };
+        /**
+         * @description A self-reported study session, as the student enters it.
+         *
+         *     Tier-1 data — see `StudyLog`. Backdating is allowed and expected (people
+         *     log in the evening for the afternoon); the model keeps `logged_at`
+         *     separately so a week entered on Sunday is visible as one signal rather
+         *     than seven. Only the future is refused.
+         */
         StudyLogCreateRequest: {
             topic: number;
+            /** @description Minutes studied, 1–720. */
             minutes: number;
             mode: components["schemas"]["ModeEnum"];
             /** Format: date-time */
@@ -1692,6 +2911,35 @@ export interface components {
             total_questions?: number;
             max_marks?: number;
             duration_min?: number;
+            /**
+             * @description Where the paper came from: an official past paper, the institute's own mock, one we wrote for the demo, or generated. The product must always be able to say this out loud.
+             *
+             *     * `official_pyq` - Official past paper
+             *     * `demo` - Demo (written by us)
+             *     * `generated` - Generated
+             *     * `institute` - Institute's own mock
+             */
+            readonly source: components["schemas"]["PaperSourceEnum"];
+        };
+        /**
+         * @description The institute's own mock, before its blueprint and results.
+         *
+         *     `exam` is the exam's code (`JEE_MAIN`, `NEET_UG`), the same string the
+         *     batches payload calls `exam_code`. Marking defaults to the exam's own
+         *     scheme, so a plain JEE Main mock needs no marking fields at all.
+         */
+        TestPaperCreateRequest: {
+            name: string;
+            exam: string;
+            /** Format: date */
+            held_on: string;
+            total_questions?: number;
+            max_marks?: number;
+            marks_correct?: number;
+            marks_wrong?: number;
+            duration_min?: number;
+            /** @description NEET test-booklet code or JEE Main date and shift — the official key is per booklet / per shift, so this is part of the paper's identity, not a label. */
+            shift_or_booklet?: string;
         };
         /**
          * @description * `minutes` - minutes
@@ -1805,6 +3053,14 @@ export interface operations {
                     "application/json": components["schemas"]["Detail"];
                 };
             };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
         };
     };
     auth_logout_create: {
@@ -1822,6 +3078,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    auth_password_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChangeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PasswordChangeRequest"];
+                "multipart/form-data": components["schemas"]["PasswordChangeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
             };
         };
     };
@@ -2002,6 +3299,35 @@ export interface operations {
             };
         };
     };
+    flags_interventions_list: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this flag. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedInterventionList"];
+                };
+            };
+        };
+    };
     flags_resolve_create: {
         parameters: {
             query?: {
@@ -2037,6 +3363,184 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ingest_batches_list: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedIngestBatchList"];
+                };
+            };
+        };
+    };
+    ingest_batches_retrieve: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ingest batch. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestBatch"];
+                };
+            };
+        };
+    };
+    ingest_mappings_list: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedColumnMappingProfileList"];
+                };
+            };
+        };
+    };
+    ingest_mappings_create: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ColumnMappingProfileRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ColumnMappingProfileRequest"];
+                "multipart/form-data": components["schemas"]["ColumnMappingProfileRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColumnMappingProfile"];
+                };
+            };
+        };
+    };
+    ingest_results_create: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ResultsUploadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultsReport"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultsReport"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description This exact file was already imported. Body: `{detail, batch_id}`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultsReport"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
             };
         };
     };
@@ -2110,10 +3614,151 @@ export interface operations {
             };
         };
     };
+    my_attempts_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description Only answers on this paper (`paper_id` from `mock-scores`). */
+                paper?: number;
+                /** @description Only answers with this outcome — `wrong` is the usual review list. `blank` (chose to skip) and `not_reached` (ran out of time) are different things. */
+                status?: "blank" | "correct" | "not_reached" | "wrong";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedMyAttemptList"];
+                };
+            };
+        };
+    };
+    my_confidence_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedConfidenceRatingList"];
+                };
+            };
+        };
+    };
+    my_confidence_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfidenceRatingRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ConfidenceRatingRequest"];
+                "multipart/form-data": components["schemas"]["ConfidenceRatingRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfidenceRating"];
+                };
+            };
+        };
+    };
+    my_marks_lost_retrieve: {
+        parameters: {
+            query: {
+                /** @description Include the per-question cause breakdown. */
+                detail?: boolean;
+                /** @description The `paper_id` of a paper I sat, from `GET /api/my/mock-scores/`. Non-numeric or missing is a 400, not an empty result. */
+                paper: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarksLost"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    my_mock_scores_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedMockScoreList"];
+                };
+            };
+        };
+    };
     my_plan_list: {
         parameters: {
             query?: {
-                /** @description The day to plan for, `YYYY-MM-DD`. Defaults to today in the server's local timezone. An unparseable date is a 400 from the ORM. */
+                /** @description The day to plan for, `YYYY-MM-DD`. Defaults to today in the server's local timezone. Anything else is a 400. */
                 date?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
@@ -2141,7 +3786,6 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description A unique integer value identifying this plan block. */
                 id: number;
             };
             cookie?: never;
@@ -2154,6 +3798,199 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlanBlock"];
+                };
+            };
+            /** @description No such block among this student's own. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    my_plan_uncomplete_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanBlock"];
+                };
+            };
+            /** @description No such block among this student's own. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    my_plan_generate_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PlanGenerateRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PlanGenerateRequestRequest"];
+                "multipart/form-data": components["schemas"]["PlanGenerateRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanGeneration"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanGeneration"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    my_profile_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyProfile"];
+                };
+            };
+        };
+    };
+    my_questions_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyQuestion"];
+                };
+            };
+            /** @description No such question, or one I have not answered. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    my_revisions_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description `true` returns only revisions not yet done. A presence filter like `?open=` on flags: any other value is ignored and returns everything. */
+                pending?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedMyRevisionList"];
+                };
+            };
+        };
+    };
+    my_revisions_complete_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyRevision"];
+                };
+            };
+            /** @description No such revision among this student's own. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
                 };
             };
         };
@@ -2207,6 +4044,80 @@ export interface operations {
             };
         };
     };
+    my_subject_breakdown_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedSubjectBreakdownList"];
+                };
+            };
+        };
+    };
+    my_topic_states_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description Only chapters with a measured `mastery` below 0.5. Chapters below the evidence floor carry a null mastery and are excluded, because 'not enough attempts to say' is not the same claim as 'weak'. */
+                weak?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedTopicStateList"];
+                };
+            };
+        };
+    };
+    my_topics_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedMyTopicList"];
+                };
+            };
+        };
+    };
     papers_list: {
         parameters: {
             query?: {
@@ -2233,6 +4144,42 @@ export interface operations {
             };
         };
     };
+    papers_create: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestPaperCreateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["TestPaperCreateRequest"];
+                "multipart/form-data": components["schemas"]["TestPaperCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestPaper"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
     papers_retrieve: {
         parameters: {
             query?: {
@@ -2254,6 +4201,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TestPaper"];
+                };
+            };
+        };
+    };
+    papers_blueprint_create: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["BlueprintUploadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlueprintReport"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlueprintReport"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
                 };
             };
         };
@@ -2361,6 +4368,132 @@ export interface operations {
             };
         };
     };
+    students_account_create: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this student. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StudentCredentialRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["StudentCredentialRequestRequest"];
+                "multipart/form-data": components["schemas"]["StudentCredentialRequestRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentCredential"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    students_account_reset_password_create: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this student. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StudentCredentialRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["StudentCredentialRequestRequest"];
+                "multipart/form-data": components["schemas"]["StudentCredentialRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentCredential"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
     students_attempts_list: {
         parameters: {
             query?: {
@@ -2388,6 +4521,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaginatedAttemptList"];
+                };
+            };
+        };
+    };
+    students_confidence_list: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this student. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedConfidenceRatingList"];
                 };
             };
         };
@@ -2549,6 +4711,97 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaginatedMockScoreList"];
+                };
+            };
+        };
+    };
+    students_plan_list: {
+        parameters: {
+            query?: {
+                /** @description The day to show, `YYYY-MM-DD`. Defaults to today in the server's timezone. Anything else is a 400. */
+                date?: string;
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this student. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPlanBlockList"];
+                };
+            };
+        };
+    };
+    students_revisions_list: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description `true` returns only revisions not yet done; anything else is ignored. */
+                pending?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this student. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedMyRevisionList"];
+                };
+            };
+        };
+    };
+    students_study_logs_list: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this student. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedStudyLogCreateList"];
                 };
             };
         };

@@ -1,3 +1,4 @@
+import { CircleDashed } from "lucide-react";
 import type { Severity } from "@/api/types";
 import { SEVERITY, riskBand } from "@/lib/severity";
 import { cn } from "@/lib/utils";
@@ -24,13 +25,19 @@ export function SeverityChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full font-medium whitespace-nowrap",
-        size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs",
+        // Inset ring, so a chip sits in a table row at exactly its text
+        // height and never nudges the row taller than its neighbours.
+        "inline-flex items-center gap-1 rounded-full font-semibold tracking-tight whitespace-nowrap ring-inset",
+        size === "sm" ? "h-5 px-2 text-[11px]" : "h-6 px-2.5 text-xs",
         token.chip,
         className,
       )}
     >
-      <Icon aria-hidden className={size === "sm" ? "size-3" : "size-3.5"} />
+      <Icon
+        aria-hidden
+        strokeWidth={2.25}
+        className={size === "sm" ? "size-3" : "size-3.5"}
+      />
       {label ?? token.label}
     </span>
   );
@@ -39,6 +46,10 @@ export function SeverityChip({
 /**
  * The same chip driven by `risk_score`, which is on a **0–1** scale. The band
  * boundaries are the server's — see `RISK_BANDS` in `lib/severity.ts`.
+ *
+ * A null score is "not scored" (too little data — `features.py` stores None
+ * rather than guess), and says so. It used to chip "On track", which is a
+ * reassurance the system has no basis for.
  */
 export function RiskChip({
   score,
@@ -49,6 +60,20 @@ export function RiskChip({
   size?: "sm" | "md";
   className?: string;
 }) {
+  if (score == null) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full bg-muted font-semibold tracking-tight whitespace-nowrap text-muted-foreground ring-1 ring-border ring-inset",
+          size === "sm" ? "h-5 px-2 text-[11px]" : "h-6 px-2.5 text-xs",
+          className,
+        )}
+      >
+        <CircleDashed aria-hidden strokeWidth={2.25} className={size === "sm" ? "size-3" : "size-3.5"} />
+        Not scored
+      </span>
+    );
+  }
   return (
     <SeverityChip severity={riskBand(score).key} size={size} className={className} />
   );

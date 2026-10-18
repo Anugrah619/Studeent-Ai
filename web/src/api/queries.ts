@@ -51,7 +51,9 @@ import type {
 
 export const qk = {
   me: ["me"] as const,
+  /** Prefix of every summary key — what a mutation invalidates. */
   dashboard: ["dashboard", "summary"] as const,
+  dashboardFor: (batch?: number) => ["dashboard", "summary", batch ?? null] as const,
   batches: ["batches"] as const,
   papers: ["papers"] as const,
   students: (filters: StudentFilters) => ["students", filters] as const,
@@ -96,10 +98,25 @@ export interface FlagFilters {
 
 type ListOpts<T> = Omit<UseQueryOptions<T[], Error, T[]>, "queryKey" | "queryFn">;
 
-export function useDashboardSummary() {
+/**
+ * The KPI strip, for the whole institute or for one batch.
+ *
+ * `?batch=` scopes every figure on the server, and the response echoes
+ * `batch_id` / `batch_name`. Callers label the strip from that echo, never
+ * from the batch they asked for: a summary that came back institute-wide must
+ * not be captioned as one batch's, even for the moment a new batch is loading.
+ */
+export function useDashboardSummary(
+  batch?: number,
+  opts?: Omit<UseQueryOptions<DashboardSummary, Error>, "queryKey" | "queryFn">,
+) {
   return useQuery<DashboardSummary, Error>({
-    queryKey: qk.dashboard,
-    queryFn: () => apiGet("/api/dashboard/summary/"),
+    queryKey: qk.dashboardFor(batch),
+    queryFn: () =>
+      apiGet("/api/dashboard/summary/", {
+        query: batch === undefined ? undefined : { batch },
+      }),
+    ...opts,
   });
 }
 

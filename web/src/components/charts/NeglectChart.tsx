@@ -1,15 +1,25 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { AnimatePresence, motion, type Variants } from "motion/react";
 import type { SubjectBreakdown } from "@/api/types";
 import { useMeasure } from "@/hooks/use-measure";
 import { num, pct, signed } from "@/lib/format";
+import { EASE_OUT_SOFT, revealViewport, transition } from "@/lib/motion";
 import { resolveSubject } from "@/lib/subjects";
+import { cn } from "@/lib/utils";
 import { Figure, FigureTable, Legend } from "./Figure";
 
-const BAR_H = 18;
+const BAR_H = 20;
 /** The fixed centre column carrying the subject name. Style and maths share it. */
 const CENTRE_W = 104;
 /** `gap-x-3`, in pixels. Both gaps sit between the centre column and a half. */
 const GAP = 12;
+/**
+ * `minmax(0, 1fr)`, not `1fr`. A bare `1fr` has a min-content floor, so the
+ * half holding the wider label could quietly take more of the row than the
+ * other — and the two halves would stop sharing one scale. With a zero floor
+ * the halves are equal by construction, which `halfWidth` below assumes.
+ */
+const COLUMNS = `minmax(0,1fr) ${CENTRE_W}px minmax(0,1fr)`;
 /** Inset either side of a label that sits inside its own bar. */
 const LABEL_INSET = 6;
 /**
@@ -20,8 +30,8 @@ const LABEL_INSET = 6;
 const CHAR_W = 6.6;
 /**
  * A bar shorter than this fraction of the axis stops reading as a bar once
- * there is a number inside it — it reads as a chip. Same rule, and the same
- * reason, as `INLINE_LABEL_MIN_PCT` in `MarksLostBar`.
+ * there is a number inside it — it reads as a chip. The same reason as the
+ * floor `INLINE_LABEL_MIN_PCT` sets on segments in `MarksLostBar`.
  */
 const INLINE_MIN_AXIS_FRACTION = 0.2;
 
@@ -34,6 +44,28 @@ const TIME_FILL = "color-mix(in oklab, var(--foreground) 32%, transparent)";
 const TIME_INK = "var(--foreground)";
 const SUBJECT_KEY_FILL =
   "linear-gradient(90deg, var(--subject-physics) 0 33.33%, var(--subject-chemistry) 33.33% 66.66%, var(--subject-maths) 66.66% 100%)";
+
+/**
+ * Bars grow once, outward from the centre, the first time the chart scrolls
+ * into view; rows follow each other by a beat. Values arrive only after their
+ * bar has, so a number is never seen sitting on a mark still in motion.
+ * `MotionConfig reducedMotion="user"` turns the growth into a cut.
+ */
+const ROW_STEP = 0.08;
+const grow: Variants = {
+  hidden: { scaleX: 0 },
+  show: (row: number) => ({
+    scaleX: 1,
+    transition: { duration: 0.55, ease: EASE_OUT_SOFT, delay: ROW_STEP * row },
+  }),
+};
+const arrive: Variants = {
+  hidden: { opacity: 0 },
+  show: (row: number) => ({
+    opacity: 1,
+    transition: { duration: 0.2, delay: ROW_STEP * row + 0.4 },
+  }),
+};
 
 interface Row extends SubjectBreakdown {
   color: string;
@@ -50,9 +82,15 @@ interface Row extends SubjectBreakdown {
  *
  * The two bars are the same subject hue at two opacities: they are two measures
  * of one entity, not two categories, and the row labels carry which is which.
+ *
+ * Kept hand-built rather than moved to Recharts. A diverging pair with a text
+ * column down the middle is two charts to Recharts, glued at a seam, and the
+ * label placement below depends on knowing each bar's length in pixels — which
+ * is exactly what a layout we own can tell us and a library's cannot.
  */
 export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
   const { ref, width } = useMeasure<HTMLDivElement>();
+  const [active, setActive] = useState<string | null>(null);
 
   const data = useMemo<Row[]>(
     () =>
@@ -137,77 +175,161 @@ export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
             <strong className="font-semibold text-foreground">{worst.label}</strong>{" "}
             takes {pct(worst.time_share_pct)} of the study hours and accounts for{" "}
             {pct(worst.marks_lost_share_pct)} of the marks lost — a{" "}
-            {num(Math.abs(worst.gap))}-point gap. That is the cheapest hour
-            available on this timetable.
+            {num(Math.abs(worst.gap))}-point gap. That is where study time looks
+            most clearly under-spent.
           </>
         ) : (
           "Effort and loss are broadly in proportion across all three subjects."
         )
       }
     >
-      <div ref={ref} className="pt-1">
-        <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-end gap-x-3">
+      <div ref={ref} className="my-auto pt-1">
+        <div
+          className="mb-2.5 grid items-end gap-x-3"
+          style={{ gridTemplateColumns: COLUMNS }}
+        >
           <div className="text-right text-[11px] font-medium text-muted-foreground">
             ← Share of study time
           </div>
-          <div style={{ width: CENTRE_W }} />
+          <div />
           <div className="text-[11px] font-medium text-muted-foreground">
             Share of marks lost →
           </div>
         </div>
 
-        <ul className="space-y-3">
-          {data.map((row) => (
-            <li
-              key={row.subject}
-              className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-3"
-            >
-              {/* Left half — grows leftward from the centre baseline. */}
-              <Half
-                side="left"
-                value={row.time_share_pct}
-                max={max}
-                halfWidth={halfWidth}
-                fill={TIME_FILL}
-                ink={TIME_INK}
-              />
+        <motion.ul
+          className="space-y-2"
+          initial="hidden"
+          whileInView="show"
+          viewport={revealViewport}
+          onMouseLeave={() => setActive(null)}
+        >
+          {data.map((row, i) => {
+            const isActive = active === row.subject;
+            return (
+              <li
+                key={row.subject}
+                tabIndex={0}
+                aria-label={`${row.label}: ${pct(row.time_share_pct)} of study time, ${pct(row.marks_lost_share_pct)} of marks lost, a ${signed(row.gap)}-point gap. ${pct(row.accuracy_pct)} accuracy.`}
+                onMouseEnter={() => setActive(row.subject)}
+                onFocus={() => setActive(row.subject)}
+                onBlur={() => setActive(null)}
+                className={cn(
+                  "relative grid items-center gap-x-3 rounded-md py-1 outline-none transition-opacity duration-150 focus-visible:ring-2 focus-visible:ring-ring",
+                  active && !isActive ? "opacity-40" : "",
+                )}
+                style={{ gridTemplateColumns: COLUMNS }}
+              >
+                {/* Left half — grows leftward from the centre baseline. */}
+                <Half
+                  side="left"
+                  row={i}
+                  value={row.time_share_pct}
+                  max={max}
+                  halfWidth={halfWidth}
+                  fill={TIME_FILL}
+                  ink={TIME_INK}
+                />
 
-              <div style={{ width: CENTRE_W }} className="text-center">
-                <div className="flex items-center justify-center gap-1.5">
-                  <span
-                    aria-hidden
-                    className="size-2 shrink-0 rounded-[2px]"
-                    style={{ background: row.color }}
-                  />
-                  <span className="truncate text-xs font-medium text-foreground">
-                    {row.label}
-                  </span>
+                <div className="min-w-0 text-center">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span
+                      aria-hidden
+                      className="size-2 shrink-0 rounded-[2px]"
+                      style={{ background: row.color }}
+                    />
+                    <span className="truncate text-xs font-medium text-foreground">
+                      {row.label}
+                    </span>
+                  </div>
+                  <div className="tnum text-[10px] text-muted-foreground">
+                    {pct(row.accuracy_pct)} accuracy
+                  </div>
                 </div>
-                <div className="tnum text-[10px] text-muted-foreground">
-                  {pct(row.accuracy_pct)} accuracy
-                </div>
-              </div>
 
-              {/* Right half — grows rightward from the centre baseline. */}
-              <Half
-                side="right"
-                value={row.marks_lost_share_pct}
-                max={max}
-                halfWidth={halfWidth}
-                fill={row.color}
-                ink={row.ink}
-              />
-            </li>
-          ))}
-        </ul>
+                {/* Right half — grows rightward from the centre baseline. */}
+                <Half
+                  side="right"
+                  row={i}
+                  value={row.marks_lost_share_pct}
+                  max={max}
+                  halfWidth={halfWidth}
+                  fill={row.color}
+                  ink={row.ink}
+                />
 
-        <div className="mt-3 grid grid-cols-[1fr_auto_1fr] gap-x-3 text-[10px] text-muted-foreground">
+                <AnimatePresence>
+                  {isActive ? <RowTooltip row={row} /> : null}
+                </AnimatePresence>
+              </li>
+            );
+          })}
+        </motion.ul>
+
+        <div
+          className="mt-2.5 grid gap-x-3 text-[10px] text-muted-foreground"
+          style={{ gridTemplateColumns: COLUMNS }}
+        >
           <div className="tnum text-left">{max}%</div>
-          <div style={{ width: CENTRE_W }} className="text-center">0</div>
+          <div className="text-center">0</div>
           <div className="tnum text-right">{max}%</div>
         </div>
       </div>
     </Figure>
+  );
+}
+
+/**
+ * The row's numbers side by side, with the one the chart is about — the gap —
+ * set in weight. It floats above the row's name, so it covers the row before,
+ * which is dimmed while this one is read.
+ */
+function RowTooltip({ row }: { row: Row }) {
+  return (
+    <motion.div
+      aria-hidden
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, transition: transition.fast }}
+      transition={transition.fast}
+      className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 w-48 -translate-x-1/2 rounded-lg border border-border bg-popover p-2.5 text-xs shadow-overlay"
+    >
+      <div className="mb-1.5 flex items-center gap-2">
+        <span
+          className="size-2.5 shrink-0 rounded-[2px]"
+          style={{ background: row.color }}
+        />
+        <span className="font-medium text-popover-foreground">{row.label}</span>
+      </div>
+      <dl className="space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="size-2 shrink-0 rounded-[2px]" style={{ background: TIME_FILL }} />
+          <dt className="flex-1 text-muted-foreground">Study time</dt>
+          <dd className="tnum font-medium text-popover-foreground">
+            {pct(row.time_share_pct, 1)}
+          </dd>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="size-2 shrink-0 rounded-[2px]" style={{ background: row.color }} />
+          <dt className="flex-1 text-muted-foreground">Marks lost</dt>
+          <dd className="tnum font-medium text-popover-foreground">
+            {pct(row.marks_lost_share_pct, 1)}
+          </dd>
+        </div>
+        <div className="flex items-center gap-2 border-t border-border pt-1">
+          <dt className="flex-1 pl-4 text-muted-foreground">Gap</dt>
+          <dd className="tnum font-semibold text-popover-foreground">
+            {signed(row.gap, 1)} pts
+          </dd>
+        </div>
+        <div className="flex items-center gap-2">
+          <dt className="flex-1 pl-4 text-muted-foreground">Accuracy</dt>
+          <dd className="tnum font-medium text-popover-foreground">
+            {pct(row.accuracy_pct, 1)}
+          </dd>
+        </div>
+      </dl>
+    </motion.div>
   );
 }
 
@@ -219,6 +341,12 @@ export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
  * same tip, when it is not. Chemistry at an 11% time share is the case that
  * forces the branch: at most real widths that bar is about thirty pixels long,
  * and a number set inside it either overflows the fill or is clipped by it.
+ *
+ * Both placements are measured from the tip itself, not left to flow layout:
+ * the bar is positioned against the centre edge of a full-width track, and an
+ * outside label is positioned at `bar length + inset` on that same track. A
+ * label therefore cannot drift from a short bar whatever the row's width, the
+ * text's width or the other half are doing — which is how it used to detach.
  *
  * Two things make the flip invisible rather than jarring:
  *
@@ -236,6 +364,7 @@ export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
  */
 function Half({
   side,
+  row,
   value,
   max,
   halfWidth,
@@ -243,6 +372,8 @@ function Half({
   ink,
 }: {
   side: "left" | "right";
+  /** Position in the list; staggers the entrance. */
+  row: number;
   value: number;
   max: number;
   halfWidth: number;
@@ -251,58 +382,64 @@ function Half({
   ink?: string;
 }) {
   const text = pct(value);
-  const barPx = (value / max) * halfWidth;
+  const fraction = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
+  const barPx = fraction * halfWidth;
   const needed = text.length * CHAR_W + 2 * LABEL_INSET;
   const inside =
     ink !== undefined &&
     barPx >= needed &&
-    value / max >= INLINE_MIN_AXIS_FRACTION;
+    fraction >= INLINE_MIN_AXIS_FRACTION;
+  const left = side === "left";
+  const length = `${fraction * 100}%`;
 
   const label = (
-    <span
+    <motion.span
       data-label-placement={inside ? "inside" : "outside"}
-      className="tnum shrink-0 text-[11px] font-medium"
-      style={{ color: inside ? ink : "var(--foreground)" }}
-    >
-      {text}
-    </span>
-  );
-
-  const bar = (
-    <div
-      className={`flex shrink-0 items-center ${
-        side === "left" ? "justify-start rounded-l-[4px]" : "justify-end rounded-r-[4px]"
-      }`}
+      variants={arrive}
+      custom={row}
+      className={cn(
+        "tnum text-[11px] leading-none font-medium whitespace-nowrap",
+        // Inside: in flow, above the absolutely-placed fill. Outside: placed
+        // on the track at the tip, centred on the bar's own midline.
+        inside ? "relative" : "absolute top-1/2 -translate-y-1/2",
+      )}
       style={{
-        width: `${(value / max) * 100}%`,
-        height: BAR_H,
-        background: fill,
-        paddingInline: inside ? LABEL_INSET : 0,
+        color: inside ? ink : "var(--foreground)",
+        ...(inside
+          ? null
+          : left
+            ? { right: `calc(${length} + ${LABEL_INSET}px)` }
+            : { left: `calc(${length} + ${LABEL_INSET}px)` }),
       }}
     >
-      {inside ? label : null}
-    </div>
+      {text}
+    </motion.span>
   );
 
   // The outer tip is the left edge on the left half and the right edge on the
-  // right half, so an outside label leads on the left and trails on the right.
+  // right half, so an inside label is pinned to that end of its bar.
   return (
-    <div
-      className={`flex min-w-0 items-center gap-1.5 ${
-        side === "left" ? "justify-end" : ""
-      }`}
-    >
-      {side === "left" ? (
-        <>
-          {inside ? null : label}
-          {bar}
-        </>
-      ) : (
-        <>
-          {bar}
-          {inside ? null : label}
-        </>
-      )}
+    <div className="relative min-w-0" style={{ height: BAR_H }}>
+      <div
+        className={cn(
+          "absolute inset-y-0 flex items-center",
+          left ? "right-0 justify-start" : "left-0 justify-end",
+        )}
+        style={{ width: length, paddingInline: inside ? LABEL_INSET : 0 }}
+      >
+        <motion.div
+          aria-hidden
+          variants={grow}
+          custom={row}
+          className={cn(
+            "absolute inset-0",
+            left ? "origin-right rounded-l-[4px]" : "origin-left rounded-r-[4px]",
+          )}
+          style={{ background: fill }}
+        />
+        {inside ? label : null}
+      </div>
+      {inside ? null : label}
     </div>
   );
 }

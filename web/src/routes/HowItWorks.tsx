@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { motion } from "motion/react";
 import {
   ArrowRight,
   Calculator,
@@ -7,20 +8,23 @@ import {
   CircleDashed,
   ClipboardList,
   Clock,
+  Database,
   Hand,
   Lock,
   Minus,
   Quote,
   Scale,
   Sparkles,
+  Tag,
   UserCheck,
   X,
 } from "lucide-react";
 import type { Attempt, DashboardSummary, MarksLost } from "@/api/types";
-import { timeToFixLabel, type Diagnosis } from "@/api/diagnosis";
+import { counterEvidenceNarrows, timeToFixLabel, type Diagnosis } from "@/api/diagnosis";
 import {
   chosenMisconception,
   chosenOption,
+  correctOption,
   type QuestionDetail,
 } from "@/api/questions";
 import {
@@ -44,6 +48,14 @@ import {
   Eyebrow,
   Figure,
 } from "@/components/explainer/Exhibit";
+import { IdeaCard } from "@/components/explainer/IdeaCard";
+import { Pipeline, type PipelineStop } from "@/components/explainer/Pipeline";
+import { RuleBeam } from "@/components/explainer/RuleBeam";
+import { Accent, PageHeadline } from "@/components/kit/PageHeadline";
+import { Reveal, RevealItem } from "@/components/kit/Reveal";
+import { Section } from "@/components/kit/Section";
+import { TextLink } from "@/components/kit/TextLink";
+import { BentoGrid } from "@/components/ui/bento-grid";
 import {
   EXAMPLE_STUDENT_ID,
   capitalise,
@@ -59,10 +71,11 @@ import {
   type SheetTally,
 } from "@/lib/explainer";
 import { num } from "@/lib/format";
+import { hoverLift } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
- * How it works — four steps, each shown on a live example.
+ * How it works — the story the founder tells, on a live example.
  *
  * Written for a coaching-institute director who has two minutes and has sat
  * through many ed-tech demos. The page's whole claim is "this is the system,
@@ -72,11 +85,21 @@ import { cn } from "@/lib/utils";
  * from the same routes the console uses. The only fixed choice is *which*
  * student to show, and that is a choice, not a number.
  *
- * The four steps keep the product's one architectural rule visible, because
- * it is also the answer to "why should I trust it": counting is code and is
- * exact (steps 1–2), judgement is the AI (step 3), and a teacher has the last
- * word (step 4). A director who remembers nothing else should remember that the
- * AI never produces a number.
+ * It reads in three passes, so a director can stop after any one of them:
+ *   1. the headline and the beam — who does what, in one sentence and one
+ *      picture;
+ *   2. the pipeline — six stops a presenter clicks through, each beside the
+ *      same step on the example student's answers;
+ *   3. the four steps in full — every figure, every citation, the answer that
+ *      can be opened.
+ * The headings alone tell the story; the detail is there for the one who asks.
+ *
+ * All three keep the product's one architectural rule visible, because it is
+ * also the answer to "why should I trust it": counting is code and is exact,
+ * judgement is the AI, and a teacher has the last word. A director who
+ * remembers nothing else should remember that the AI does none of the
+ * counting. (It does write figures into its own sentences — the headline's
+ * "25 marks" — so the page never claims it produces no number at all.)
  */
 export function HowItWorks() {
   const studentId = EXAMPLE_STUDENT_ID;
@@ -110,6 +133,7 @@ export function HowItWorks() {
   // The answer the page puts under the microscope: the first citation of the
   // strongest finding — chosen by the diagnosis, not by this file.
   const spotlight = citedQuestions.find((q) => q.id === cited[0]?.question_id);
+  const repeats = repeatedMistakes(citedQuestions);
 
   const name = student.data?.name ?? "this student";
   const who = student.data ? firstName(student.data.name) : "the student";
@@ -124,141 +148,228 @@ export function HowItWorks() {
     noPaper: summary.isSuccess && paperId === undefined,
   };
 
+  const diagnosisPending = summary.isPending || diagnosis.isPending;
+  const stops = pipelineStops({
+    ctx,
+    sheet: sheet.data,
+    spotlight,
+    spotlightPending: diagnosis.isPending || citedPending,
+    repeats,
+    repeatsPending: diagnosis.isPending || citedPending,
+    marksLost: marksLost.data,
+    diagnosis: diagnosis.data,
+    diagnosisPending,
+    diagnosisError: diagnosis.error,
+  });
+
   return (
-    <div className="py-6">
+    <div className="pb-6">
       <Intro ctx={ctx} pending={summary.isPending || student.isPending} />
-      <StepRail />
 
-      <div className="mt-8 space-y-12">
-        <Step
-          n={1}
-          id="step-record"
-          who="The system"
-          icon={<ClipboardList aria-hidden className="size-3.5" />}
-          title="Every answer is recorded — including which option was chosen"
-          promise="A cross says he got it wrong. The option he chose says why."
-          lede={
+      <Reveal delay={0.1}>
+        <RuleBeam
+          label={`Who does what: the answers are recorded and counted by the system, exactly; the AI explains the pattern, seeing only a code such as ${pseudonymFor(studentId)}; a teacher decides what to do.`}
+          stops={[
+            {
+              icon: Calculator,
+              title: "The answers",
+              line: "Recorded and counted by the system. Exact, every time.",
+            },
+            {
+              icon: Sparkles,
+              title: "The AI",
+              line: (
+                <>
+                  Explains <em>why</em>. Sees &ldquo;{pseudonymFor(studentId)}&rdquo;, never a
+                  name — and does none of the counting.
+                </>
+              ),
+              accent: true,
+            },
+            {
+              icon: UserCheck,
+              title: "A teacher",
+              line: "Checks the evidence, decides what to teach, agrees or disagrees.",
+            },
+          ]}
+        />
+      </Reveal>
+
+      <div className="mt-14 space-y-16">
+        <Section
+          id="pipeline"
+          eyebrow="Follow one answer"
+          title="From a tick-box to a teaching decision, in six stops"
+          description={
             <>
-              <p>
-                Most test software keeps a tick or a cross. We keep the option
-                the student actually picked.
-              </p>
-              <p>
-                That matters because, on our diagnostic paper, the tempting
-                wrong options are labelled in advance with the specific mistake
-                that leads a student to choose them. So a wrong answer is not
-                just a lost mark — it is a clue.
-              </p>
+              Click any stop — or use Next — to see what happens there, in plain
+              words, beside the same step on {ctx.who}&rsquo;s recorded answers.
             </>
           }
         >
-          <RecordExhibit
-            ctx={ctx}
-            sheet={sheet.data}
-            sheetPending={sheet.isPending}
-            sheetError={sheet.error}
-            spotlight={spotlight}
-            spotlightPending={diagnosis.isPending || citedPending}
-          />
-        </Step>
+          <Reveal>
+            <Pipeline
+              stops={stops}
+              label="The pipeline, in order: the answer sheet; the misconception tag on the option chosen; exact counting; Gemini's judgement; the teacher's action; saved as a training example."
+              endpoints={[ATTEMPTS_ROUTE, QUESTION_ROUTE, MARKS_LOST_ROUTE, DIAGNOSIS_ROUTE]}
+              exampleLabel={`On ${ctx.who}’s recorded answers`}
+            />
+          </Reveal>
+        </Section>
 
-        <Step
-          n={2}
-          id="step-count"
-          who="Plain arithmetic — no AI"
-          icon={<Calculator aria-hidden className="size-3.5" />}
-          title="We count, exactly"
-          promise="The numbers are never guessed. The same answers always give the same numbers."
-          lede={
-            <>
-              <p>
-                Next, the system counts: the score, how many answers were right,
-                the marks lost and which chapters they were lost in, and which
-                labelled wrong options keep coming back.
-              </p>
-              <p>
-                This is ordinary arithmetic on the recorded answers. No AI is
-                involved in this step, and none of these figures is ever
-                produced by one.
-              </p>
-            </>
-          }
+        <Section
+          id="steps"
+          eyebrow="In full"
+          title="The four steps, on the stored record"
+          description="The same journey with every figure on show. Each panel says where its data came from, and each cited wrong answer opens."
         >
-          <CountExhibit
-            ctx={ctx}
-            sheet={sheet.data}
-            marksLost={marksLost.data}
-            pending={sheet.isPending || marksLost.isPending}
-            error={sheet.error ?? marksLost.error}
-            repeats={repeatedMistakes(citedQuestions)}
-            repeatsPending={diagnosis.isPending || citedPending}
-            repeatsUnchecked={citedFailed}
-          />
-        </Step>
+          <StepRail />
 
-        <Step
-          n={3}
-          id="step-reason"
-          who="The AI"
-          icon={<Sparkles aria-hidden className="size-3.5" />}
-          title="The AI reads the pattern"
-          promise="The line that matters is what he got right — because that is what narrows a weak chapter down to one fixable trigger."
-          lede={
-            <>
-              <p>
-                Only now is the AI involved. It is handed the counts, the
-                questions and the options {who} chose — with his name replaced
-                by a code — and asked what a good teacher would ask: is this one
-                repeated misunderstanding, or scattered slips?
-              </p>
-              <p>
-                It is also shown the questions he got <em>right</em> in the same
-                chapters. Those are what separate “weak at the chapter” from
-                “goes wrong on one specific kind of question”.
-              </p>
-            </>
-          }
+          <div className="mt-8 space-y-12">
+            <Step
+              n={1}
+              id="step-record"
+              who="The system"
+              icon={<ClipboardList aria-hidden className="size-3.5" />}
+              title="Each answer is kept with the option chosen"
+              promise="A cross says he got it wrong. The option he chose often says why."
+              lede={
+                <>
+                  <p>
+                    A tick or a cross says only that an answer was wrong. On our
+                    diagnostic paper we also keep the option the student picked.
+                  </p>
+                  <p>
+                    That matters because the tempting wrong options on that paper
+                    are labelled in advance with the specific mistake
+                    that leads a student to choose them. So a wrong answer is not
+                    just a lost mark — it is a clue.
+                  </p>
+                </>
+              }
+            >
+              <RecordExhibit
+                ctx={ctx}
+                sheet={sheet.data}
+                sheetPending={sheet.isPending}
+                sheetError={sheet.error}
+                spotlight={spotlight}
+                spotlightPending={diagnosis.isPending || citedPending}
+              />
+            </Step>
+
+            <Step
+              n={2}
+              id="step-count"
+              who="Plain arithmetic — no AI"
+              icon={<Calculator aria-hidden className="size-3.5" />}
+              title="We count, exactly"
+              promise="The numbers are never guessed. The same answers always give the same numbers."
+              lede={
+                <>
+                  <p>
+                    Next, the system counts: the score, how many answers were right,
+                    the marks lost and which chapters they were lost in, and which
+                    labelled wrong options keep coming back.
+                  </p>
+                  <p>
+                    This is ordinary arithmetic on the recorded answers. No AI is
+                    involved in this step, and none of these figures is ever
+                    produced by one.
+                  </p>
+                </>
+              }
+            >
+              <CountExhibit
+                ctx={ctx}
+                sheet={sheet.data}
+                marksLost={marksLost.data}
+                pending={sheet.isPending || marksLost.isPending}
+                error={sheet.error ?? marksLost.error}
+                repeats={repeats}
+                repeatsPending={diagnosis.isPending || citedPending}
+                repeatsUnchecked={citedFailed}
+              />
+            </Step>
+
+            <Step
+              n={3}
+              id="step-reason"
+              who="The AI"
+              icon={<Sparkles aria-hidden className="size-3.5" />}
+              title="The AI reads the pattern"
+              promise="The line that matters is what he got right — because that is what narrows a weak chapter down to one fixable trigger."
+              lede={
+                <>
+                  <p>
+                    Only now is the AI involved. It is handed the counts, the
+                    questions and the options {who} chose — with his name replaced
+                    by a code — and asked what a good teacher would ask: is this one
+                    repeated misunderstanding, or scattered slips?
+                  </p>
+                  <p>
+                    It is also shown the questions he got <em>right</em> in the same
+                    chapters. Those are what separate “weak at the chapter” from
+                    “goes wrong on one specific kind of question”.
+                  </p>
+                </>
+              }
+            >
+              <ReasonExhibit
+                ctx={ctx}
+                diagnosis={diagnosis.data}
+                pending={diagnosisPending}
+                error={diagnosis.error}
+                sheet={sheet.data}
+              />
+            </Step>
+
+            <Step
+              n={4}
+              id="step-check"
+              who="A teacher"
+              icon={<UserCheck aria-hidden className="size-3.5" />}
+              title="A teacher checks it, and the verdict is kept"
+              promise="Little has to be taken on trust: each finding opens to the wrong answers it cites."
+              lede={
+                <>
+                  <p>
+                    Each finding links to the wrong answers it cites. A teacher opens
+                    any of them and sees the question, the option the student chose,
+                    and the belief that leads to that option — then agrees or
+                    disagrees.
+                  </p>
+                  <p>
+                    That judgement is saved alongside the AI&rsquo;s reasoning, as a
+                    checked example for training a model of our own later. Today it
+                    changes nothing else — not this diagnosis, and not the next one.
+                  </p>
+                </>
+              }
+            >
+              <CheckExhibit
+                ctx={ctx}
+                diagnosis={diagnosis.data}
+                pending={diagnosisPending}
+                error={diagnosis.error}
+                spotlight={spotlight}
+              />
+            </Step>
+          </div>
+        </Section>
+
+        <Section
+          id="remember"
+          eyebrow="If you remember five things"
+          title="What makes this different from a score report"
         >
-          <ReasonExhibit
+          <KeyIdeas
             ctx={ctx}
             diagnosis={diagnosis.data}
-            pending={summary.isPending || diagnosis.isPending}
-            error={diagnosis.error}
+            spotlight={spotlight}
             sheet={sheet.data}
           />
-        </Step>
-
-        <Step
-          n={4}
-          id="step-check"
-          who="A teacher"
-          icon={<UserCheck aria-hidden className="size-3.5" />}
-          title="A teacher checks it, and the system learns"
-          promise="Nothing has to be taken on trust: every claim opens to the answers behind it."
-          lede={
-            <>
-              <p>
-                Every claim links to the answers it rests on. A teacher opens
-                any of them and sees the question, the option the student chose,
-                and the belief that leads to that option — then agrees or
-                disagrees.
-              </p>
-              <p>
-                That judgement is saved alongside the AI&rsquo;s reasoning. Over
-                time those checked examples become the training material for
-                our own model — one that has learned from your teachers.
-              </p>
-            </>
-          }
-        >
-          <CheckExhibit
-            ctx={ctx}
-            diagnosis={diagnosis.data}
-            pending={summary.isPending || diagnosis.isPending}
-            error={diagnosis.error}
-            spotlight={spotlight}
-          />
-        </Step>
+        </Section>
       </div>
 
       <NextSteps studentId={studentId} who={who} />
@@ -282,40 +393,49 @@ interface Ctx {
 
 function Intro({ ctx, pending }: { ctx: Ctx; pending: boolean }) {
   return (
-    <header className="max-w-3xl">
-      <Eyebrow>How it works</Eyebrow>
-      <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-balance sm:text-[1.75rem]">
-        From an answer sheet to a teaching decision, in four steps
-      </h1>
-      <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">
-        Each step is shown on a real example from this system —{" "}
-        {pending ? (
-          "one student's answers to the latest paper"
-        ) : (
-          <>
-            <span className="font-medium text-foreground">{ctx.name}</span>
-            &rsquo;s answers to{" "}
-            <span className="font-medium text-foreground">
-              {ctx.paperName ?? "the latest paper"}
-            </span>
-          </>
-        )}{" "}
-        — and the diagnosis it made from them. Every panel is read from the
-        system as this page loads: what you see is what a teacher sees, not a
-        screenshot.
-      </p>
-      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-        {capitalise(ctx.who)} is one of this
-        demo&rsquo;s simulated students and the paper is our own; the AI&rsquo;s
-        diagnosis is real.{" "}
-        <Link
-          to="/trust"
-          className="font-medium text-foreground underline underline-offset-4"
-        >
-          What&rsquo;s real and what&rsquo;s simulated
-        </Link>
-      </p>
-    </header>
+    <PageHeadline
+      backdrop="hero"
+      eyebrow="How it works"
+      title={
+        <>
+          The system counts. The AI explains.{" "}
+          <Accent gradient>A teacher decides.</Accent>
+        </>
+      }
+      support={
+        <>
+          From an answer sheet to a teaching decision, shown on one worked
+          example from this system —{" "}
+          {pending ? (
+            "one student's answers to the latest paper"
+          ) : (
+            <>
+              <span className="font-medium text-foreground">{ctx.name}</span>
+              &rsquo;s answers to{" "}
+              <span className="font-medium text-foreground">
+                {ctx.paperName ?? "the latest paper"}
+              </span>
+            </>
+          )}{" "}
+          — and the diagnosis it made from them. Every panel draws on the same
+          data a teacher&rsquo;s console uses, and its tag says whether that is
+          live data or the demo fixtures.
+        </>
+      }
+      meta={
+        <>
+          <span className="inline-flex items-start gap-1.5 rounded-lg border border-border bg-card/80 px-2.5 py-1.5 text-xs leading-snug text-muted-foreground">
+            <Database aria-hidden className="mt-px size-3.5 shrink-0" />
+            {capitalise(ctx.who)} is one of this demo&rsquo;s simulated students,
+            answering with a mistake pattern built in, and the paper is our own;
+            the AI&rsquo;s diagnosis of that pattern is real.
+          </span>
+          <TextLink to="/trust" arrow className="text-sm">
+            What&rsquo;s real and what&rsquo;s simulated
+          </TextLink>
+        </>
+      }
+    />
   );
 }
 
@@ -335,17 +455,15 @@ const RAIL = [
  */
 function StepRail() {
   return (
-    <nav aria-label="The four steps" className="mt-6">
+    <nav aria-label="The four steps">
       <ol className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {RAIL.map((step, i) => (
           <li key={step.id} className="min-w-0">
             <a
               href={`#${step.id}`}
               className={cn(
-                "flex h-full min-w-0 items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50",
-                step.id === "step-reason"
-                  ? "border-foreground/30 bg-card"
-                  : "border-border bg-card",
+                "flex h-full min-w-0 items-center gap-3 rounded-lg border bg-card px-3 py-2.5 shadow-card transition-[background-color,box-shadow] outline-none hover:bg-muted/60 hover:shadow-raised focus-visible:ring-3 focus-visible:ring-ring/50",
+                step.id === "step-reason" ? "border-brand-line" : "border-border",
               )}
             >
               <span className="tnum flex size-7 shrink-0 items-center justify-center rounded-full border border-foreground/25 text-xs font-semibold text-foreground">
@@ -355,7 +473,12 @@ function StepRail() {
                 <span className="block text-sm font-semibold text-foreground">
                   {step.verb}
                 </span>
-                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <span
+                  className={cn(
+                    "flex items-center gap-1 text-[11px]",
+                    step.id === "step-reason" ? "text-brand-ink" : "text-muted-foreground",
+                  )}
+                >
                   <step.icon aria-hidden className="size-3" />
                   {step.who}
                 </span>
@@ -368,6 +491,13 @@ function StepRail() {
   );
 }
 
+/**
+ * One step: the takeaway first, then the reasoning, then the live exhibit.
+ *
+ * The promise sits directly under the heading because it is the sentence a
+ * skimming reader should leave with; the lede below it is for the one who
+ * wants the why.
+ */
 function Step({
   n,
   id,
@@ -391,33 +521,533 @@ function Step({
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className="grid scroll-mt-20 gap-5 border-t border-border pt-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,8fr)] lg:gap-10"
+      className="scroll-mt-28 border-t border-border pt-8"
     >
-      <div className="min-w-0 lg:sticky lg:top-20 lg:self-start">
-        <div className="flex items-center gap-2.5">
-          <span className="tnum flex size-7 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">
-            {n}
-          </span>
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
-            {icon}
-            {who}
-          </span>
+      <Reveal className="grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,8fr)] lg:gap-10">
+        <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+          <div className="flex items-center gap-2.5">
+            <span className="tnum flex size-7 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">
+              {n}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+              {icon}
+              {who}
+            </span>
+          </div>
+          <h2
+            id={`${id}-title`}
+            className="mt-3 font-heading text-xl leading-snug font-semibold tracking-tight text-balance text-foreground sm:text-2xl"
+          >
+            {title}
+          </h2>
+          <p className="mt-3 max-w-prose border-l-2 border-brand pl-3 text-[0.9375rem] leading-relaxed font-medium text-foreground">
+            {promise}
+          </p>
+          <div className="mt-3.5 max-w-prose space-y-2.5 text-sm leading-relaxed text-muted-foreground">
+            {lede}
+          </div>
         </div>
-        <h2
-          id={`${id}-title`}
-          className="mt-3 text-lg leading-snug font-semibold tracking-tight text-balance text-foreground sm:text-xl"
-        >
-          {title}
-        </h2>
-        <div className="mt-2.5 max-w-prose space-y-2.5 text-sm leading-relaxed text-muted-foreground">
-          {lede}
-        </div>
-        <p className="mt-4 max-w-prose border-l-2 border-foreground/70 pl-3 text-sm leading-relaxed font-medium text-foreground">
-          {promise}
-        </p>
-      </div>
-      <div className="min-w-0">{children}</div>
+        <div className="min-w-0">{children}</div>
+      </Reveal>
     </section>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * The pipeline — six stops, each with its example
+ *
+ * Every example is assembled from the same queries the four steps use, so the
+ * pipeline can never tell a different story from the detail below it. Where a
+ * query has not answered, the stop says so; it never fills in.
+ * ------------------------------------------------------------------ */
+
+function pipelineStops({
+  ctx,
+  sheet,
+  spotlight,
+  spotlightPending,
+  repeats,
+  repeatsPending,
+  marksLost,
+  diagnosis,
+  diagnosisPending,
+  diagnosisError,
+}: {
+  ctx: Ctx;
+  sheet: Attempt[] | undefined;
+  spotlight: QuestionDetail | undefined;
+  spotlightPending: boolean;
+  repeats: RepeatedMistake[];
+  repeatsPending: boolean;
+  marksLost: MarksLost | undefined;
+  diagnosis: Diagnosis | undefined;
+  diagnosisPending: boolean;
+  diagnosisError: Error | null;
+}): PipelineStop[] {
+  const { who } = ctx;
+  const pseudonym = pseudonymFor(ctx.studentId);
+
+  /** The shared fallbacks: nothing sat yet, still loading, or nothing to show. */
+  const unavailable = (pending: boolean, none: string): ReactNode =>
+    ctx.noPaper ? (
+      <Quiet>No paper has been sat yet, so there is no example to show.</Quiet>
+    ) : pending ? (
+      <ExhibitSkeleton lines={3} />
+    ) : (
+      <Quiet>{none}</Quiet>
+    );
+
+  const aiUnavailable = (none: string): ReactNode =>
+    diagnosisError ? (
+      <Quiet>
+        {isReasoningUnavailable(diagnosisError)
+          ? "The AI could not be reached just now, so there is no live example for this stop. The stops before it need no AI."
+          : isNotEnoughEvidence(diagnosisError)
+            ? "There is not enough labelled evidence on this paper for the AI to reason over — so it does not try."
+            : "The diagnosis could not be loaded just now."}
+      </Quiet>
+    ) : (
+      unavailable(diagnosisPending, none)
+    );
+
+  const chosen = spotlight ? chosenOption(spotlight) : null;
+  const right = spotlight ? correctOption(spotlight) : null;
+  const tag = spotlight ? chosenMisconception(spotlight) : null;
+  const tally = sheet ? tallySheet(sheet) : null;
+  const lead = diagnosis?.hypotheses[0];
+  const confirmed = lead && sheet ? labelsNamedIn(lead.counter_evidence, sheet) : [];
+  const band = timeToFixLabel(diagnosis?.time_to_fix);
+  const repeat = repeats[0];
+
+  return [
+    {
+      id: "sheet",
+      title: "Answer sheet",
+      actor: "system",
+      icon: ClipboardList,
+      explain: (
+        <>
+          <p>
+            A student picks one option on each multiple-choice question. A
+            score sheet keeps only a tick or a cross.
+          </p>
+          <p>
+            On our diagnostic paper we keep the option itself — because a wrong
+            option is chosen for a reason, and the option often says which.
+          </p>
+        </>
+      ),
+      example:
+        spotlight && chosen ? (
+          <>
+            {tally ? (
+              <p className="text-muted-foreground">
+                {capitalise(who)}&rsquo;s sheet has{" "}
+                <Strong>{plural(tally.total, "question")}</Strong>:{" "}
+                <Strong>{num(tally.correct)} right</Strong>,{" "}
+                <Strong>{num(tally.wrong)} wrong</Strong>
+                {tally.blank ? `, ${num(tally.blank)} skipped` : ""}.
+              </p>
+            ) : null}
+            <p className="mt-2">
+              On <Code>{spotlight.label}</Code>, {who} chose{" "}
+              <Strong>
+                ({chosen.label}) {chosen.text}
+              </Strong>
+              {right && right.label !== chosen.label ? (
+                <>
+                  . The right answer was ({right.label}) {right.text}
+                </>
+              ) : null}
+              .
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Stored with it: the result
+              {spotlight.time_spent != null
+                ? ` and the time taken — ${num(spotlight.time_spent)} s`
+                : ""}
+              .
+            </p>
+          </>
+        ) : (
+          unavailable(spotlightPending, "The diagnosis has not cited a wrong answer to follow.")
+        ),
+      more: { href: "#step-record", label: "See the whole answer sheet" },
+    },
+    {
+      id: "tag",
+      title: "Option's misconception tag",
+      actor: "system",
+      icon: Tag,
+      explain: (
+        <>
+          <p>
+            On our diagnostic paper, the tempting wrong options are labelled in
+            advance with the misconception that produces each one.
+          </p>
+          <p>
+            So choosing it is not just a lost mark — it is a clue to what the
+            student believes.
+          </p>
+        </>
+      ),
+      example:
+        spotlight && chosen && tag ? (
+          <>
+            <p className="text-muted-foreground">
+              Option ({chosen.label}) on {spotlight.label} was labelled before
+              anyone sat the paper:
+            </p>
+            <p className="mt-2">
+              <Code>{tag.code}</Code> <Strong>{tag.name}</Strong>
+            </p>
+            {tag.description ? (
+              <blockquote className="mt-2.5 flex gap-2 text-muted-foreground">
+                <Quote aria-hidden className="mt-1 size-3.5 shrink-0" />
+                <span>{tag.description}</span>
+              </blockquote>
+            ) : null}
+          </>
+        ) : (
+          unavailable(spotlightPending, "The cited answer carries no label to show.")
+        ),
+      more: { href: "#step-record", label: "See the option as it is stored" },
+    },
+    {
+      id: "count",
+      title: "Counting — exact",
+      actor: "code",
+      icon: Calculator,
+      explain: (
+        <>
+          <p>
+            Plain counting finds the same misconception chosen again and again.
+            It is ordinary arithmetic on the recorded answers: exact, and the
+            same answers always give the same numbers.
+          </p>
+          <p className="font-medium">The AI does none of this counting.</p>
+        </>
+      ),
+      example: repeat ? (
+        <>
+          <p>
+            <Code>{repeat.misconception.code}</Code> was chosen on{" "}
+            <Strong>{plural(repeat.questions.length, "question")}</Strong> among
+            the answers the diagnosis cites:
+          </p>
+          <p className="tnum mt-2 flex flex-wrap gap-1">
+            {repeat.questions.map((q) => (
+              <span
+                key={q.questionId}
+                className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+              >
+                {q.label}
+                <span className="text-muted-foreground"> chose {q.chose}</span>
+              </span>
+            ))}
+          </p>
+          {marksLost ? (
+            <p className="mt-2.5 text-muted-foreground">
+              The same counting, over the whole paper: a score of{" "}
+              <Strong>
+                {num(marksLost.score)} of {num(marksLost.max_marks)}
+              </Strong>
+              , with <Strong>{num(marksLost.total_lost)} marks</Strong> lost.
+            </p>
+          ) : null}
+        </>
+      ) : (
+        unavailable(repeatsPending, "No labelled wrong option was chosen twice among the cited answers.")
+      ),
+      more: { href: "#step-count", label: "See the full count" },
+    },
+    {
+      id: "judge",
+      title: "Gemini's judgement",
+      actor: "ai",
+      icon: Sparkles,
+      explain: (
+        <>
+          <p>
+            Only now is the AI — Google&rsquo;s Gemini — involved. It judges{" "}
+            <em>why</em> the pattern is there, using counter-evidence: questions
+            in the same chapter {who} got right, where the trigger was absent.
+          </p>
+          <p>
+            That is what separates one specific trigger from a weak chapter. It
+            sees the student only as &ldquo;{pseudonym}&rdquo; — never a name.
+          </p>
+        </>
+      ),
+      example: diagnosis ? (
+        <>
+          <p className="font-semibold text-balance">
+            {diagnosis.headline || "No diagnosis text was returned for this paper."}
+          </p>
+          {lead?.counter_evidence ? (
+            <div className="mt-2.5 border-l-[3px] border-status-good pl-3">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide uppercase">
+                <Scale aria-hidden className="size-3.5" />
+                The counter-evidence
+              </p>
+              <p className="mt-1 text-muted-foreground">{lead.counter_evidence}</p>
+            </div>
+          ) : null}
+          {confirmed.length ? (
+            <p className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-muted-foreground">On the answer sheet:</span>
+              {confirmed.map((row) => (
+                <SheetMark key={row.id} row={row} />
+              ))}
+            </p>
+          ) : null}
+        </>
+      ) : (
+        aiUnavailable("There is no diagnosis to show.")
+      ),
+      more: { href: "#step-reason", label: "See the AI's diagnosis" },
+    },
+    {
+      id: "action",
+      title: "The teacher's action",
+      actor: "teacher",
+      icon: UserCheck,
+      explain: (
+        <>
+          <p>
+            The AI recommends one action for the teacher, with the size of the
+            job as a band rather than a minute count.
+          </p>
+          <p>
+            The teacher reads the finding, opens the answers behind it, and
+            decides.
+          </p>
+        </>
+      ),
+      example: diagnosis?.recommended_action ? (
+        <>
+          <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            The AI suggests
+          </p>
+          <p className="mt-1">{diagnosis.recommended_action}</p>
+          {band ? (
+            <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock aria-hidden className="size-3.5" />
+              About {band.toLowerCase()} to fix
+            </p>
+          ) : null}
+        </>
+      ) : diagnosis ? (
+        <Quiet>This diagnosis came back with no recommended action.</Quiet>
+      ) : (
+        aiUnavailable("There is no recommendation to show.")
+      ),
+      more: { href: "#step-check", label: "See what the teacher sees" },
+    },
+    {
+      id: "saved",
+      title: "Saved as a training example",
+      actor: "system",
+      icon: Database,
+      explain: (
+        <>
+          <p>
+            Every reasoning transcript is saved — the data the AI was shown
+            and what it said.
+          </p>
+          <p>
+            A teacher&rsquo;s Agree or Disagree is saved with it. Together they
+            become a checked training example: material for training our own
+            model later.
+          </p>
+        </>
+      ),
+      example: diagnosis ? (
+        <>
+          <p>
+            This diagnosis is saved as{" "}
+            <Strong>
+              {diagnosis.trace_id ? `trace #${diagnosis.trace_id}` : "a trace"}
+            </Strong>
+            .
+          </p>
+          <p className="mt-2 inline-flex items-start gap-1.5 text-muted-foreground">
+            {diagnosis.human_verdict ? (
+              <Check aria-hidden className="mt-0.5 size-3.5 shrink-0 text-status-good" />
+            ) : (
+              <CircleDashed aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+            )}
+            <span>
+              {diagnosis.human_verdict === "agreed"
+                ? "A teacher agreed with it, so it is now a checked training example."
+                : diagnosis.human_verdict === "disagreed"
+                  ? "A teacher disagreed with it, so it is now a checked training example."
+                  : "No teacher has reviewed it yet. It becomes a training example the moment one does."}
+            </span>
+          </p>
+        </>
+      ) : (
+        aiUnavailable("There is no saved reasoning to show.")
+      ),
+      more: { href: "#step-check", label: "See how a verdict becomes training data" },
+    },
+  ];
+}
+
+function Quiet({ children }: { children: ReactNode }) {
+  return <p className="text-xs leading-relaxed text-muted-foreground">{children}</p>;
+}
+
+function Strong({ children }: { children: ReactNode }) {
+  return <span className="tnum font-semibold text-foreground">{children}</span>;
+}
+
+function Code({ children }: { children: ReactNode }) {
+  return (
+    <code className="rounded border border-border bg-muted px-1 py-px font-mono text-[11px] text-foreground">
+      {children}
+    </code>
+  );
+}
+
+/** One answer-sheet cell, in words and an icon — never the tint alone. */
+function SheetMark({ row }: { row: Attempt }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded border border-border bg-background px-1.5 py-0.5">
+      <span className="tnum font-mono text-[11px] text-foreground">{row.question_id}</span>
+      {row.status === "correct" ? (
+        <Check aria-hidden className="size-3.5 text-status-good" />
+      ) : (
+        <X aria-hidden className="size-3.5 text-status-critical" />
+      )}
+      <span className="text-muted-foreground">{STATUS_MARK[row.status].word}</span>
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * The five ideas
+ * ------------------------------------------------------------------ */
+
+/**
+ * The page's argument, five cards long, each with a specimen of the real
+ * thing beside it — a sum, a label, a citation — so the idea is shown rather
+ * than asserted. A specimen that has not loaded is simply left off.
+ */
+function KeyIdeas({
+  ctx,
+  diagnosis,
+  spotlight,
+  sheet,
+}: {
+  ctx: Ctx;
+  diagnosis: Diagnosis | undefined;
+  spotlight: QuestionDetail | undefined;
+  sheet: Attempt[] | undefined;
+}) {
+  const parts = diagnosis ? resolvedEvidence(diagnosis) : [];
+  const chosen = spotlight ? chosenOption(spotlight) : null;
+  const tag = spotlight ? chosenMisconception(spotlight) : null;
+  const lead = diagnosis?.hypotheses[0];
+  const confirmed = lead && sheet ? labelsNamedIn(lead.counter_evidence, sheet) : [];
+
+  return (
+    <Reveal stagger={0.06}>
+      <BentoGrid className="auto-rows-auto grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <RevealItem className="sm:col-span-2">
+          <IdeaCard
+            icon={Calculator}
+            title="The AI does none of the counting"
+            body="Scores, marks lost and marks at stake are counted by ordinary code from the recorded answers. The AI explains the pattern; a figure inside its own sentences is its wording, not the count."
+            specimen={
+              parts.length && diagnosis ? (
+                <p className="tnum flex flex-wrap items-center gap-1.5 text-xs">
+                  {parts.map((row, i) => (
+                    <span key={row.question_id} className="inline-flex items-center gap-1.5">
+                      {i > 0 ? (
+                        <span aria-hidden className="text-muted-foreground">
+                          +
+                        </span>
+                      ) : null}
+                      <span className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+                        {row.label}
+                        <span className="text-muted-foreground"> {num(row.marks_at_stake)}</span>
+                      </span>
+                    </span>
+                  ))}
+                  <span aria-hidden className="text-muted-foreground">
+                    =
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {num(diagnosis.total_marks_at_stake)} marks at stake
+                  </span>
+                </p>
+              ) : null
+            }
+            to="#step-count"
+            cta="See the count"
+          />
+        </RevealItem>
+        <RevealItem>
+          <IdeaCard
+            icon={Tag}
+            title="A wrong option is a clue"
+            body="On our diagnostic paper, the tempting wrong options are labelled in advance with the misconception behind each one."
+            specimen={
+              spotlight && chosen && tag ? (
+                <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <Code>
+                    {spotlight.label} ({chosen.label})
+                  </Code>
+                  <ArrowRight aria-hidden className="size-3" />
+                  <Code>{tag.code}</Code>
+                  <span className="sr-only">is labelled</span>
+                  <span>{tag.name}</span>
+                </p>
+              ) : null
+            }
+            to="#step-record"
+            cta="See one answer"
+          />
+        </RevealItem>
+        <RevealItem>
+          <IdeaCard
+            icon={Scale}
+            title="What he got right narrows it down"
+            body="Correct answers in the same chapter, where the trigger was absent, narrow “weak at the chapter” down to one fixable trigger."
+            specimen={
+              confirmed.length ? (
+                <p className="flex flex-wrap items-center gap-1.5 text-xs">
+                  {confirmed.map((row) => (
+                    <SheetMark key={row.id} row={row} />
+                  ))}
+                </p>
+              ) : null
+            }
+            to="#step-reason"
+            cta="See the counter-evidence"
+          />
+        </RevealItem>
+        <RevealItem>
+          <IdeaCard
+            icon={Lock}
+            title="The AI never sees a name"
+            body={`It is sent a code such as “${pseudonymFor(ctx.studentId)}” and the answers. Each institute's data is walled off from every other's inside the database.`}
+            to="/trust#privacy"
+            cta="What the AI never sees"
+          />
+        </RevealItem>
+        <RevealItem>
+          <IdeaCard
+            icon={UserCheck}
+            title="A teacher checks the AI"
+            body="Each finding opens to the wrong answers it cites. A teacher's Agree or Disagree is saved with the reasoning, as a label for training a model of our own later."
+            to="#step-check"
+            cta="See the teacher's view"
+          />
+        </RevealItem>
+      </BentoGrid>
+    </Reveal>
   );
 }
 
@@ -814,7 +1444,7 @@ function CountExhibit({
       {top && topChapter && topChapter.asked > 0 ? (
         <div className="rounded-xl border border-border bg-muted/40 px-4 py-3.5 text-sm leading-relaxed">
           <p className="text-muted-foreground">
-            This is where most products stop:{" "}
+            A score report stops here:{" "}
             <span className="font-medium text-foreground">
               &ldquo;weak in {top.topic} — revise the chapter.&rdquo;
             </span>
@@ -827,7 +1457,7 @@ function CountExhibit({
             </span>{" "}
             {top.topic} questions correctly on this paper.
             {topChapter.correct * 2 > topChapter.asked
-              ? " Re-teaching the whole chapter would re-teach what he already knows. Step 3 finds what is actually going wrong."
+              ? " Re-teaching the whole chapter would re-teach what he already knows. Step 3 looks for what is actually going wrong."
               : " Step 3 asks whether one misunderstanding explains the losses."}
           </p>
         </div>
@@ -980,9 +1610,10 @@ function ReasonExhibit({
           <span className="inline-flex items-start gap-1.5">
             <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
             <span>
-              The AI saw this student only as &ldquo;Student{" "}
-              {pseudonymFor(ctx.studentId)}&rdquo; — never a name. Every number
-              on this card was counted by the system, not by the AI.{" "}
+              The AI saw this student only as &ldquo;
+              {pseudonymFor(ctx.studentId)}&rdquo; — never a name. The marks at
+              stake were counted by the system; a figure inside the AI&rsquo;s
+              own sentences is its wording.{" "}
               <Link
                 to="/trust#privacy"
                 className="font-medium text-foreground underline underline-offset-4"
@@ -1022,7 +1653,9 @@ function ReasonExhibit({
                 <div className="mt-4 border-l-[3px] border-status-good bg-status-good/[0.07] py-3 pr-3.5 pl-3.5">
                   <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-foreground uppercase">
                     <Scale aria-hidden className="size-3.5" />
-                    Why it&rsquo;s one trigger, not a weak chapter
+                    {counterEvidenceNarrows(lead.counter_evidence)
+                      ? "Why it’s one trigger, not a weak chapter"
+                      : "Not narrowed to one trigger yet"}
                   </p>
                   <p className="mt-1.5 max-w-prose text-[0.9375rem] leading-relaxed text-foreground">
                     {lead.counter_evidence}
@@ -1105,9 +1738,9 @@ function DiagnosisUnavailable({ error }: { error: Error }) {
   if (isReasoningUnavailable(error)) {
     return (
       <ExhibitNote detail={error.message}>
-        The AI is not connected on this deployment, so this step has no live
-        example right now. Steps 1 and 2 need no AI at all, which is why they
-        are still shown above.
+        The AI could not be reached just now, so this step has no live example.
+        Steps 1 and 2 need no AI at all, which is why they are still shown
+        above.
       </ExhibitNote>
     );
   }
@@ -1184,8 +1817,8 @@ function CheckExhibit({
                 id="explainer-belief"
                 className="text-[11px] font-semibold tracking-[0.06em] text-foreground uppercase"
               >
-                What choosing ({spotlight.chosen_label ?? "?"}) on {spotlight.label}{" "}
-                reveals — in {ctx.who}&rsquo;s own words
+                The belief behind choosing ({spotlight.chosen_label ?? "?"}) on{" "}
+                {spotlight.label}
               </h3>
               <blockquote className="mt-2 flex gap-2.5">
                 <Quote aria-hidden className="mt-1 size-4 shrink-0 text-muted-foreground" />
@@ -1200,15 +1833,24 @@ function CheckExhibit({
             </section>
           ) : null}
 
+          {diagnosis.recommended_action ? (
+            <div>
+              <Eyebrow>The one action the AI suggests</Eyebrow>
+              <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-foreground">
+                {diagnosis.recommended_action}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                A suggestion for the teacher to weigh against the evidence above —
+                the teacher decides.
+              </p>
+            </div>
+          ) : null}
+
           <VerdictLoop diagnosis={diagnosis} />
 
-          <Link
-            to={`/students/${ctx.studentId}`}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline underline-offset-4"
-          >
+          <TextLink to={`/students/${ctx.studentId}`} arrow className="text-sm">
             Agree or disagree on {ctx.who}&rsquo;s page
-            <ArrowRight aria-hidden className="size-4" />
-          </Link>
+          </TextLink>
         </div>
       )}
     </Exhibit>
@@ -1229,7 +1871,7 @@ function VerdictLoop({ diagnosis }: { diagnosis: Diagnosis }) {
   const boxes = [
     {
       title: "The AI's reasoning",
-      body: `Saved in full as ${trace} — what it was shown and what it said.`,
+      body: `Saved as ${trace} — the data it was shown and what it said.`,
       done: true,
     },
     {
@@ -1295,12 +1937,12 @@ function NextSteps({ studentId, who }: { studentId: number; who: string }) {
   return (
     <nav
       aria-label="Where to go next"
-      className="mt-12 grid gap-2 border-t border-border pt-6 sm:grid-cols-2"
+      className="mt-16 grid gap-3 border-t border-border pt-8 sm:grid-cols-2"
     >
       <NextLink
         to="/trust"
         title="Data & trust"
-        body="What's real and what's simulated, what the AI never sees, and why it never does the maths."
+        body="What's real and what's simulated, what the AI never sees, and why the counting is left to code."
       />
       <NextLink
         to={`/students/${studentId}`}
@@ -1313,9 +1955,10 @@ function NextSteps({ studentId, who }: { studentId: number; who: string }) {
 
 function NextLink({ to, title, body }: { to: string; title: string; body: string }) {
   return (
+    <motion.div {...hoverLift} className="rounded-xl">
     <Link
       to={to}
-      className="group flex items-start justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3.5 transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="group flex h-full items-start justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3.5 shadow-card transition-shadow outline-none hover:shadow-raised focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-foreground">{title}</span>
@@ -1328,5 +1971,6 @@ function NextLink({ to, title, body }: { to: string; title: string; body: string
         className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
       />
     </Link>
+    </motion.div>
   );
 }

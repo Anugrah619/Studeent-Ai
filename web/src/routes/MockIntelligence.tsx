@@ -1,10 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FileQuestion } from "lucide-react";
+import { ApiError } from "@/api/client";
+import type { MarksLost } from "@/api/types";
 import { useMarksLost, useMockScores, useStudent } from "@/api/queries";
 import { MarksLostBar } from "@/components/charts/MarksLostBar";
-import { ErrorState, PanelSkeleton } from "@/components/common/States";
-import { causeSlices, marksLostTotals } from "@/lib/causes";
+import { EmptyState, ErrorState, PanelSkeleton } from "@/components/common/States";
+import { KpiCard } from "@/components/kit/KpiCard";
+import { Accent, PageHeadline } from "@/components/kit/PageHeadline";
+import { Section } from "@/components/kit/Section";
+import { causeSlices, marksLostTotals, type MarksLostTotals } from "@/lib/causes";
+import { firstName } from "@/lib/explainer";
 import { longDate, num, pct } from "@/lib/format";
 import { SUBJECT_LIST } from "@/lib/subjects";
 import {
@@ -44,7 +50,13 @@ export function MockIntelligence() {
     [scores.data, paperId],
   );
 
-  const error = student.error ?? marksLost.error;
+  /**
+   * A 404 here is an answer, not a failure: the server holds no attempts for
+   * this student on this paper. Retrying will not change it, so it gets a
+   * calm sentence and the paper picker rather than the red error state.
+   */
+  const noSheet = marksLost.error instanceof ApiError && marksLost.error.status === 404;
+  const error = student.error ?? (noSheet ? null : marksLost.error);
 
   /**
    * The denominators, resolved once. Null until the data lands, which is also
@@ -54,142 +66,139 @@ export function MockIntelligence() {
 
   /** The paper's real maximum, from the server, once it has answered. */
   const maxMarks = marksLost.data?.max_marks ?? null;
+  const name = student.data ? firstName(student.data.name) : "this student";
+  const paperName = row?.paper_name ?? "this paper";
+
+  const picker = (
+    <div>
+      <Label htmlFor="paper-select" className="mb-1.5 block text-xs text-muted-foreground">
+        Paper
+      </Label>
+      <Select
+        value={row ? String(paperId) : ""}
+        onValueChange={(value) => navigate(`/students/${id}/mock/${value}`)}
+      >
+        <SelectTrigger id="paper-select" className="w-60 max-w-full bg-card">
+          <SelectValue placeholder="Choose a paper" />
+        </SelectTrigger>
+        <SelectContent>
+          {(scores.data ?? []).map((score) => (
+            <SelectItem key={score.paper_id} value={String(score.paper_id)}>
+              {/* No denominator here: `MockScore` carries no paper max, and
+                  the one we know belongs to the paper currently open, not
+                  to every row in this list. */}
+              {score.paper_name} · {num(score.total)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const headline =
+    marksLost.data && totals ? (
+      mockHeadline(marksLost.data, totals, paperName, name)
+    ) : (
+      loadingHeadline()
+    );
 
   return (
-    <div className="space-y-6 py-6">
-      <Link
-        to={`/students/${id}`}
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-      >
-        <ChevronLeft aria-hidden className="size-3.5" />
-        {student.data?.name ?? "Student"} · 360
-      </Link>
+    <div className="space-y-10 py-6">
+      <div>
+        <Link
+          to={`/students/${id}`}
+          className="inline-flex items-center gap-1 rounded-sm text-xs text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <ChevronLeft aria-hidden className="size-3.5" />
+          {student.data?.name ?? "Student"} · 360
+        </Link>
 
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight">
-            {row?.paper_name ?? "Mock"} · mock intelligence
-          </h1>
-          <p className="tnum mt-1 text-sm text-muted-foreground">
-            {student.data?.name ?? "—"}
-            {row ? ` · held ${longDate(row.held_on)}` : ""}
-            {/* The score is quoted only once the paper's own maximum has
-                arrived. A number out of the wrong denominator is worse than a
-                number that shows up half a second later. */}
-            {row && maxMarks ? ` · scored ${num(row.total)} of ${num(maxMarks)}` : ""}
-          </p>
-        </div>
-
-        {/* One filter row, above everything it scopes. */}
-        <div>
-          <Label htmlFor="paper-select" className="mb-1.5 block text-xs">
-            Paper
-          </Label>
-          <Select
-            value={String(paperId)}
-            onValueChange={(value) => navigate(`/students/${id}/mock/${value}`)}
-          >
-            <SelectTrigger id="paper-select" className="w-[220px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(scores.data ?? []).map((score) => (
-                <SelectItem key={score.paper_id} value={String(score.paper_id)}>
-                  {/* No denominator here: `MockScore` carries no paper max, and
-                      the one we know belongs to the paper currently open, not
-                      to every row in this list. */}
-                  {score.paper_name} · {num(score.total)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <PageHeadline
+          className="pt-5 pb-0 sm:pt-6"
+          eyebrow={row ? `Mock intelligence · ${row.paper_name}` : "Mock intelligence"}
+          title={noSheet ? `No answer sheet for ${name} on this paper.` : headline.title}
+          support={noSheet ? undefined : headline.support}
+          meta={
+            <span className="tnum text-muted-foreground">
+              {student.data?.name ?? "—"}
+              {row ? ` · held ${longDate(row.held_on)}` : ""}
+            </span>
+          }
+          actions={picker}
+        />
       </div>
 
       {error ? <ErrorState error={error} onRetry={() => marksLost.refetch()} /> : null}
 
-      {row ? (
-        <section
-          aria-label="Subject scores in this paper"
-          className="grid grid-cols-3 gap-3"
-        >
-          {SUBJECT_LIST.map((subject) => (
-            <div
-              key={subject.key}
-              className="rounded-xl border border-border bg-card px-4 py-3"
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  aria-hidden
-                  className="size-2.5 shrink-0 rounded-[2px]"
-                  style={{ background: subject.color }}
-                />
-                <span className="text-xs font-medium text-muted-foreground">
-                  {subject.label}
-                </span>
-              </div>
-              {/* No "/ 100". `MockScore` ships three subject scores and a
-                  total, and no per-subject maximum — and this paper is out of
-                  184, not 300, so thirds of it are not 100 either. The share of
-                  the paper's own total is a number we can actually stand
-                  behind. */}
-              <div className="tnum mt-1.5 text-2xl leading-none font-semibold">
-                {num(row[subject.key])}
-                {row.total > 0 ? (
-                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                    {pct((row[subject.key] / row.total) * 100)} of the paper
-                  </span>
-                ) : null}
-              </div>
+      {noSheet ? (
+        <EmptyState
+          icon={<FileQuestion aria-hidden className="size-5" />}
+          title="Nothing to attribute on this paper"
+          body={`The server has no attempts recorded for ${name} on it, so there are no lost marks to explain. Pick a paper ${name} sat from the paper list.`}
+        />
+      ) : marksLost.isPending || !marksLost.data || !totals ? (
+        error ? null : (
+          <>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+              <Skeleton className="col-span-2 h-40 rounded-xl" />
+              <Skeleton className="h-40 rounded-xl" />
+              <Skeleton className="h-40 rounded-xl" />
+              <Skeleton className="h-40 rounded-xl" />
             </div>
-          ))}
-        </section>
-      ) : null}
-
-      {marksLost.isPending || !marksLost.data || !totals ? (
-        <>
-          <Skeleton className="h-28 rounded-xl" />
-          <PanelSkeleton lines={4} />
-        </>
+            <PanelSkeleton lines={4} />
+          </>
+        )
       ) : (
         <>
-          {/* The one hero figure on this view.
-              The denominator here is `attributed_lost`, never `total_lost`.
-              "61 of the 90 we can explain" is a claim the engine can defend;
-              "61 of your 166 marks" quietly asserts that the other 105 were
-              also understood, which is the thing it was just changed to stop
-              doing. */}
-          <section className="rounded-xl border border-border bg-card px-6 py-5">
-            <p className="text-xs font-medium text-muted-foreground">
-              Recoverable without learning anything new
-            </p>
-            <p className="mt-2 flex flex-wrap items-baseline gap-2">
-              <span className="text-[56px] leading-none font-semibold tracking-tight text-foreground">
-                {num(marksLost.data.recoverable)}
-              </span>
-              <span className="text-lg text-muted-foreground">
-                of the {num(totals.attributed)} marks we can explain
-              </span>
-            </p>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              Only{" "}
-              <strong className="font-semibold text-foreground">
-                {num(marksLost.data.conceptual_gap)} marks
-              </strong>{" "}
-              went to things this student genuinely does not know. The rest went
-              to execution, the clock, and questions they could have answered and
-              did not
-              {totals.recoverablePct === null
-                ? ""
-                : ` — ${pct(totals.recoverablePct)} of the explained loss`}
-              , addressable with drilling and paper strategy rather than more
-              teaching.
-            </p>
+          <section aria-label="The figures behind the headline" className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+              {/* The one hero figure on this view.
+                  The denominator here is `attributed_lost`, never `total_lost`.
+                  "61 of the 90 we can explain" is a claim the engine can defend;
+                  "61 of your 166 marks" quietly asserts that the other 76 were
+                  also understood, which is the thing it was changed to stop
+                  doing. */}
+              <KpiCard
+                size="hero"
+                className="col-span-2"
+                label="Recoverable without learning anything new"
+                value={marksLost.data.recoverable}
+                unit={`of the ${num(totals.attributed)} marks we can explain`}
+                caption={
+                  totals.recoverablePct === null
+                    ? "Execution, the clock and avoidable skips — fixed with drilling and paper strategy."
+                    : `${pct(totals.recoverablePct)} of the explained loss — execution, the clock and avoidable skips.`
+                }
+              />
+              <KpiCard
+                label="Conceptual gap"
+                value={marksLost.data.conceptual_gap}
+                unit="marks"
+                caption="The only part that needs teaching"
+              />
+              <KpiCard
+                label="Not attributed"
+                value={totals.unattributed}
+                unit={`of ${num(totals.totalLost)} lost`}
+                caption="Too little evidence to name a cause"
+              />
+              {/* The score is quoted with a denominator only once the paper's
+                  own maximum has arrived. A number out of the wrong
+                  denominator is worse than one that shows up half a second
+                  later. */}
+              <KpiCard
+                label="Score on this paper"
+                value={marksLost.data.score ?? row?.total ?? null}
+                unit={maxMarks ? `of ${num(maxMarks)}` : undefined}
+                caption={`${num(totals.totalLost)} marks lost in all — split below`}
+              />
+            </div>
+
             {totals.unattributed > 0 ? (
-              <p className="mt-2.5 flex max-w-2xl gap-2.5 text-sm leading-relaxed text-muted-foreground">
+              <p className="flex max-w-3xl gap-2.5 px-1 text-sm leading-relaxed text-muted-foreground">
                 <span
                   aria-hidden
-                  className="mt-[7px] h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                  className="mt-1.75 h-2.5 w-2.5 shrink-0 rounded-xs"
                   style={{ background: "var(--cause-unattributed)" }}
                 />
                 <span>
@@ -198,7 +207,7 @@ export function MockIntelligence() {
                     {num(totals.unattributed)} marks
                   </strong>{" "}
                   of the {num(totals.totalLost)} lost are not attributed to any
-                  cause. Those questions come from chapters they have barely
+                  cause. Those questions come from chapters {name} has barely
                   attempted, so calling them a proven gap would be a guess. They
                   are counted, shown, and left uncalled.
                 </span>
@@ -212,51 +221,180 @@ export function MockIntelligence() {
             scored={marksLost.data.score ?? row?.total}
           />
 
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {causeSlices(marksLost.data).map((slice) => (
-              <article
-                key={slice.key}
-                className="rounded-xl border border-border bg-card p-4"
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="size-2.5 shrink-0 rounded-[2px]"
-                    style={{ background: slice.color }}
-                  />
-                  <h3 className="text-xs font-medium text-muted-foreground">
-                    {slice.label}
-                  </h3>
-                </div>
-                <p className="tnum mt-2 text-2xl leading-none font-semibold">
-                  {num(slice.marks)}
-                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                    {pct(slice.sharePct)}
-                  </span>
-                </p>
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                  {slice.meaning}.
-                </p>
-                {/* Three outcomes, not two. The unattributed bucket is neither
-                    a teaching job nor a drilling job — it is a question the
-                    engine has not earned the right to answer yet, and saying
-                    so is more useful than filing it under either. */}
-                <p className="mt-2 text-[11px] font-medium">
-                  {!slice.attributed ? (
-                    <span className="text-muted-foreground">
-                      No call made yet
+          <Section
+            title="Each cause, and what fixes it"
+            description="Teaching closes a conceptual gap; drilling and paper strategy close the rest. The bucket the engine will not call is shown as exactly that."
+          >
+            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              {causeSlices(marksLost.data).map((slice) => (
+                <li
+                  key={slice.key}
+                  className="flex flex-col rounded-xl bg-card p-4 shadow-card ring-1 ring-border"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="size-2.5 shrink-0 rounded-xs"
+                      style={{ background: slice.color }}
+                    />
+                    <h3 className="text-[13px] font-medium text-muted-foreground">
+                      {slice.label}
+                    </h3>
+                  </div>
+                  <p className="tnum mt-2 text-2xl leading-none font-semibold">
+                    {num(slice.marks)}
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                      {pct(slice.sharePct)}
                     </span>
-                  ) : slice.needsNewLearning ? (
-                    <span className="text-status-warn">Needs teaching</span>
-                  ) : (
-                    <span className="text-status-good">Needs drilling</span>
-                  )}
-                </p>
-              </article>
-            ))}
-          </section>
+                  </p>
+                  <p className="mt-2 flex-1 text-xs leading-relaxed text-muted-foreground">
+                    {slice.meaning}.
+                  </p>
+                  {/* Three outcomes, not two. The unattributed bucket is neither
+                      a teaching job nor a drilling job — it is a question the
+                      engine has not earned the right to answer yet, and saying
+                      so is more useful than filing it under either. */}
+                  <p className="mt-3 text-xs font-semibold">
+                    {!slice.attributed ? (
+                      <span className="text-muted-foreground">No call made yet</span>
+                    ) : slice.needsNewLearning ? (
+                      <span className="text-status-warn">Needs teaching</span>
+                    ) : (
+                      <span className="text-status-good">Needs drilling</span>
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </Section>
+
+          {row ? (
+            <Section
+              title="By subject"
+              description="What each subject contributed to this paper's total."
+            >
+              <ul aria-label="Subject scores in this paper" className="grid gap-3 sm:grid-cols-3">
+                {SUBJECT_LIST.map((subject) => (
+                  <li
+                    key={subject.key}
+                    className="rounded-xl bg-card px-4 py-3.5 shadow-card ring-1 ring-border"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className="size-2.5 shrink-0 rounded-xs"
+                        style={{ background: subject.color }}
+                      />
+                      <span className="text-[13px] font-medium text-muted-foreground">
+                        {subject.label}
+                      </span>
+                    </div>
+                    {/* No "/ 100". `MockScore` ships three subject scores and a
+                        total, and no per-subject maximum — and a paper out of
+                        184 does not split into thirds of 100 either. The share
+                        of the paper's own total is a number we can stand
+                        behind. */}
+                    <p className="tnum mt-1.5 text-2xl leading-none font-semibold">
+                      {num(row[subject.key])}
+                      {row.total > 0 ? (
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                          {pct((row[subject.key] / row.total) * 100)} of the paper
+                        </span>
+                      ) : null}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
         </>
       )}
     </div>
   );
+}
+
+/**
+ * The page's one sentence, from the paper's own split. It leads with whichever
+ * job is bigger — drilling or teaching — and never says more than the counts
+ * do. The rates it quotes are the server's (`recoverable_pct` divides by the
+ * attributed loss); nothing here divides by `total_lost`.
+ */
+function mockHeadline(
+  data: MarksLost,
+  totals: MarksLostTotals,
+  paperName: string,
+  name: string,
+): { title: ReactNode; support: ReactNode } {
+  if (totals.attributed <= 0) {
+    return {
+      title: (
+        <>
+          None of the <Accent>{num(totals.totalLost)} marks</Accent> lost on{" "}
+          {paperName} can be called yet.
+        </>
+      ),
+      support: `They come from chapters ${name} has barely attempted, so naming a cause would be a guess.`,
+    };
+  }
+
+  if (data.recoverable >= data.conceptual_gap) {
+    return {
+      title: (
+        <>
+          <Accent>{num(data.recoverable)} marks</Accent> on {paperName} were
+          recoverable without learning anything new.
+        </>
+      ),
+      support: (
+        <>
+          Only{" "}
+          <strong className="font-semibold text-foreground">
+            {num(data.conceptual_gap)} marks
+          </strong>{" "}
+          went to chapters where {name}&rsquo;s mastery is low. The rest of what we can
+          explain went to execution, the clock and questions {name} could have
+          answered — work for drilling and paper strategy, not more teaching.
+        </>
+      ),
+    };
+  }
+
+  return {
+    title: (
+      <>
+        <Accent>{num(data.conceptual_gap)} marks</Accent> on {paperName} went to
+        chapters where {name}&rsquo;s mastery is low.
+      </>
+    ),
+    support: (
+      <>
+        That is a teaching job. A further{" "}
+        <strong className="font-semibold text-foreground">
+          {num(data.recoverable)} marks
+        </strong>{" "}
+        were recoverable without learning anything new — execution, the clock
+        and avoidable skips.
+      </>
+    ),
+  };
+}
+
+function loadingHeadline(): { title: ReactNode; support: ReactNode } {
+  return {
+    title: (
+      <>
+        <span className="sr-only">Loading this paper</span>
+        <span
+          aria-hidden
+          className="inline-block h-9 w-[24ch] max-w-full animate-pulse rounded-md bg-muted align-middle"
+        />
+      </>
+    ),
+    support: (
+      <span
+        aria-hidden
+        className="inline-block h-4 w-[48ch] max-w-full animate-pulse rounded-md bg-muted align-middle"
+      />
+    ),
+  };
 }

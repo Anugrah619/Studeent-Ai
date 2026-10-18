@@ -27,6 +27,7 @@ export type MarksLostCause = S["MarksLostCause"];
 export type Me = S["Me"];
 export type Mentor = S["Mentor"];
 export type MockScore = S["MockScore"];
+export type PasswordChangeRequest = S["PasswordChangeRequest"];
 export type PlanBlock = S["PlanBlock"];
 export type StudentDetail = S["StudentDetail"];
 export type StudentList = S["StudentList"];

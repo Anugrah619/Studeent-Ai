@@ -17,6 +17,7 @@ import {
 } from "../src/api/questions";
 import { handlers } from "../src/mocks/handlers";
 import { questionFor } from "../src/mocks/fixtures/questions";
+import { flags, interventions } from "../src/mocks/fixtures/flags";
 import { dashboardSummary } from "../src/mocks/fixtures/dashboard";
 import {
   DIAGNOSTIC_MAX_MARKS,
@@ -58,7 +59,7 @@ test("director console renders the KPI strip and the triage table", async () => 
 
   const body = text();
   assert.ok(body.includes("Director console"), "page heading");
-  assert.ok(body.includes("Students flagged this week"), "hero tile");
+  assert.ok(body.includes("Students with open flags"), "hero tile");
   assert.ok(body.includes("Students who need you this week"), "triage heading");
 
   // The six names from the concept note's triage list.
@@ -115,7 +116,9 @@ test("student 360 renders the header, both charts and the mastery grid", async (
   assert.ok(body.includes("Topic mastery"), "mastery grid");
   assert.ok(body.includes("Coordination Compounds"), "a real chapter name");
 
-  // The trend chart took its real SVG branch.
+  // The trend chart took its real SVG branch. It is drawn when it scrolls into
+  // view, one tick after the data lands, so wait for its surface first.
+  await waitFor(() => document.querySelector("[data-slot='chart'] svg") !== null);
   assert.equal(
     document.querySelectorAll("svg path[stroke-width='2']").length,
     3,
@@ -127,8 +130,14 @@ test("student 360 renders the header, both charts and the mastery grid", async (
     "five hairline gridlines",
   );
 
-  const bands = Array.from(document.querySelectorAll("svg rect[role='button']"));
-  assert.equal(bands.length, 7, "one hit target per mock");
+  // Keyboard stepping is the chart's own arrow-key layer, on a focusable plot;
+  // these are the labelled regions a screen reader meets, one per mock.
+  assert.ok(
+    document.querySelector("[data-slot='chart'] svg[tabindex='0']"),
+    "the plot takes keyboard focus",
+  );
+  const bands = Array.from(document.querySelectorAll("svg rect[data-mock][role='img']"));
+  assert.equal(bands.length, 7, "one labelled region per mock");
   assert.match(
     bands[6].getAttribute("aria-label") ?? "",
     /total 134$/,
@@ -246,7 +255,11 @@ test("the diagnosis card leads with the headline and shows its evidence", async 
     /Reverses electrophilic aromatic substitution directing effects/,
     "the headline is the hero",
   );
-  assert.ok(card.includes("AIT Mock 14"), "the paper being diagnosed");
+  // Captioned with the paper the diagnosis says it is about. The page asks for
+  // Aarav's latest mock (AIT Mock 14), but D16–D21 are diagnostic-paper
+  // labels, and the card used to print the requested name over them.
+  assert.ok(card.includes("Mock 15 — Diagnostic"), "the paper being diagnosed");
+  assert.ok(!card.includes("AIT Mock 14"), "not the paper that was merely asked for");
 
   // The evidence is visible, not buried: code, confidence, question ids, marks.
   assert.ok(card.includes("MIS-ORG-EAS"), "misconception code");
@@ -329,7 +342,7 @@ test("agreeing with a diagnosis records the verdict", async () => {
     "the question is asked before an answer exists",
   );
   assert.ok(
-    diagnosisCard().includes("trains the system"),
+    diagnosisCard().includes("teacher-checked"),
     "the card says what the verdict does",
   );
 
@@ -353,7 +366,7 @@ test("no systematic pattern renders as an answer, not an empty card", async () =
   });
 
   const card = diagnosisCard();
-  assert.ok(card.includes("scattered carelessness"), "the honest reading");
+  assert.ok(card.includes("the errors look scattered"), "the honest reading");
   assert.ok(
     card.includes("invent a misconception"),
     "the card says why it is empty of hypotheses",
@@ -372,7 +385,7 @@ test("503 and 422 are told apart and neither reads as a crash", async () => {
   });
   let card = diagnosisCard();
   assert.ok(
-    card.includes("The reasoning layer is not connected yet"),
+    card.includes("The diagnosis could not be prepared just now"),
     "503 explains itself",
   );
   assert.ok(
@@ -393,7 +406,7 @@ test("503 and 422 are told apart and neither reads as a crash", async () => {
     "422 is its own state",
   );
   assert.ok(
-    !card.includes("reasoning layer is not connected"),
+    !card.includes("could not be prepared just now"),
     "422 does not borrow the 503 copy",
   );
   await act(async () => root.unmount());
@@ -482,11 +495,14 @@ test("an evidence chip opens the question, and marks the pick and the answer dif
   // greyscale and every colour-vision deficiency.
   assert.ok(panel.includes("Correct answer") && panel.includes("chose this"));
 
-  // 3 — the belief, in his own voice. The reason the panel is worth opening.
+  // 3 — the belief behind the option. The reason the panel is worth opening.
+  // It is the catalogue's description of the misconception, so it is never
+  // attributed to the student as his own words.
   assert.ok(
-    panel.includes("in Aarav's own words"),
-    "the belief block says whose words these are",
+    panel.includes("The belief behind choosing"),
+    "the belief block says what it is",
   );
+  assert.ok(!panel.includes("own words"), "and does not put it in his mouth");
   assert.ok(
     panel.includes(
       "An activating group (–CH3, –OH, –NH2) sends the incoming group to meta",
@@ -688,12 +704,16 @@ test("neglect-chart value labels stay attached to short bars", async () => {
   await act(async () => root.unmount());
 });
 
-test("logging an intervention closes the flag and drops the row", async () => {
+test("logging an intervention records it and leaves the flag open", async () => {
   const root = await renderAt("/");
   await waitFor(() => text().includes("Kunal Deshpande"));
 
-  const before = document.querySelectorAll("tbody tr").length;
+  // One row per open flag: the table groups by student, and a student's
+  // other flags are rows of their own under the first, folded but in the DOM.
+  const flagRows = () => document.querySelectorAll("tbody tr[data-flag-id]").length;
+  const before = flagRows();
   assert.equal(before, 10, "ten open flags");
+  const loggedBefore = interventions.length;
 
   const open = buttons().find((b) => b.textContent?.trim() === "Log intervention");
   assert.ok(open, "an intervene button exists");
@@ -718,10 +738,26 @@ test("logging an intervention closes the flag and drops the row", async () => {
   assert.ok(submit && !submit.disabled, "submit is enabled once an action is set");
   await click(submit!);
 
-  await waitFor(
-    () => document.querySelectorAll("tbody tr").length === before - 1,
-    { timeout: 8000 },
-  );
+  // The dialog confirms from the server's record, and says the flag stays.
+  await waitFor(() => text().includes("Logged: Called the parent"), { timeout: 8000 });
+  assert.match(text(), /The flag stays open/, "the dialog says the flag is not closed");
+
+  // `FlagViewSet.intervene` records an Intervention and never resolves: the
+  // flag is still open on the server, and still a row once the list refetches.
+  assert.equal(interventions.length, loggedBefore + 1, "one intervention recorded");
+  const record = interventions[interventions.length - 1];
+  assert.equal(record.action, "Called the parent");
+  const flag = flags.find((f) => f.id === record.flag);
+  assert.ok(flag?.is_open, "the flag is still open");
+  assert.equal(flag?.resolved_at, null, "and has no resolved date");
+
+  const done = buttons().find((b) => b.textContent?.trim() === "Done");
+  assert.ok(done, "a Done button closes the confirmation");
+  await click(done!);
+  await waitFor(() => document.querySelector('[role="dialog"]') === null);
+  // Give the invalidated flags query time to land, then count again.
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  assert.equal(flagRows(), before, "the row is still in the triage table");
 
   await act(async () => root.unmount());
 });
@@ -757,7 +793,7 @@ test("the explainer's steps 1 and 2 stand when the AI is not connected", async (
   const root = await renderAt("/how-it-works");
   await waitFor(
     () =>
-      section("step-reason").includes("not connected") &&
+      section("step-reason").includes("could not be reached") &&
       section("step-count").includes("134"),
     { timeout: 8000 },
   );
@@ -788,12 +824,17 @@ test("how it works walks four steps on the API's own figures", async () => {
 
   const body = text();
   for (const heading of [
-    "Every answer is recorded",
+    "Each answer is kept with the option chosen",
     "We count, exactly",
     "The AI reads the pattern",
-    "A teacher checks it, and the system learns",
+    // Not "and the system learns": a verdict is stored as a label and
+    // changes nothing else, so the step says only that it is kept.
+    "A teacher checks it, and the verdict is kept",
   ]) {
     assert.ok(body.includes(heading), `step: ${heading}`);
+  }
+  for (const overclaim of ["the system learns", "never does the maths"]) {
+    assert.ok(!body.includes(overclaim), `no overclaim: ${overclaim}`);
   }
   assert.ok(body.includes("Mock 15 — Diagnostic"), "the paper the summary names");
   assert.ok(!body.includes("AIT Mock 14"), "not the 300-mark mock it used to name");
@@ -833,14 +874,17 @@ test("how it works walks four steps on the API's own figures", async () => {
   assert.match(step3, /D22\s*right/, "D22 is confirmed against the answer sheet");
   assert.match(step3, /D23\s*right/, "and so is D23");
   assert.ok(step3.includes("trace #53"), "the trace the reasoning is saved under");
-  assert.ok(step3.includes("Student S-1"), "the AI saw a code, not a name");
+  assert.ok(step3.includes("“S-1”"), "the AI saw a code, not a name");
   assert.ok(!/\d+[- ]?minute/i.test(step3), "a band, never an invented minute count");
 
   // 4 — the loop. Read-only: the verdict is given on the student's own page.
   const step4El = document.getElementById("step-check")!;
   const step4 = section("step-check");
   assert.ok(step4.includes("Not given yet"), "an unreviewed trace says so");
-  assert.ok(step4.includes("in Aarav’s own words"), "the belief, in his voice");
+  // The belief is the catalogue's description of the misconception, not
+  // anything the student wrote — so it is never attributed to him.
+  assert.ok(step4.includes("The belief behind choosing"), "the belief behind the option");
+  assert.ok(!step4.includes("own words"), "never put in the student's mouth");
   assert.ok(
     !buttons(step4El).some((b) => b.textContent?.trim() === "Agree"),
     "no verdict is recorded from an explainer page",
@@ -860,7 +904,7 @@ test("how it works walks four steps on the API's own figures", async () => {
   await act(async () => root.unmount());
 });
 
-test("data & trust labels what is simulated and prints no number it cannot read", async () => {
+test("data & trust labels what is simulated and says where every figure came from", async () => {
   const root = await renderAt("/trust");
   await waitFor(
     () =>
@@ -871,24 +915,35 @@ test("data & trust labels what is simulated and prints no number it cannot read"
   );
 
   const real = section("real");
-  for (const label of ["Simulated", "Our own", "Being added", "Real"]) {
+  for (const label of ["Simulated", "Our own", "Official", "Real", "Not yet"]) {
     assert.ok(real.includes(label), `status: ${label}`);
   }
+  assert.ok(!real.includes("Being added"), "imported papers are no longer 'being added'");
   assert.ok(real.includes("312 students"), "student count from the summary");
   assert.ok(real.includes("184 marks"), "the paper, from /api/papers/");
 
-  // No provenance field exists yet, so the past-papers row must carry words
-  // and no figure at all.
+  // The API has no provenance field, so the past-papers row carries the import
+  // records — exactly those, and the plain statement that diagnosis does not
+  // run on them yet.
   const pastPapers = Array.from(document.querySelectorAll("#real tbody tr")).find(
-    (tr) => tr.textContent?.includes("Official past papers"),
+    (tr) => tr.textContent?.includes("Real past papers"),
   );
   assert.ok(pastPapers, "the past-papers row exists");
-  assert.ok(!/\d/.test(pastPapers!.textContent ?? ""), "and invents no count");
-  // The flow's step ordinals are decorative (`aria-hidden`); every other
-  // character of the section must be free of figures.
-  const crossCheck = document.getElementById("answer-key")!.cloneNode(true) as HTMLElement;
-  crossCheck.querySelectorAll("[aria-hidden='true']").forEach((el) => el.remove());
-  assert.ok(!/\d/.test(crossCheck.textContent ?? ""), "nor does the cross-check");
+  const pastText = pastPapers!.textContent ?? "";
+  // NTA does not publish NEET papers; ours is a publisher's copy. Only the
+  // answer keys are NTA's, so the row must not call both papers official.
+  assert.ok(pastText.includes("publisher"), "the NEET paper's source is named");
+  assert.ok(pastText.includes("75 questions"), "JEE Main 2026, 2 April Shift 1");
+  assert.ok(pastText.includes("180 questions"), "NEET UG 2025, Code 45");
+  assert.ok(pastText.includes("does not run on them yet"), "diagnosis is not on them yet");
+  // The cross-check states its figures — and that no person has reviewed the
+  // disagreements yet. Saying "done" there would be the overclaim.
+  const crossCheck = section("answer-key");
+  assert.ok(crossCheck.includes("66 of 75"), "JEE Main agreement with NTA's key");
+  assert.ok(crossCheck.includes("157 of 180"), "NEET agreement with NTA's key");
+  assert.ok(crossCheck.includes("32 disagreements"), "the disagreements, counted");
+  assert.ok(crossCheck.includes("has not yet reviewed"), "and not yet reviewed by a person");
+  assert.ok(crossCheck.includes("Import records"), "labelled as not read live");
 
   const privacy = section("privacy");
   assert.ok(privacy.includes("S-1"), "what the AI is given");

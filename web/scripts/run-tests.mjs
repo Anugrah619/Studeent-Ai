@@ -13,18 +13,46 @@ import { build } from "esbuild";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
-const outdir = resolve(root, "node_modules/.tmp/test");
+// One directory per run, not a shared one. Two `npm test`s running at once
+// used to rebuild the same two bundles under each other, and the loser failed
+// on a half-written file with an error that looked like a broken test.
+const outdir = resolve(
+  root,
+  `node_modules/.tmp/test-${process.pid}-${Date.now().toString(36)}`,
+);
 
-rmSync(outdir, { recursive: true, force: true });
 mkdirSync(outdir, { recursive: true });
+const cleanUp = () => rmSync(outdir, { recursive: true, force: true });
 
-const entry = process.argv[2] ?? "test/smoke.test.tsx";
-const suiteFile = resolve(outdir, "suite.test.mjs");
+// Every `test/*.test.tsx` by default, each bundled on its own, so a suite can
+// be added without touching this file. Pass paths to run just those.
+const entries = process.argv.slice(2).length
+  ? process.argv.slice(2)
+  : readdirSync(resolve(root, "test"))
+      .filter((name) => name.endsWith(".test.tsx"))
+      .sort()
+      .map((name) => `test/${name}`);
 const setupFile = resolve(outdir, "setup.mjs");
+const suiteFile = (entry) =>
+  resolve(outdir, entry.replace(/^.*[\\/]/, "").replace(/\.tsx?$/, ".mjs"));
+
+/**
+ * Components import their own stylesheets (KaTeX's, React Flow's). With every
+ * package left external, Node would be handed `import "x.css"` and refuse the
+ * extension, so a stylesheet becomes an empty module here — the smoke tests
+ * read the DOM, never computed styles.
+ */
+const ignoreCss = {
+  name: "ignore-css",
+  setup(b) {
+    b.onResolve({ filter: /\.css$/ }, (args) => ({ path: args.path, namespace: "ignore-css" }));
+    b.onLoad({ filter: /.*/, namespace: "ignore-css" }, () => ({ contents: "", loader: "js" }));
+  },
+};
 
 const common = {
   bundle: true,
@@ -37,6 +65,7 @@ const common = {
   // Bundle only our own source; every dependency stays a real Node import.
   packages: "external",
   alias: { "@": resolve(root, "src") },
+  plugins: [ignoreCss],
   define: {
     // Keep in step with `src/vite-env.d.ts`. esbuild substitutes these by exact
     // text, so a key the app reads and this block omits survives into the
@@ -53,17 +82,24 @@ const common = {
   },
 };
 
-await build({
-  ...common,
-  entryPoints: [resolve(root, "test/setup-dom.ts")],
-  outfile: setupFile,
-});
+try {
+  await build({
+    ...common,
+    entryPoints: [resolve(root, "test/setup-dom.ts")],
+    outfile: setupFile,
+  });
 
-await build({
-  ...common,
-  entryPoints: [resolve(root, entry)],
-  outfile: suiteFile,
-});
+  for (const entry of entries) {
+    await build({
+      ...common,
+      entryPoints: [resolve(root, entry)],
+      outfile: suiteFile(entry),
+    });
+  }
+} catch (error) {
+  cleanUp();
+  throw error;
+}
 
 const result = spawnSync(
   process.execPath,
@@ -72,9 +108,10 @@ const result = spawnSync(
     pathToFileURL(setupFile).href,
     "--test",
     "--test-force-exit",
-    suiteFile,
+    ...entries.map(suiteFile),
   ],
   { stdio: "inherit", cwd: root },
 );
 
+cleanUp();
 process.exit(result.status ?? 1);

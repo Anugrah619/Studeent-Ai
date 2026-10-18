@@ -1,14 +1,88 @@
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import type { MockScore, StudentDetail } from "@/api/types";
-import { StatTile } from "@/components/common/StatTile";
+import { KpiCard } from "@/components/kit/KpiCard";
 import { RiskChip } from "@/components/common/SeverityChip";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { Button } from "@/components/ui/button";
-import { longDate, num, pct, signed } from "@/lib/format";
+import { Skeleton } from "@/components/ui/skeleton";
+import { initials, longDate, num, pct } from "@/lib/format";
 import { riskBand } from "@/lib/severity";
 
-export function HealthHeader({
+/**
+ * Who this is, compactly. The name and the risk band are the only loud things;
+ * roll, batch, target and mentor are reference detail a director glances at
+ * once, so they sit in one quiet line. The page's headline is the diagnosis
+ * directly below, not this.
+ */
+export function StudentHeader({
+  student,
+  latest,
+}: {
+  student: StudentDetail;
+  latest?: MockScore;
+}) {
+  return (
+    <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+      <div className="flex min-w-0 items-center gap-3.5">
+        <span
+          aria-hidden
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-card text-sm font-semibold text-foreground shadow-card ring-1 ring-border"
+        >
+          {initials(student.name)}
+        </span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h1 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
+              {student.name}
+            </h1>
+            <RiskChip score={student.state.risk_score} size="md" />
+            {student.exited_at ? (
+              <span className="rounded-full px-2 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border">
+                Exited {longDate(student.exited_at)}
+              </span>
+            ) : null}
+          </div>
+          <p className="tnum mt-0.5 text-sm text-muted-foreground">
+            {student.roll_no} · {student.batch.name} · {student.batch.exam_code}{" "}
+            {student.batch.year}
+            {student.target ? ` · Target ${student.target}` : ""} · Mentor{" "}
+            {student.mentor.name}
+          </p>
+        </div>
+      </div>
+
+      {latest ? (
+        <Button variant="outline" asChild>
+          <Link to={`/students/${student.id}/mock/${latest.paper_id}`}>
+            Open {latest.paper_name}
+            <ArrowRight aria-hidden className="size-4" />
+          </Link>
+        </Button>
+      ) : null}
+    </header>
+  );
+}
+
+export function StudentHeaderSkeleton() {
+  return (
+    <div className="flex items-center gap-3.5" aria-hidden>
+      <Skeleton className="size-11 rounded-full" />
+      <div className="space-y-2">
+        <Skeleton className="h-6 w-56" />
+        <Skeleton className="h-4 w-80 max-w-[70vw]" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The student's standing across the whole series, in four cards. The hero
+ * figure on this page is the diagnosis's marks at stake, above — so none of
+ * these is a hero, and the two behaviour signals that used to be cards of
+ * their own (consistency, revision debt) sit in one quiet line beneath.
+ */
+export function HealthKpis({
   student,
   scores,
 }: {
@@ -17,49 +91,22 @@ export function HealthHeader({
 }) {
   const state = student.state;
   const band = riskBand(state.risk_score);
-  const latest = scores.at(-1);
-  const trend = state.mock_trend ?? 0;
+  // Null is "fewer than two papers", not "flat": it renders as a dash.
+  const trend = state.mock_trend;
 
   return (
-    <header className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-semibold tracking-tight">{student.name}</h1>
-            <RiskChip score={state.risk_score} size="md" />
-            {student.exited_at ? (
-              <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
-                Exited {longDate(student.exited_at)}
-              </span>
-            ) : null}
-          </div>
-          <p className="tnum mt-1 text-sm text-muted-foreground">
-            {student.roll_no} · {student.batch.name} · {student.batch.exam_code}{" "}
-            {student.batch.year}
-            {student.target ? ` · Target ${student.target}` : ""} · Mentor{" "}
-            {student.mentor.name}
-          </p>
-        </div>
-
-        {latest ? (
-          <Button variant="outline" asChild>
-            <Link to={`/students/${student.id}/mock/${latest.paper_id}`}>
-              Open {latest.paper_name}
-              <ArrowRight aria-hidden className="size-4" />
-            </Link>
-          </Button>
-        ) : null}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {/* No "of 300". `StudentState.mock_avg` averages across papers whose
             maxima differ — the seeded series runs seven papers out of 300 and
             one out of 184 — so there is no single denominator to quote, and
             quoting one anyway is how "152.6 of 300" appeared beside a paper
             worth 184. The count of papers is the honest caption. */}
-        <StatTile
+        <KpiCard
           label="Mock average"
-          value={num(state.mock_avg, 1)}
+          value={state.mock_avg}
+          format="decimal"
+          digits={1}
           caption={`marks, averaged across ${scores.length} mocks`}
           trend={
             scores.length > 1 ? (
@@ -71,14 +118,20 @@ export function HealthHeader({
             ) : undefined
           }
         />
-        <StatTile
+        <KpiCard
           label="Mock trend"
-          value={signed(trend)}
-          delta={{
-            text: trend < 0 ? "falling" : trend > 0 ? "rising" : "flat",
-            tone: trend < 0 ? "bad" : trend > 0 ? "good" : "neutral",
-            caption: "",
-          }}
+          value={trend}
+          format="signed"
+          digits={trend == null || Number.isInteger(trend) ? 0 : 1}
+          delta={
+            trend == null
+              ? undefined
+              : {
+                  text: trend < 0 ? "falling" : trend > 0 ? "rising" : "flat",
+                  tone: trend < 0 ? "bad" : trend > 0 ? "good" : "neutral",
+                  direction: trend < 0 ? "down" : trend > 0 ? "up" : "flat",
+                }
+          }
           caption={
             scores.length > 1
               ? `${num(scores[0].total)} → ${num(scores.at(-1)!.total)} across the series`
@@ -87,26 +140,22 @@ export function HealthHeader({
         />
         {/* `risk_score` is 0–1 on the wire. Two decimals, not rounded to a
             whole number — that turned 0.696 into "1" — and not multiplied to
-            70, which invents a percentage the score is not and lets the tile
-            quietly disagree with the band chip beside it. */}
-        <StatTile
+            70, which invents a percentage the score is not and lets the card
+            quietly disagree with the band chip beside the name. */}
+        <KpiCard
           label="Risk score"
-          value={num(state.risk_score, 2)}
-          caption={`${band.label} · 0–1 scale · recomputed nightly`}
+          value={state.risk_score}
+          format="decimal"
+          digits={2}
+          // Not "recomputed nightly": the recompute is a manual command and
+          // nothing schedules it (TECHNICAL_DOC.md, "there is no scheduler").
+          caption={`${state.risk_score == null ? "Not scored yet" : band.label} · 0–1 scale · from mock trend, subject balance, revision and consistency`}
         />
-        <StatTile
-          label="Study consistency"
-          value={pct((state.consistency ?? 0) * 100)}
-          caption="Share of planned sessions actually logged"
-        />
-        <StatTile
-          label="Revision debt"
-          value={num(state.revision_debt)}
-          caption="Chapters past their recall floor"
-        />
-        <StatTile
+        <KpiCard
           label="Syllabus covered"
-          value={pct(state.syllabus_pct, 1)}
+          value={state.syllabus_pct}
+          format="percent"
+          digits={1}
           caption={
             student.batch.exam_date
               ? `Exam ${longDate(student.batch.exam_date)}`
@@ -114,6 +163,35 @@ export function HealthHeader({
           }
         />
       </div>
-    </header>
+
+      <dl className="tnum mt-3 flex flex-wrap gap-x-6 gap-y-1.5 px-1 text-sm text-muted-foreground">
+        <div className="flex items-baseline gap-1.5">
+          <dt>Study consistency</dt>
+          <dd className="font-semibold text-foreground">
+            {state.consistency == null ? "—" : pct(state.consistency * 100)}
+          </dd>
+          {/* `features.py`: days with any study logged in the last 60, over
+              60. There is no plan behind it, so it never says "planned". */}
+          <dd className="text-xs">of the last 60 days had study logged</dd>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <dt>Revision debt</dt>
+          <dd className="font-semibold text-foreground">{num(state.revision_debt)}</dd>
+          {/* A count of scheduled revision sessions past their date and not
+              done — not chapters, and not a modelled "recall floor". */}
+          <dd className="text-xs">revision sessions overdue</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+export function HealthKpisSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden>
+      {Array.from({ length: 4 }, (_, i) => (
+        <Skeleton key={i} className="h-32 rounded-xl" />
+      ))}
+    </div>
   );
 }

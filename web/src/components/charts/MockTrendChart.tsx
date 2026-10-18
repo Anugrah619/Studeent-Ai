@@ -1,13 +1,42 @@
 import { useMemo, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  XAxis,
+  YAxis,
+  usePlotArea,
+  useXAxisScale,
+} from "recharts";
 import type { MockScore } from "@/api/types";
+import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { useMeasure } from "@/hooks/use-measure";
 import { num, shortDate, signed } from "@/lib/format";
 import { SUBJECT_LIST, type SubjectKey } from "@/lib/subjects";
 import { Figure, FigureTable, Legend } from "./Figure";
 
-const PAD = { top: 14, right: 46, bottom: 26, left: 32 };
-const PLOT_H = 208;
-const MAX = 100;
+/** The floor. In a two-up row the plot grows to fill whatever its neighbour sets. */
+const PLOT_H = 248;
+const TICKS = [0, 25, 50, 75, 100];
+/**
+ * One draw, left to right, on mount. Longer than a UI transition on purpose: a
+ * line that arrives in 200 ms reads as a flicker, and the eye should travel the
+ * series once in the direction time runs. It never replays.
+ */
+const DRAW_MS = 650;
+
+/**
+ * Subject identity comes from the same tokens as every other subject mark, so
+ * the lines can never drift from the legend, the neglect chart or a swatch.
+ * Never the brand: it is chrome-only and must not read as a series.
+ */
+const CONFIG = Object.fromEntries(
+  SUBJECT_LIST.map((subject) => [
+    subject.key,
+    { label: subject.label, color: subject.color },
+  ]),
+) satisfies ChartConfig;
 
 interface Props {
   rows: MockScore[];
@@ -15,16 +44,31 @@ interface Props {
   highlight?: SubjectKey;
 }
 
+/** "AIT Mock 08" → "08": the axis carries the mock number, the tooltip the name. */
+const tickLabel = (row: MockScore) => row.paper_name.replace(/^\D+/, "") || row.paper_name;
+
+const spoken = (row: MockScore) =>
+  `${row.paper_name}: Physics ${row.physics}, Chemistry ${row.chemistry}, Maths ${row.maths}, total ${row.total}`;
+
 /**
  * Three subject series on ONE axis (each subject is out of 100, so no second
  * scale is ever tempting). Identity is carried by the legend plus the tooltip;
  * only the series the story is about gets a direct end-label, because Physics
  * and Maths converge at the right edge and stacked labels would detach from
  * their lines.
+ *
+ * Drawn with Recharts (shadcn's chart wrapper) for the crosshair tooltip, the
+ * keyboard layer — focus the plot and the arrow keys step mock by mock — and a
+ * single left-to-right draw on mount, which is skipped under reduced motion.
  */
 export function MockTrendChart({ rows, highlight }: Props) {
+  const reduce = useReducedMotion() ?? false;
+  // Measured before paint so the first frame is drawn at the real width. The
+  // container's default 320px guess would otherwise flash, then morph.
   const { ref, width } = useMeasure<HTMLDivElement>();
-  const [active, setActive] = useState<number | null>(null);
+  // The chart sits below the fold on Student 360. Drawn on mount, its one
+  // animation would play to an empty viewport; drawn on arrival, it is seen.
+  const [seen, setSeen] = useState(false);
 
   const lead = useMemo<SubjectKey>(() => {
     if (highlight) return highlight;
@@ -41,14 +85,14 @@ export function MockTrendChart({ rows, highlight }: Props) {
     return worst;
   }, [rows, highlight]);
 
-  const innerW = Math.max(0, width - PAD.left - PAD.right);
-  const x = (i: number) =>
-    PAD.left + (rows.length <= 1 ? innerW / 2 : (innerW * i) / (rows.length - 1));
-  const y = (value: number) => PAD.top + (1 - value / MAX) * PLOT_H;
-  const height = PAD.top + PLOT_H + PAD.bottom;
+  const byId = useMemo(
+    () => new Map(rows.map((row) => [row.paper_id, row])),
+    [rows],
+  );
 
   const last = rows[rows.length - 1];
   const first = rows[0];
+  const lastIndex = rows.length - 1;
 
   const legendItems = SUBJECT_LIST.map((subject) => ({
     color: subject.color,
@@ -64,7 +108,7 @@ export function MockTrendChart({ rows, highlight }: Props) {
       title="Mock score trend"
       subtitle={
         <>
-          Each subject is marked out of 100 across {rows.length} mocks. Total{" "}
+          Physics, Chemistry and Maths across {rows.length} mocks. Total{" "}
           {first && last ? (
             <>
               moved {num(first.total)} → {num(last.total)} (
@@ -111,175 +155,181 @@ export function MockTrendChart({ rows, highlight }: Props) {
         </FigureTable>
       }
     >
-      <div ref={ref} className="relative w-full">
-        {width > 0 ? (
-          <svg
-            width={width}
-            height={height}
-            role="img"
-            aria-label={`Mock score trend across ${rows.length} mocks for Physics, Chemistry and Maths.`}
-            className="overflow-visible"
-            onMouseLeave={() => setActive(null)}
+      {/* The plot is absolutely positioned inside a box that flexes to fill
+          the figure. Out of flow, its measured pixel height can never hold the
+          box open, so the row it shares can shrink again as well as grow. */}
+      <motion.div
+        ref={ref}
+        className="relative w-full flex-1"
+        style={{ minHeight: PLOT_H }}
+        viewport={{ once: true, amount: 0.3 }}
+        onViewportEnter={() => setSeen(true)}
+      >
+        {width > 0 && seen ? (
+          <ChartContainer
+            config={CONFIG}
+            initialDimension={{ width, height: PLOT_H }}
+            // shadcn's container hides the surface's outline outright, which
+            // would leave a keyboard user on the plot with no sign of focus.
+            className="absolute inset-0 aspect-auto [font-variant-numeric:tabular-nums] [&_.recharts-surface:focus-visible]:rounded-sm [&_.recharts-surface:focus-visible]:outline-2 [&_.recharts-surface:focus-visible]:outline-solid [&_.recharts-surface:focus-visible]:outline-offset-2 [&_.recharts-surface:focus-visible]:outline-ring"
           >
-            {/* Hairline grid, solid, one step off the surface. */}
-            {[0, 25, 50, 75, 100].map((tick) => (
-              <g key={tick}>
-                <line
-                  x1={PAD.left}
-                  x2={PAD.left + innerW}
-                  y1={y(tick)}
-                  y2={y(tick)}
-                  stroke="var(--chart-grid)"
-                  strokeWidth={1}
-                  shapeRendering="crispEdges"
-                />
-                <text
-                  x={PAD.left - 8}
-                  y={y(tick)}
-                  textAnchor="end"
-                  dominantBaseline="middle"
-                  className="tnum fill-muted-foreground text-[10px]"
-                >
-                  {tick}
-                </text>
-              </g>
-            ))}
-
-            {rows.map((row, i) => (
-              <text
-                key={row.paper_id}
-                x={x(i)}
-                y={PAD.top + PLOT_H + 16}
-                textAnchor="middle"
-                className="tnum fill-muted-foreground text-[10px]"
-              >
-                {row.paper_name.replace(/^\D+/, "")}
-              </text>
-            ))}
-
-            {active !== null ? (
-              <line
-                x1={x(active)}
-                x2={x(active)}
-                y1={PAD.top}
-                y2={PAD.top + PLOT_H}
-                stroke="var(--chart-axis)"
+            <LineChart
+              data={rows}
+              margin={{ top: 12, right: 34, bottom: 0, left: 0 }}
+              role="group"
+              aria-label={`Mock score trend across ${rows.length} mocks for Physics, Chemistry and Maths. Focus the chart and use the arrow keys to step through the mocks; the table view lists every value.`}
+            >
+              {/* Hairline grid, solid, one step off the surface. Horizontal
+                  only: the mocks are discrete events, not a time grid. */}
+              <CartesianGrid
+                vertical={false}
+                stroke="var(--chart-grid)"
                 strokeWidth={1}
                 shapeRendering="crispEdges"
               />
-            ) : null}
-
-            {SUBJECT_LIST.map((subject) => {
-              const d = rows
-                .map((row, i) => `${i === 0 ? "M" : "L"}${x(i)},${y(row[subject.key])}`)
-                .join(" ");
-              const dim = active !== null;
-              return (
-                <g key={subject.key}>
-                  <path
-                    d={d}
-                    fill="none"
-                    stroke={subject.color}
-                    strokeWidth={2}
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                    opacity={dim && subject.key !== lead ? 0.85 : 1}
-                  />
-                  {/* End marker: >=8px, with a 2px surface ring. */}
-                  {last ? (
-                    <circle
-                      cx={x(rows.length - 1)}
-                      cy={y(last[subject.key])}
-                      r={4}
-                      fill={subject.color}
-                      stroke="var(--chart-surface)"
-                      strokeWidth={2}
-                    />
-                  ) : null}
-                </g>
-              );
-            })}
-
-            {/* Selective direct label: only the series the chart argues about. */}
-            {last ? (
-              <text
-                x={x(rows.length - 1) + 10}
-                y={y(last[lead])}
-                dominantBaseline="middle"
-                className="tnum fill-foreground text-[11px] font-semibold"
-              >
-                {num(last[lead])}
-              </text>
-            ) : null}
-
-            {active !== null
-              ? SUBJECT_LIST.map((subject) => (
-                  <circle
-                    key={subject.key}
-                    cx={x(active)}
-                    cy={y(rows[active][subject.key])}
-                    r={4}
-                    fill={subject.color}
-                    stroke="var(--chart-surface)"
-                    strokeWidth={2}
-                  />
-                ))
-              : null}
-
-            {/* Generous hit bands — never make the reader land on a 4px dot. */}
-            {rows.map((row, i) => (
-              <rect
-                key={row.paper_id}
-                x={x(i) - Math.max(12, innerW / (rows.length * 2))}
-                y={PAD.top}
-                width={Math.max(24, innerW / rows.length)}
-                height={PLOT_H}
-                fill="transparent"
-                tabIndex={0}
-                role="button"
-                aria-label={`${row.paper_name}: Physics ${row.physics}, Chemistry ${row.chemistry}, Maths ${row.maths}, total ${row.total}`}
-                className="cursor-pointer outline-none focus-visible:fill-foreground/5"
-                onMouseEnter={() => setActive(i)}
-                onFocus={() => setActive(i)}
-                onBlur={() => setActive(null)}
+              <XAxis
+                dataKey="paper_id"
+                type="category"
+                interval={0}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={10}
+                padding={{ left: 10, right: 10 }}
+                tick={{ fontSize: 10 }}
+                tickFormatter={(id: number) => {
+                  const row = byId.get(id);
+                  return row ? tickLabel(row) : "";
+                }}
               />
-            ))}
-          </svg>
-        ) : (
-          <div style={{ height }} />
-        )}
+              <YAxis
+                domain={[0, 100]}
+                ticks={TICKS}
+                interval={0}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={6}
+                width={30}
+                tick={{ fontSize: 10 }}
+              />
+              <ChartTooltip
+                cursor={{ stroke: "var(--chart-axis)", strokeWidth: 1 }}
+                isAnimationActive={!reduce}
+                animationDuration={150}
+                offset={14}
+                content={({ active, payload }) => (
+                  <TrendTooltip
+                    active={active}
+                    row={payload?.[0]?.payload as MockScore | undefined}
+                  />
+                )}
+              />
 
-        {active !== null && width > 0 ? (
-          <TrendTooltip
-            row={rows[active]}
-            left={x(active)}
-            width={width}
-          />
+              {SUBJECT_LIST.map((subject) => (
+                <Line
+                  key={subject.key}
+                  dataKey={subject.key}
+                  name={subject.label}
+                  type="linear"
+                  stroke={`var(--color-${subject.key})`}
+                  strokeWidth={2}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  isAnimationActive={!reduce}
+                  animationDuration={DRAW_MS}
+                  animationEasing="ease-out"
+                  // End marker only: >=8px, with a 2px surface ring. A dot on
+                  // every mock would compete with the line for the eye.
+                  dot={(props: { cx?: number; cy?: number; index?: number }) =>
+                    props.index === lastIndex && props.cx != null && props.cy != null ? (
+                      <circle
+                        key={`end-${subject.key}`}
+                        cx={props.cx}
+                        cy={props.cy}
+                        r={4}
+                        fill={subject.color}
+                        stroke="var(--chart-surface)"
+                        strokeWidth={2}
+                      />
+                    ) : (
+                      <g key={`dot-${subject.key}-${props.index}`} />
+                    )
+                  }
+                  activeDot={{
+                    r: 4.5,
+                    fill: subject.color,
+                    stroke: "var(--chart-surface)",
+                    strokeWidth: 2,
+                  }}
+                  // Selective direct label: only the series the chart argues about.
+                  label={
+                    subject.key === lead
+                      ? (props: { x?: number | string; y?: number | string; index?: number; value?: unknown }) =>
+                          props.index === lastIndex ? (
+                            <text
+                              key={`label-${subject.key}`}
+                              x={Number(props.x) + 10}
+                              y={Number(props.y)}
+                              dominantBaseline="middle"
+                              className="fill-foreground text-[11px] font-semibold"
+                            >
+                              {num(Number(props.value))}
+                            </text>
+                          ) : null
+                      : false
+                  }
+                />
+              ))}
+
+              <MockTargets rows={rows} />
+            </LineChart>
+          </ChartContainer>
         ) : null}
-      </div>
+      </motion.div>
     </Figure>
   );
 }
 
-function TrendTooltip({
-  row,
-  left,
-  width,
-}: {
-  row: MockScore;
-  left: number;
-  width: number;
-}) {
-  const flip = left > width * 0.6;
+/**
+ * One labelled region per mock, so a screen reader in browse mode meets each
+ * paper spoken in full rather than a single opaque picture. Transparent and
+ * not focusable: hover and the arrow keys are Recharts' job, and they reach
+ * the same values through the tooltip.
+ */
+function MockTargets({ rows }: { rows: MockScore[] }) {
+  const xScale = useXAxisScale();
+  const plot = usePlotArea();
+  if (!xScale || !plot || rows.length === 0) return null;
+  const band = plot.width / rows.length;
+  return (
+    <g>
+      {rows.map((row) => {
+        const cx = Number(xScale(row.paper_id));
+        if (!Number.isFinite(cx)) return null;
+        return (
+          <rect
+            key={row.paper_id}
+            data-mock={row.paper_id}
+            x={cx - band / 2}
+            y={plot.y}
+            width={band}
+            height={plot.height}
+            fill="transparent"
+            pointerEvents="none"
+            role="img"
+            aria-label={spoken(row)}
+          />
+        );
+      })}
+    </g>
+  );
+}
+
+function TrendTooltip({ active, row }: { active?: boolean; row?: MockScore }) {
+  if (!active || !row) return null;
   return (
     <div
       role="status"
-      className="pointer-events-none absolute top-0 z-10 w-44 rounded-lg border border-border bg-popover p-2.5 text-xs shadow-lg"
-      style={
-        flip
-          ? { right: Math.max(0, width - left + 12) }
-          : { left: Math.min(left + 12, width - 180) }
-      }
+      className="w-44 rounded-lg border border-border bg-popover p-2.5 text-xs shadow-overlay"
     >
       <div className="font-medium text-popover-foreground">{row.paper_name}</div>
       <div className="mb-1.5 text-[11px] text-muted-foreground">
@@ -290,7 +340,7 @@ function TrendTooltip({
           <div key={subject.key} className="flex items-center gap-2">
             <span
               aria-hidden
-              className="size-2 shrink-0 rounded-full"
+              className="h-0.5 w-3 shrink-0 rounded-full"
               style={{ background: subject.color }}
             />
             <dt className="flex-1 text-muted-foreground">{subject.label}</dt>
@@ -300,7 +350,7 @@ function TrendTooltip({
           </div>
         ))}
         <div className="flex items-center gap-2 border-t border-border pt-1">
-          <dt className="flex-1 pl-4 text-muted-foreground">Total</dt>
+          <dt className="flex-1 pl-5 text-muted-foreground">Total</dt>
           <dd className="tnum font-semibold text-popover-foreground">
             {num(row.total)}
           </dd>

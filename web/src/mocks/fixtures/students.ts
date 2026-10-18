@@ -381,6 +381,8 @@ export function studentListRow(seed: Seed): StudentList {
     mock_avg: derived.mock_avg,
     open_flags: seed.open_flags,
     exited_at: seed.exited_at ?? null,
+    // No fixture student has a login, as in the seeded database.
+    login_status: "none",
   };
 }
 
@@ -399,6 +401,7 @@ export function studentDetail(id: number): StudentDetail | undefined {
     batch,
     mentor,
     state: stateFor(seed),
+    login_status: "none",
   };
 }
 

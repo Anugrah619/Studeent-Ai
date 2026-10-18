@@ -1,3 +1,6 @@
+import { motion, useReducedMotion } from "motion/react";
+import { EASE_OUT_SOFT } from "@/lib/motion";
+
 interface Props {
   values: number[];
   width?: number;
@@ -7,7 +10,14 @@ interface Props {
   label: string;
 }
 
-/** A shape, not a chart. It has no axis, so every value it hints at is printed elsewhere. */
+/**
+ * A shape, not a chart. It has no axis, so every value it hints at is printed elsewhere.
+ *
+ * It draws itself once, left to right, and only then shows the current point —
+ * so the eye lands where the series ends, which is the only point the tile
+ * names. Stays hand-built SVG: at 72×22 there is nothing for a chart library
+ * to add, and no tooltip, because the figure beside it is the value.
+ */
 export function Sparkline({
   values,
   width = 72,
@@ -15,6 +25,7 @@ export function Sparkline({
   accent = "var(--foreground)",
   label,
 }: Props) {
+  const reduce = useReducedMotion() ?? false;
   if (values.length < 2) return null;
 
   const min = Math.min(...values);
@@ -34,7 +45,7 @@ export function Sparkline({
       aria-label={label}
       className="overflow-visible"
     >
-      <path
+      <motion.path
         d={d}
         fill="none"
         stroke="currentColor"
@@ -42,14 +53,20 @@ export function Sparkline({
         strokeLinejoin="round"
         strokeLinecap="round"
         className="text-muted-foreground/60"
+        initial={reduce ? false : { pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.6, ease: EASE_OUT_SOFT, delay: 0.15 }}
       />
-      <circle
+      <motion.circle
         cx={x(values.length - 1)}
         cy={y(values[values.length - 1])}
         r={2.5}
         fill={accent}
         stroke="var(--chart-surface)"
         strokeWidth={1.5}
+        initial={reduce ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2, delay: 0.7 }}
       />
     </svg>
   );

@@ -58,6 +58,8 @@ export type DiagnosisVerdictBody = DiagnosisVerdictRequest;
  */
 export type ResolvedEvidence = Evidence & { question_id: number };
 
+export type DiagnosisTally = WireDiagnosis["tally"];
+
 export function isResolved(row: Evidence): row is ResolvedEvidence {
   return typeof row.question_id === "number";
 }
@@ -187,8 +189,39 @@ function parseHypothesis(raw: unknown): Hypothesis {
     confidence: isConfidence(row.confidence) ? row.confidence : "low",
     evidence_questions: labels,
     evidence,
+    // Resolved by the server against the counter-evidence it derived, so a
+    // label here is always a question this student answered correctly. Absent
+    // from an older deployment, in which case the card keeps matching labels
+    // in the sentence itself (`labelsNamedIn`).
+    counter_evidence_questions: Array.isArray(row.counter_evidence_questions)
+      ? row.counter_evidence_questions.map(parseEvidence)
+      : [],
     counter_evidence: str(row.counter_evidence),
     marks_at_stake: int(row.marks_at_stake),
+  };
+}
+
+/**
+ * The counts the model was handed. Zeroes for an older server rather than a
+ * guess: `wrong: 0` reads as "no data", and a made-up figure on a card whose
+ * whole claim is that its arithmetic can be checked would be worse than none.
+ */
+function parseTally(raw: unknown): DiagnosisTally {
+  const row = (raw ?? {}) as Record<string, unknown>;
+  return {
+    answered: int(row.answered),
+    wrong: int(row.wrong),
+    wrong_with_known_cause: int(row.wrong_with_known_cause),
+    by_misconception: Array.isArray(row.by_misconception)
+      ? row.by_misconception.map((entry) => {
+          const r = (entry ?? {}) as Record<string, unknown>;
+          return {
+            misconception_code: str(r.misconception_code, "UNCODED"),
+            wrong_answers: int(r.wrong_answers),
+            marks: int(r.marks),
+          };
+        })
+      : [],
   };
 }
 
@@ -223,6 +256,10 @@ export function parseDiagnosis(raw: unknown): Diagnosis {
         : hypotheses.reduce((sum, h) => sum + h.marks_at_stake, 0),
     recommended_action: str(body.recommended_action),
     time_to_fix: isTimeToFix(body.time_to_fix) ? body.time_to_fix : null,
+    // The pseudonym the model saw, echoed by the server. Blank from an older
+    // deployment, where "Data & trust" restates the rule instead.
+    student_ref: str(body.student_ref),
+    tally: parseTally(body.tally),
     trace_id: int(body.trace_id),
     from_cache: body.from_cache === true,
     // `"unreviewed"` is the server's third value and means nobody has answered.
@@ -265,11 +302,35 @@ export async function postDiagnosisVerdict(
   return parseDiagnosis(raw);
 }
 
+/**
+ * Whether a hypothesis's counter-evidence actually narrows it.
+ *
+ * When the model leaves `counter_evidence` empty, the server writes one of two
+ * fixed sentences in its place (`reasoning/services/diagnose.py`:
+ * `COUNTER_EVIDENCE_ABSENT`, `COUNTER_EVIDENCE_UNSTATED`), and both say the
+ * finding is NOT narrowed — "it may be chapter-wide". A heading over them that
+ * reads "a trigger, not a topic gap" would contradict the text under it.
+ */
+const UN_NARROWED_PREFIXES = [
+  "No counter-evidence on this paper",
+  "The model did not state the counter-evidence",
+];
+
+export function counterEvidenceNarrows(text: string): boolean {
+  const t = text.trim();
+  return !UN_NARROWED_PREFIXES.some((prefix) => t.startsWith(prefix));
+}
+
 /* ------------------------------------------------------------------ *
  * The two failures the card has to say something intelligent about
  * ------------------------------------------------------------------ */
 
-/** No API key configured: the reasoning layer is not wired up yet. */
+/**
+ * The reasoning layer did not answer. Two different causes share this status
+ * (`api/views.py`): no key and no cached answer (`DIAGNOSIS_NOT_PREPARED`),
+ * or a key that is configured but Gemini at capacity (`DIAGNOSIS_BUSY`). The
+ * server's `detail` says which; nothing on screen may assume the first.
+ */
 export const REASONING_UNAVAILABLE = 503;
 /** Not enough tagged evidence to reason over. A different thing entirely. */
 export const NOT_ENOUGH_EVIDENCE = 422;

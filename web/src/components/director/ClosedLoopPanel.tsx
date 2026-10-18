@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
+import { motion } from "motion/react";
 import type { Flag, Outcome } from "@/api/types";
 import { SeverityChip } from "@/components/common/SeverityChip";
 import { EmptyState } from "@/components/common/States";
 import { daysAgo } from "@/lib/format";
+import { fadeUp, stagger } from "@/lib/motion";
 import { detectorLabel } from "@/lib/severity";
 
 const OUTCOME: Record<Outcome, { label: string; severity: "improving" | "critical" | "watch" }> =
@@ -15,49 +17,63 @@ const OUTCOME: Record<Outcome, { label: string; severity: "improving" | "critica
 /**
  * A console that only raises flags is a complaints box. This is the half that
  * renews a contract: what was done, and whether it worked.
+ *
+ * Deliberately quieter than the triage table above it — no card shadow, no
+ * actions, smaller type. Nothing here asks the director to do anything; the
+ * outcome chip is the only thing on a row meant to be read from a distance.
  */
 export function ClosedLoopPanel({ flags }: { flags: Flag[] }) {
   if (!flags.length) {
     return (
       <EmptyState
         title="No flags closed yet"
-        body="Once a mentor logs an intervention, the flag moves here and the recovery clock starts."
+        body="When a flag is closed with what became of the student, it appears here."
       />
     );
   }
 
   return (
-    <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+    <motion.ul
+      variants={stagger(0.04)}
+      initial="hidden"
+      animate="show"
+      className="divide-y divide-border overflow-hidden rounded-xl bg-muted/25 ring-1 ring-border"
+    >
       {flags.map((flag) => {
-        const outcome = flag.outcome && flag.outcome in OUTCOME
-          ? OUTCOME[flag.outcome as Outcome]
-          : OUTCOME.unknown;
+        const outcome =
+          flag.outcome && flag.outcome in OUTCOME
+            ? OUTCOME[flag.outcome as Outcome]
+            : OUTCOME.unknown;
         return (
-          <li key={flag.id} className="flex flex-wrap items-start gap-x-4 gap-y-2 px-5 py-3">
-            <div className="min-w-[160px] flex-1">
+          <motion.li
+            key={flag.id}
+            variants={fadeUp}
+            className="grid gap-x-6 gap-y-1.5 px-5 py-3.5 transition-colors duration-150 hover:bg-muted/40 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] sm:items-center"
+          >
+            <div className="min-w-0">
               <Link
                 to={`/students/${flag.student_id}`}
-                className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                className="rounded-sm text-sm font-medium text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {flag.student_name}
               </Link>
-              <div className="text-[11px] text-muted-foreground">
+              <div className="text-xs text-muted-foreground">
                 {flag.batch_name} · {detectorLabel(flag.type)}
               </div>
             </div>
-            <p className="min-w-[200px] flex-[2] text-xs leading-snug text-muted-foreground">
+            <p className="text-[13px] leading-snug text-muted-foreground">
               {flag.headline}
             </p>
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="flex items-center gap-3 sm:justify-end">
               <SeverityChip severity={outcome.severity} label={outcome.label} />
-              <span className="w-20 text-right text-[11px] text-muted-foreground">
-                {daysAgo(flag.resolved_at)}
+              <span className="text-xs whitespace-nowrap text-muted-foreground sm:w-20 sm:text-right">
+                closed {daysAgo(flag.resolved_at)}
               </span>
             </div>
-          </li>
+          </motion.li>
         );
       })}
-    </ul>
+    </motion.ul>
   );
 }
 

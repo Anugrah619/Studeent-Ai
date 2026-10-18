@@ -18,9 +18,16 @@ import type { Diagnosis as WireDiagnosis } from "@/api/types";
  * Student ids match the live roster, which is what makes flipping
  * `VITE_USE_MOCKS` a change of *source* rather than a change of subject.
  *
- * Exactly one row is not a transcript, and says so where it sits: an
- * unresolved citation on Tanvi's weakest hypothesis, because every live trace
- * so far resolves cleanly and the null branch would otherwise never render.
+ * One row is not a transcript, and says so where it sits: an unresolved
+ * citation on Tanvi's weakest hypothesis, because every live trace so far
+ * resolves cleanly and the null branch would otherwise never render.
+ *
+ * Faizan's (3) is not a verified transcript either. Its text dates from the
+ * original invented fixtures (cd660e8), and no live trace has ever returned
+ * `pattern_found: false` to replace it with. Its headline used to name
+ * "Faizan" — which a model sent only "S-3" cannot write, and which put an
+ * impossible sentence on screen next to the claim that the AI never sees a
+ * name. The name was taken out; swap in the live response once one exists.
  *
  * Between them these reach every state the card can be in, so the whole thing
  * is demonstrable by clicking through the roster with no backend and no API
@@ -35,7 +42,16 @@ import type { Diagnosis as WireDiagnosis } from "@/api/types";
  *   everyone else       422, not enough tagged evidence on this paper
  */
 
-const DIAGNOSES: Record<number, Diagnosis> = {
+/**
+ * What the literals below hold: a diagnosis without the three fields the
+ * server computes (`student_ref`, `tally`, and each hypothesis's
+ * `counter_evidence_questions`). `complete` adds them.
+ */
+type FixtureDiagnosis = Omit<Diagnosis, "student_ref" | "tally" | "hypotheses"> & {
+  hypotheses: Omit<Diagnosis["hypotheses"][number], "counter_evidence_questions">[];
+};
+
+const BASE: Record<number, FixtureDiagnosis> = {
   1: {
     paper_id: 17,
     paper_name: "Mock 15 — Diagnostic",
@@ -132,7 +148,7 @@ const DIAGNOSES: Record<number, Diagnosis> = {
     paper_id: 17,
     paper_name: "Mock 15 — Diagnostic",
     headline:
-      "No systematic misconception in Faizan's paper — the six wrong answers do not share a cause.",
+      "No systematic misconception in this paper — the six wrong answers do not share a cause.",
     pattern_found: false,
     hypotheses: [],
     recommended_action:
@@ -260,6 +276,147 @@ const DIAGNOSES: Record<number, Diagnosis> = {
     human_verdict: null,
   },
 };
+
+
+/**
+ * The three things the server added to a diagnosis — the pseudonym the model
+ * saw, the tally it was handed, and the counter-evidence questions resolved to
+ * ids — copied from the live responses for the four hero students (cached
+ * traces, so reading them cost no model call). Not typed from memory: the
+ * tally in particular is a count of the real attempts behind each card.
+ *
+ * Faizan (3) has no live trace to copy from — see the note at the top — so his
+ * tally is invented to agree with his own text ("six wrong answers, no shared
+ * cause") and says so below. Priya (6) never gets a diagnosis at all.
+ */
+type Tally = Diagnosis["tally"];
+const LIVE: Record<number, { tally: Tally; counter: Diagnosis["hypotheses"][number]["counter_evidence_questions"][] }> = {
+  // Aarav Mehta
+  1: {
+    tally: {
+      answered: 46,
+      wrong: 10,
+      wrong_with_known_cause: 5,
+      by_misconception: [
+        { misconception_code: "MIS-ORG-EAS", wrong_answers: 5, marks: 25 },
+      ],
+    },
+    counter: [
+      [
+        { question_id: 929, label: "D22", chose: "C", marks_at_stake: 0 },
+        { question_id: 930, label: "D23", chose: "A", marks_at_stake: 0 },
+      ],
+    ],
+  },
+  // Kunal Deshpande
+  4: {
+    tally: {
+      answered: 46,
+      wrong: 9,
+      wrong_with_known_cause: 5,
+      by_misconception: [
+        { misconception_code: "MIS-ROT-AXIS", wrong_answers: 5, marks: 25 },
+      ],
+    },
+    counter: [
+      [
+        { question_id: 914, label: "D07", chose: "D", marks_at_stake: 0 },
+        { question_id: 915, label: "D08", chose: "B", marks_at_stake: 0 },
+      ],
+    ],
+  },
+  // Tanvi Shah
+  5: {
+    tally: {
+      answered: 46,
+      wrong: 9,
+      wrong_with_known_cause: 8,
+      by_misconception: [
+        { misconception_code: "MIS-CALC-CHAIN", wrong_answers: 5, marks: 25 },
+        { misconception_code: "MIS-KIN-RELVEL", wrong_answers: 1, marks: 5 },
+        { misconception_code: "MIS-ORG-MARKOV", wrong_answers: 1, marks: 5 },
+        { misconception_code: "MIS-ROT-SHAPE", wrong_answers: 1, marks: 5 },
+      ],
+    },
+    counter: [
+      [
+        { question_id: 945, label: "D38", chose: "B", marks_at_stake: 0 },
+        { question_id: 946, label: "D39", chose: "C", marks_at_stake: 0 },
+      ],
+      [
+        { question_id: 911, label: "D04", chose: "C", marks_at_stake: 0 },
+        { question_id: 913, label: "D06", chose: "B", marks_at_stake: 0 },
+        { question_id: 915, label: "D08", chose: "B", marks_at_stake: 0 },
+      ],
+      [
+        { question_id: 920, label: "D13", chose: "A", marks_at_stake: 0 },
+        { question_id: 921, label: "D14", chose: "B", marks_at_stake: 0 },
+      ],
+      [
+        { question_id: 923, label: "D16", chose: "B", marks_at_stake: 0 },
+        { question_id: 924, label: "D17", chose: "D", marks_at_stake: 0 },
+        { question_id: 926, label: "D19", chose: "B", marks_at_stake: 0 },
+        { question_id: 929, label: "D22", chose: "C", marks_at_stake: 0 },
+        { question_id: 936, label: "D29", chose: "B", marks_at_stake: 0 },
+      ],
+    ],
+  },
+  // Ishita Rao
+  2: {
+    tally: {
+      answered: 46,
+      wrong: 12,
+      wrong_with_known_cause: 8,
+      by_misconception: [
+        { misconception_code: "MIS-ORG-MARKOV", wrong_answers: 4, marks: 20 },
+        { misconception_code: "MIS-ROT-SHAPE", wrong_answers: 2, marks: 10 },
+        { misconception_code: "MIS-BOND-COUNT", wrong_answers: 1, marks: 5 },
+        { misconception_code: "MIS-CALC-CHAIN", wrong_answers: 1, marks: 5 },
+      ],
+    },
+    counter: [
+      [
+        { question_id: 936, label: "D29", chose: "B", marks_at_stake: 0 },
+      ],
+      [
+        { question_id: 911, label: "D04", chose: "C", marks_at_stake: 0 },
+        { question_id: 913, label: "D06", chose: "B", marks_at_stake: 0 },
+        { question_id: 915, label: "D08", chose: "B", marks_at_stake: 0 },
+      ],
+      [
+        { question_id: 946, label: "D39", chose: "C", marks_at_stake: 0 },
+      ],
+    ],
+  },
+};
+
+const INVENTED_TALLY: Tally = {
+  answered: 46,
+  wrong: 6,
+  // Six wrong answers on distractors nobody has explained: real losses the
+  // taxonomy has nothing to say about, which is the finding.
+  wrong_with_known_cause: 0,
+  by_misconception: [],
+};
+
+/** Fill in the fields the server computes, so the literals above stay readable. */
+function complete(id: number, row: FixtureDiagnosis): Diagnosis {
+  const live = LIVE[id];
+  return {
+    ...row,
+    // The server's own rule: the model is sent `S-{student id}`, never a name.
+    student_ref: `S-${id}`,
+    tally: live?.tally ?? INVENTED_TALLY,
+    hypotheses: row.hypotheses.map((h, i) => ({
+      ...h,
+      counter_evidence_questions: live?.counter[i] ?? [],
+    })),
+  };
+}
+
+const DIAGNOSES: Record<number, Diagnosis> = Object.fromEntries(
+  Object.entries(BASE).map(([id, row]) => [id, complete(Number(id), row)]),
+);
 
 /** Students the fixture answers 503 for: the reasoning layer is not configured. */
 const UNCONFIGURED = new Set([6]);

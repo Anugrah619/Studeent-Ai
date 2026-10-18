@@ -50,7 +50,9 @@ export const CAUSES: Record<CauseKey, CauseToken> = {
   conceptual_gap: {
     key: "conceptual_gap",
     label: "Conceptual gap",
-    meaning: "Wrong, and mastery on that topic was already low",
+    // `mock_analysis.py`: today's mastery below 0.60 (wrong or skipped), or a
+    // wrong answer after twice the student's usual time on a known chapter.
+    meaning: "Wrong or skipped on a weak chapter, or wrong after twice the usual time",
     color: "var(--cause-conceptual)",
     ink: "#ffffff",
     attributed: true,
@@ -59,7 +61,9 @@ export const CAUSES: Record<CauseKey, CauseToken> = {
   execution_error: {
     key: "execution_error",
     label: "Execution error",
-    meaning: "Wrong, but mastery high and time normal",
+    // Known chapter (mastery >= 0.60) and not slow — a rushed answer lands
+    // here too, so the wording does not promise "normal" time.
+    meaning: "Wrong on a chapter they know, and not unusually slow",
     color: "var(--cause-execution)",
     ink: "#ffffff",
     attributed: true,

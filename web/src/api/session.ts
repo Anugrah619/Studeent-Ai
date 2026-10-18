@@ -14,7 +14,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiGet, apiPost, ensureCsrfToken } from "./client";
 import { qk } from "./queries";
-import type { LoginRequest, Me } from "./types";
+import type { LoginRequest, Me, PasswordChangeRequest } from "./types";
 
 /**
  * The current identity, or `null` when nobody is signed in.
@@ -71,6 +71,25 @@ export function useLogout() {
     onSettled: () => {
       queryClient.setQueryData(qk.me, null);
       queryClient.clear();
+    },
+  });
+}
+
+/**
+ * Replace my password. The last step of a new account's first sign-in.
+ *
+ * The server answers with the refreshed identity, `must_change_password` now
+ * false, and keeps the session alive, so the cache takes it and the gate in
+ * `RequireAuth` opens on the same tab with no second sign-in. Nothing else is
+ * invalidated: until this succeeded the server refused every other route, so
+ * there is nothing cached from before that could be stale.
+ */
+export function useChangePassword() {
+  const queryClient = useQueryClient();
+  return useMutation<Me, Error, PasswordChangeRequest>({
+    mutationFn: (body) => apiPost("/api/auth/password/", { body }),
+    onSuccess: (me) => {
+      queryClient.setQueryData(qk.me, me);
     },
   });
 }

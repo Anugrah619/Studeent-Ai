@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
+import { KpiCard } from "@/components/kit/KpiCard";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
 
 interface StatTileProps {
   label: string;
@@ -15,8 +15,10 @@ interface StatTileProps {
 }
 
 /**
- * Stat tile. Proportional figures on the value — `tabular-nums` makes a number
- * like 121 look loose at display size; it is reserved for columns.
+ * Stat tile: the original API over the kit's KpiCard, so every existing tile
+ * picks up the card look without a call site changing. The value arrives
+ * pre-formatted, so it is shown as given rather than animated — a new screen
+ * that has the raw number should use KpiCard directly and get the roll-in.
  */
 export function StatTile({
   label,
@@ -29,48 +31,20 @@ export function StatTile({
   className,
 }: StatTileProps) {
   return (
-    <div
-      className={cn(
-        "flex min-w-0 flex-col justify-between rounded-xl border border-border bg-card p-4",
-        className,
-      )}
-      title={hint}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        {trend}
-      </div>
-
-      {loading ? (
-        <Skeleton className="mt-3 h-8 w-20" />
-      ) : (
-        <div className="mt-2 flex items-baseline gap-2">
-          <span className="text-[28px] leading-none font-semibold tracking-tight text-foreground">
-            {value}
-          </span>
-          {delta ? (
-            <span
-              className={cn(
-                "text-xs font-medium",
-                delta.tone === "good"
-                  ? "text-status-good"
-                  : delta.tone === "bad"
-                    ? "text-status-critical"
-                    : "text-muted-foreground",
-              )}
-            >
-              {delta.text}
-            </span>
-          ) : null}
-        </div>
-      )}
-
-      {(caption || delta?.caption) && !loading ? (
-        <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-          {caption ?? delta?.caption}
-        </p>
-      ) : null}
-    </div>
+    <KpiCard
+      label={label}
+      display={value}
+      delta={
+        delta
+          ? { text: delta.text, tone: delta.tone, caption: delta.caption || undefined }
+          : undefined
+      }
+      caption={caption}
+      hint={hint}
+      trend={trend}
+      loading={loading}
+      className={className}
+    />
   );
 }
 

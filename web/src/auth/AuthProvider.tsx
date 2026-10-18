@@ -1,6 +1,6 @@
 import { createContext, use, type ReactNode } from "react";
-import { useLogin, useLogout, useMe } from "@/api/session";
-import type { LoginRequest, Me } from "@/api/types";
+import { useChangePassword, useLogin, useLogout, useMe } from "@/api/session";
+import type { LoginRequest, Me, PasswordChangeRequest } from "@/api/types";
 
 export type AuthStatus =
   /** `/api/me/` has not answered yet. Render nothing decisive. */
@@ -22,6 +22,9 @@ export interface AuthValue {
   loginError: Error | null;
   logout: () => Promise<void>;
   logoutPending: boolean;
+  changePassword: (body: PasswordChangeRequest) => Promise<Me>;
+  changePasswordPending: boolean;
+  changePasswordError: Error | null;
   retry: () => void;
 }
 
@@ -40,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const me = useMe();
   const login = useLogin();
   const logout = useLogout();
+  const changePassword = useChangePassword();
 
   const status: AuthStatus = me.isPending
     ? "loading"
@@ -60,6 +64,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await logout.mutateAsync();
     },
     logoutPending: logout.isPending,
+    changePassword: (body) => changePassword.mutateAsync(body),
+    changePasswordPending: changePassword.isPending,
+    changePasswordError: changePassword.error ?? null,
     retry: () => void me.refetch(),
   };
 

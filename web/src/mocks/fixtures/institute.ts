@@ -102,6 +102,8 @@ export const papers: TestPaper[] = [
     total_questions: 75,
     max_marks: 300,
     duration_min: 180,
+    // Every seeded paper is ours, not the institute's and not an official one.
+    source: "demo" as const,
   })),
   {
     id: DIAGNOSTIC_PAPER_ID,
@@ -110,6 +112,7 @@ export const papers: TestPaper[] = [
     total_questions: 46,
     max_marks: DIAGNOSTIC_MAX_MARKS,
     duration_min: 60,
+    source: "demo" as const,
   },
 ];
 

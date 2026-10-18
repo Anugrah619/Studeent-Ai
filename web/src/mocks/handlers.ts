@@ -20,7 +20,6 @@ import { planBlocks } from "./fixtures/plan";
 import { KNOWN_STUDENTS, hasQuestion, questionFor } from "./fixtures/questions";
 import {
   mockScoresFor,
-  seedById,
   seeds,
   studentDetail,
   studentListRow,
@@ -120,6 +119,7 @@ const DEMO_ME: Me = {
   student_id: null,
   is_staff: false,
   is_superuser: false,
+  must_change_password: false,
 };
 
 const session: { me: Me | null } = { me: DEMO_ME };
@@ -131,14 +131,36 @@ export function signInDemoUser() {
   session.me = DEMO_ME;
 }
 
+/** Start a test as someone else — a student on a temporary password, say. */
+export function signInAs(me: Me) {
+  session.me = me;
+}
+
 const UNAUTHENTICATED = HttpResponse.json(
   { detail: "Authentication credentials were not provided." },
   { status: 403 },
 );
 
-/** Every tenant route is behind the session, exactly as `IsAuthenticated` is. */
-function guard<T>(body: () => T): T | typeof UNAUTHENTICATED {
-  return session.me === null ? UNAUTHENTICATED : body();
+/**
+ * What the server answers, for every route outside `/api/auth/` and `/api/me/`,
+ * to an account still on a temporary password. The `code` is what a client
+ * branches on; the sentence is for people.
+ */
+const PASSWORD_CHANGE_REQUIRED = HttpResponse.json(
+  { detail: "Choose a new password before you continue.", code: "password_change_required" },
+  { status: 403 },
+);
+
+/**
+ * Every tenant route is behind the session, exactly as `IsAuthenticated` is —
+ * and behind the forced password change, as the server's middleware makes it.
+ */
+function guard<T>(
+  body: () => T,
+): T | typeof UNAUTHENTICATED | typeof PASSWORD_CHANGE_REQUIRED {
+  if (session.me === null) return UNAUTHENTICATED;
+  if (session.me.must_change_password) return PASSWORD_CHANGE_REQUIRED;
+  return body();
 }
 
 export const handlers = [
@@ -189,6 +211,37 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
+  http.post("/api/auth/password/", async ({ request }) => {
+    await settle();
+    if (session.me === null) return UNAUTHENTICATED;
+    const body = (await request.json()) as {
+      current_password?: string;
+      new_password?: string;
+    };
+    // The temporary password in the fixtures is the seeded one, as at login.
+    if (body.current_password !== "demo12345") {
+      return HttpResponse.json(
+        { current_password: ["That is not your current password."] },
+        { status: 400 },
+      );
+    }
+    const next = body.new_password ?? "";
+    // A stand-in for Django's validators: enough to reach the error path from
+    // the screen, not a copy of the rules (the server is the one place those live).
+    if (next.length < 8) {
+      return HttpResponse.json(
+        {
+          new_password: [
+            "This password is too short. It must contain at least 8 characters.",
+          ],
+        },
+        { status: 400 },
+      );
+    }
+    session.me = { ...session.me, must_change_password: false };
+    return HttpResponse.json(session.me);
+  }),
+
   http.get("/api/me/", async () => {
     await settle();
     return session.me ? HttpResponse.json(session.me) : UNAUTHENTICATED;
@@ -196,9 +249,38 @@ export const handlers = [
 
   /* ----------------------------------------------------------- dashboard */
 
-  http.get("/api/dashboard/summary/", async () => {
+  http.get("/api/dashboard/summary/", async ({ request }) => {
     await settle();
-    return guard(() => HttpResponse.json(dashboardSummary()));
+    if (session.me === null) return UNAUTHENTICATED;
+
+    // `?batch=` is validated the way the server validates it — a 400 for a
+    // non-number, a 404 for a batch this institute does not have — so the
+    // console's error path is the live one.
+    const raw = new URL(request.url).searchParams.get("batch");
+    if (raw) {
+      const batchId = Number(raw);
+      if (!Number.isInteger(batchId)) {
+        return HttpResponse.json(
+          { detail: "?batch= must be a numeric Batch id." },
+          { status: 400 },
+        );
+      }
+      if (!batches.some((b) => b.id === batchId)) {
+        return HttpResponse.json(
+          { detail: "No such batch in this institute." },
+          { status: 404 },
+        );
+      }
+    }
+
+    // A valid batch still gets the institute-wide strip, with `batch_id: null`
+    // saying so. The fixtures hold one mock average and one revision-debt
+    // figure, both transcribed for the whole institute; a per-batch version
+    // would have to be made up, and a made-up number under a batch's name is
+    // worse than an honest "institute-wide". The console reads the echo, so it
+    // labels these figures for what they are in mock mode and scopes them on
+    // the live server, where the numbers are real.
+    return HttpResponse.json(dashboardSummary());
   }),
 
   /* ------------------------------------------- router lists — PAGINATED */
@@ -501,11 +583,16 @@ export const handlers = [
       );
     }
 
-    const student = seedById.get(flag.student_id);
-    const mentor =
-      mentors.find((m) => m.id === body.mentor) ??
-      mentors.find((m) => m.id === student?.mentorId) ??
-      mentors[0];
+    // The signed-in mentor, as `FlagViewSet.intervene` does it — the server
+    // ignores `body.mentor` and reads `request.user.mentor`, and refuses an
+    // account that has none.
+    const mentor = mentors.find((m) => m.id === session.me?.mentor_id);
+    if (!mentor) {
+      return HttpResponse.json(
+        { detail: "Only mentors can log interventions." },
+        { status: 403 },
+      );
+    }
 
     const record: Intervention = {
       id: 900 + interventions.length + 1,
@@ -517,11 +604,11 @@ export const handlers = [
     };
     interventions.push(record);
 
-    // Logging an intervention closes the loop: the flag leaves the triage list.
-    flag.is_open = false;
-    flag.resolved_at = record.taken_at;
-    flag.outcome = "unknown";
-
+    // The flag is deliberately left open, exactly as `FlagViewSet.intervene`
+    // leaves it: calling a parent is not the student recovering, and the
+    // server only closes a flag through `POST /resolve/` with a stated
+    // outcome. This mock used to close it here, which let the console promise
+    // behaviour the live API has never had.
     return HttpResponse.json(record, { status: 201 });
   }),
 

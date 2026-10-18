@@ -22,6 +22,25 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(import.meta.dirname, "./src"),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          /**
+           * React's runtime in a chunk of its own. Each screen is already its
+           * own lazy chunk (`App.tsx`); what was left in the entry was mostly
+           * react-dom, which changes only on an upgrade — so it is cached
+           * across every deploy of our own code instead of re-downloaded with
+           * it, and the entry stops tripping the 500 kB warning.
+           */
+          manualChunks(id) {
+            if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
+              return "react";
+            }
+            return undefined;
+          },
+        },
+      },
+    },
     server: {
       port: PORT,
       /**

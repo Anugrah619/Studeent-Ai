@@ -27,26 +27,28 @@ export function StudentFlagsPanel({
       {flags.map((flag) => (
         <li
           key={flag.id}
-          className="flex flex-col rounded-xl border border-border bg-card p-4"
+          className="flex flex-col rounded-xl bg-card p-4 shadow-card ring-1 ring-border sm:p-5"
         >
           <div className="flex flex-wrap items-center gap-2">
             <SeverityChip severity={flag.severity} />
-            <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+            <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
               {detectorLabel(flag.type)}
             </span>
-            <span className="ml-auto text-[11px] text-muted-foreground">
+            <span className="ml-auto text-xs text-muted-foreground">
               {daysAgo(flag.raised_at)}
             </span>
           </div>
 
-          <p className="mt-2 text-sm leading-snug text-foreground">{flag.headline}</p>
+          <p className="mt-2.5 text-[15px] leading-snug font-medium text-foreground">
+            {flag.headline}
+          </p>
 
           <div className="mt-3 flex-1">
             <EvidenceList evidence={flag.evidence} />
           </div>
 
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <span className="truncate text-[11px] text-muted-foreground">
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <span className="truncate text-xs text-muted-foreground">
               {flag.topic_name} · {flag.mentor_name}
             </span>
             <Button size="sm" variant="outline" onClick={() => onIntervene(flag)}>

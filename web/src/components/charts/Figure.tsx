@@ -1,5 +1,7 @@
 import { useId, useState, type ReactNode } from "react";
+import { motion } from "motion/react";
 import { Table2, BarChart3 } from "lucide-react";
+import { fadeIn, transition } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 interface FigureProps {
@@ -36,17 +38,20 @@ export function Figure({
   return (
     <section
       className={cn(
-        "flex flex-col rounded-xl border border-border bg-card",
+        // The card surface, as `ui/card` draws it. `bg-card` is the same value
+        // as `--chart-surface`, which the charts paint their 2px gaps and dot
+        // rings in — so a gap reads as a gap, never as a hairline.
+        "flex flex-col rounded-xl bg-card text-card-foreground shadow-card ring-1 ring-foreground/10",
         className,
       )}
     >
-      <header className="flex flex-wrap items-start justify-between gap-3 px-5 pt-4 pb-3">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">
+      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 px-5 pt-5 pb-3">
+        <div className="min-w-0 flex-1 basis-64">
+          <h3 className="font-heading text-[15px] leading-snug font-semibold tracking-tight text-foreground">
             {title}
           </h3>
           {subtitle ? (
-            <p className="mt-0.5 max-w-prose text-xs leading-relaxed text-muted-foreground">
+            <p className="mt-1 max-w-prose text-[13px] leading-relaxed text-muted-foreground">
               {subtitle}
             </p>
           ) : null}
@@ -56,12 +61,13 @@ export function Figure({
           <div
             role="group"
             aria-label="View as"
-            className="flex items-center rounded-md border border-border p-0.5"
+            className="flex items-center rounded-lg bg-muted p-0.5 ring-1 ring-border/60"
           >
             <ViewButton
               active={view === "chart"}
               onClick={() => setView("chart")}
               controls={panelId}
+              pillId={`${panelId}-pill`}
               icon={<BarChart3 aria-hidden className="size-3.5" />}
               label="Chart"
             />
@@ -69,6 +75,7 @@ export function Figure({
               active={view === "table"}
               onClick={() => setView("table")}
               controls={panelId}
+              pillId={`${panelId}-pill`}
               icon={<Table2 aria-hidden className="size-3.5" />}
               label="Table"
             />
@@ -76,18 +83,27 @@ export function Figure({
         </div>
       </header>
 
-      {legend ? <div className="px-5 pb-3">{legend}</div> : null}
+      {legend ? <div className="px-5 pb-4">{legend}</div> : null}
 
-      <div id={panelId} className="min-w-0 flex-1 px-5 pb-4">
+      {/* A flex column, so a chart that wants the figure's full height (the
+          trend line, in a two-up row) can take it with `flex-1`. */}
+      <div id={panelId} className="flex min-w-0 flex-1 flex-col px-5 pb-5">
         {view === "chart" ? (
           children
         ) : (
-          <div className="overflow-x-auto">{table}</div>
+          <motion.div
+            variants={fadeIn}
+            initial="hidden"
+            animate="show"
+            className="overflow-x-auto"
+          >
+            {table}
+          </motion.div>
         )}
       </div>
 
       {footnote ? (
-        <footer className="border-t border-border px-5 py-3 text-xs leading-relaxed text-muted-foreground">
+        <footer className="rounded-b-xl border-t border-border bg-muted/40 px-5 py-3.5 text-[13px] leading-relaxed text-muted-foreground">
           {footnote}
         </footer>
       ) : null}
@@ -99,12 +115,15 @@ function ViewButton({
   active,
   onClick,
   controls,
+  pillId,
   icon,
   label,
 }: {
   active: boolean;
   onClick: () => void;
   controls: string;
+  /** Shared by the pair, so the pill slides between them instead of blinking. */
+  pillId: string;
   icon: ReactNode;
   label: string;
 }) {
@@ -115,14 +134,24 @@ function ViewButton({
       aria-pressed={active}
       aria-controls={controls}
       className={cn(
-        "flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors",
+        "relative flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
         active
-          ? "bg-secondary text-secondary-foreground"
+          ? "text-foreground"
           : "text-muted-foreground hover:text-foreground",
       )}
     >
-      {icon}
-      {label}
+      {active ? (
+        <motion.span
+          layoutId={pillId}
+          transition={transition.layout}
+          aria-hidden
+          className="absolute inset-0 rounded-md bg-card shadow-card ring-1 ring-foreground/10"
+        />
+      ) : null}
+      <span className="relative flex items-center gap-1.5">
+        {icon}
+        {label}
+      </span>
     </button>
   );
 }

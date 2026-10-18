@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { Database, Info, Radio } from "lucide-react";
+import { ArrowDown, ArrowRight, ClipboardList, Database, Info, Radio } from "lucide-react";
 import { USE_MOCKS } from "@/api/env";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { IMPORT_RECORDS_NOTE } from "./importRecords";
 
 /**
  * The building blocks the two explainer pages share.
@@ -44,6 +45,68 @@ export function SourceTag({
   );
 }
 
+/**
+ * The tag for figures that come from our import records, not the API.
+ *
+ * Shaped like `SourceTag` on purpose, so a reader who has learned to look at
+ * the corner of a card for "where is this from?" finds the answer there too —
+ * and finds a different answer.
+ */
+export function RecordsTag({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
+        className,
+      )}
+      title={IMPORT_RECORDS_NOTE}
+    >
+      <ClipboardList aria-hidden className="size-3" />
+      Import records
+      <span className="sr-only">. {IMPORT_RECORDS_NOTE}</span>
+    </span>
+  );
+}
+
+/**
+ * A link to a place further down the same page, in TextLink's ink.
+ *
+ * Not a router `Link`: a hash-only navigation through the router is a PUSH,
+ * and the shell scrolls to the top on every PUSH — the opposite of the jump
+ * the reader asked for. A plain anchor is a native jump (a POP to the router).
+ */
+export function AnchorLink({
+  href,
+  children,
+  className,
+  direction = "down",
+}: {
+  href: `#${string}`;
+  children: ReactNode;
+  className?: string;
+  direction?: "down" | "right";
+}) {
+  const Icon = direction === "down" ? ArrowDown : ArrowRight;
+  return (
+    <a
+      href={href}
+      className={cn(
+        "group/link inline-flex items-center gap-1 rounded-sm text-sm font-medium text-brand-ink underline decoration-brand-line underline-offset-4 transition-colors outline-none hover:decoration-brand-ink focus-visible:ring-3 focus-visible:ring-ring/50",
+        className,
+      )}
+    >
+      {children}
+      <Icon
+        aria-hidden
+        className={cn(
+          "size-3.5 transition-transform duration-150",
+          direction === "down" ? "group-hover/link:translate-y-0.5" : "group-hover/link:translate-x-0.5",
+        )}
+      />
+    </a>
+  );
+}
+
 /** One live illustration: a titled card that names its source. */
 export function Exhibit({
   title,
@@ -52,6 +115,7 @@ export function Exhibit({
   footer,
   className,
   labelledBy,
+  tag,
 }: {
   title: ReactNode;
   endpoints: string[];
@@ -59,12 +123,14 @@ export function Exhibit({
   footer?: ReactNode;
   className?: string;
   labelledBy?: string;
+  /** In place of the source tag — for figures that are not from the API. */
+  tag?: ReactNode;
 }) {
   return (
     <figure
       aria-labelledby={labelledBy}
       className={cn(
-        "flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card",
+        "flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card",
         className,
       )}
     >
@@ -75,7 +141,7 @@ export function Exhibit({
         >
           {title}
         </span>
-        <SourceTag endpoints={endpoints} />
+        {tag ?? <SourceTag endpoints={endpoints} />}
       </figcaption>
       <div className="min-w-0 flex-1 px-4 py-4 sm:px-5">{children}</div>
       {footer ? (

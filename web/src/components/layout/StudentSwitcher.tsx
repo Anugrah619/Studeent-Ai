@@ -29,7 +29,7 @@ export function StudentSwitcher() {
           empty value stays a valid "nothing selected" state on the console. */}
       <SelectTrigger
         size="sm"
-        className="w-[184px]"
+        className="w-[136px] sm:w-[184px]"
         aria-label="Open a student's 360 view"
       >
         <span

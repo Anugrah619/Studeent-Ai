@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from "react";
 import {
-  Check,
+  CircleCheck,
   CircleHelp,
+  CircleX,
   Hand,
   Lightbulb,
   Quote,
   Stethoscope,
+  Tag,
   Timer,
   Unlink,
 } from "lucide-react";
@@ -23,6 +25,7 @@ import {
 } from "@/api/questions";
 import { useQuestion } from "@/api/queries";
 import { ErrorState } from "@/components/common/States";
+import { MathText } from "@/components/kit/MathText";
 import {
   Dialog,
   DialogContent,
@@ -87,7 +90,7 @@ export function QuestionPanel({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent
-        className="max-h-[88vh] w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl"
+        className="max-h-[88vh] w-full gap-0 overflow-y-auto p-0 shadow-overlay sm:max-w-2xl"
         aria-describedby="question-panel-meta"
       >
         {query.isPending ? (
@@ -129,12 +132,12 @@ function QuestionBody({
 
   return (
     <>
-      <DialogHeader className="gap-1 border-b border-border bg-muted/40 py-3.5 pr-12 pl-5 sm:pl-7">
-        <DialogTitle className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-base">
-          <span className="tnum font-mono text-sm font-semibold">
+      <DialogHeader className="gap-1.5 border-b border-border bg-muted/40 py-4 pr-12 pl-5 sm:pl-7">
+        <DialogTitle className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-base">
+          <span className="tnum rounded-md bg-card px-2 py-0.5 font-mono text-sm font-semibold shadow-card ring-1 ring-border">
             {data.label || `#${data.id}`}
           </span>
-          <span className="text-sm font-normal text-muted-foreground">
+          <span className="text-sm font-medium text-muted-foreground">
             {[data.subject, data.topic].filter(Boolean).join(" · ") ||
               "Unmapped question"}
           </span>
@@ -198,14 +201,19 @@ function QuestionBody({
       </DialogHeader>
 
       <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
-        {/* 1 — the stem. The artefact. Biggest reading-size text on the panel. */}
-        <p className="max-w-[58ch] text-base leading-relaxed font-medium text-balance text-foreground sm:text-[1.0625rem]">
+        {/* 1 — the stem. The artefact. Biggest reading-size text on the panel.
+            Typeset, because real stems carry `$\theta$` and `\ce{}`; MathText
+            never treats the text around a formula as HTML. */}
+        <MathText
+          as="p"
+          className="max-w-[60ch] text-base leading-relaxed font-medium text-foreground sm:text-[1.0625rem]"
+        >
           {data.question_text || "This question has no stem on file."}
-        </p>
+        </MathText>
 
         {/* 2 — the options. */}
         {data.options.length ? (
-          <ol className="space-y-1.5" aria-label="Options">
+          <ol className="space-y-2" aria-label="Options">
             {data.options.map((option) => (
               <li key={option.label}>
                 <OptionRow option={option} who={who} asked={asked} />
@@ -237,7 +245,6 @@ function QuestionBody({
         {/* 3 — the belief. The reason this panel exists. */}
         {belief ? (
           <Belief
-            who={who}
             optionLabel={chosen?.label ?? data.chosen_label ?? ""}
             name={belief.name}
             code={belief.code}
@@ -285,10 +292,12 @@ function QuestionBody({
  * One option
  *
  * Two independent facts can be true of a row — "this is the right answer" and
- * "this student picked it" — and they are marked by two different means so
- * neither depends on hue: the correct answer gets a tick and the word Correct;
- * the student's pick gets a filled letter, a pointing hand and their name. A
- * reader in greyscale, or with any colour-vision deficiency, still gets both.
+ * "this student picked it" — and each is marked with an icon AND a word, so
+ * neither depends on hue: a tick and "Correct answer"; a cross (or a hand, when
+ * the pick was right) and "{name} chose this". A reader in greyscale, or with
+ * any colour-vision deficiency, still gets both. A wrong pick also carries the
+ * tag on that distractor, named in plain language — the belief that produced
+ * the choice, right where the choice is.
  * ------------------------------------------------------------------ */
 
 function OptionRow({
@@ -302,61 +311,108 @@ function OptionRow({
 }) {
   // `=== true` on purpose. `null` is "not asked" and `false` is "not picked",
   // and only the former must leave the row completely unmarked.
-  const picked = option.chosen === true;
+  const picked = asked && option.chosen === true;
   const wrongPick = picked && !option.is_correct;
+  const tag = wrongPick ? option.misconception : null;
 
   return (
     <div
       className={cn(
-        "flex gap-3 rounded-lg border px-3 py-2.5",
+        "flex gap-3 rounded-xl px-3.5 py-3 ring-1 ring-inset",
         option.is_correct
-          ? "border-status-good/45 bg-status-good/[0.06]"
+          ? "bg-status-good/[0.07] ring-status-good/45"
           : wrongPick
-            ? "border-status-critical/45 bg-status-critical/[0.06]"
-            : "border-border",
+            ? "bg-status-critical/[0.06] ring-status-critical/45"
+            : "ring-border",
       )}
     >
       <span
         aria-hidden
         className={cn(
-          "tnum mt-px flex size-6 shrink-0 items-center justify-center rounded-md border font-mono text-[11px] font-semibold",
-          picked
-            ? "border-transparent bg-foreground text-background"
-            : "border-border bg-muted text-muted-foreground",
+          "tnum mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-semibold",
+          option.is_correct
+            ? "bg-status-good text-background"
+            : wrongPick
+              ? "bg-status-critical text-background"
+              : "bg-muted text-muted-foreground ring-1 ring-border ring-inset",
         )}
       >
         {option.label}
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className="text-sm leading-relaxed text-foreground">
+        <p className="text-[15px] leading-relaxed text-foreground">
           <span className="sr-only">Option {option.label}: </span>
-          {option.text}
+          <MathText>{option.text}</MathText>
         </p>
 
-        {option.is_correct || (asked && picked) ? (
-          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-semibold tracking-wide uppercase">
+        {option.is_correct || picked ? (
+          <p className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {option.is_correct ? (
-              <span className="inline-flex items-center gap-1 text-status-good">
-                <Check aria-hidden className="size-3.5" />
+              <Marker tone="good" icon={<CircleCheck aria-hidden className="size-3.5" />}>
                 Correct answer
-              </span>
+              </Marker>
             ) : null}
-            {asked && picked ? (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1",
-                  option.is_correct ? "text-foreground" : "text-status-critical",
-                )}
+            {picked ? (
+              <Marker
+                tone={wrongPick ? "critical" : "neutral"}
+                icon={
+                  wrongPick ? (
+                    <CircleX aria-hidden className="size-3.5" />
+                  ) : (
+                    <Hand aria-hidden className="size-3.5" />
+                  )
+                }
               >
-                <Hand aria-hidden className="size-3.5" />
                 {who} chose this
-              </span>
+                {wrongPick ? <span className="sr-only"> — a wrong answer</span> : null}
+              </Marker>
+            ) : null}
+          </p>
+        ) : null}
+
+        {tag ? (
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <Tag aria-hidden className="size-3.5 shrink-0" />
+            <span>Tagged</span>
+            <code className="rounded-md bg-card px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground ring-1 ring-border">
+              {tag.code}
+            </code>
+            {tag.name ? (
+              <span className="font-medium text-foreground">{tag.name}</span>
             ) : null}
           </p>
         ) : null}
       </div>
     </div>
+  );
+}
+
+const MARKER_TONE = {
+  good: "bg-status-good/12 text-status-good ring-status-good/30",
+  critical: "bg-status-critical/10 text-status-critical ring-status-critical/30",
+  neutral: "bg-muted text-foreground ring-border",
+} as const;
+
+function Marker({
+  tone,
+  icon,
+  children,
+}: {
+  tone: keyof typeof MARKER_TONE;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset",
+        MARKER_TONE[tone],
+      )}
+    >
+      {icon}
+      {children}
+    </span>
   );
 }
 
@@ -370,13 +426,11 @@ function OptionRow({
  * ------------------------------------------------------------------ */
 
 function Belief({
-  who,
   optionLabel,
   name,
   code,
   description,
 }: {
-  who: string;
   optionLabel: string;
   name: string;
   code: string;
@@ -385,16 +439,19 @@ function Belief({
   return (
     <section
       aria-labelledby="belief-heading"
-      className="rounded-lg border border-foreground/20 bg-muted/40 px-4 py-4 sm:px-5"
+      className="rounded-xl bg-muted/50 px-4 py-4 ring-1 ring-foreground/15 sm:px-5"
     >
       <h3
         id="belief-heading"
         className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold tracking-[0.08em] text-foreground uppercase"
       >
         <Stethoscope aria-hidden className="size-3.5" />
+        {/* The text below is the catalogue's description of the misconception,
+            written when the paper was tagged — never anything the student
+            wrote, so it is not put in their mouth. */}
         {optionLabel
-          ? `What choosing (${optionLabel}) reveals — in ${who}'s own words`
-          : `What this choice reveals — in ${who}'s own words`}
+          ? `The belief behind choosing (${optionLabel})`
+          : "The belief behind this choice"}
       </h3>
 
       <blockquote className="mt-2.5 flex gap-2.5">
@@ -402,13 +459,16 @@ function Belief({
           aria-hidden
           className="mt-1 size-4 shrink-0 text-muted-foreground"
         />
-        <p className="max-w-[52ch] text-[0.9375rem] leading-relaxed text-foreground sm:text-base">
+        <MathText
+          as="p"
+          className="max-w-[54ch] text-[0.9375rem] leading-relaxed text-foreground sm:text-base"
+        >
           {description}
-        </p>
+        </MathText>
       </blockquote>
 
       <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-        <code className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground">
+        <code className="rounded-md bg-card px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground ring-1 ring-border">
           {code}
         </code>
         {name ? <span>{name}</span> : null}
@@ -425,7 +485,7 @@ function Remedy({ text }: { text: string }) {
   return (
     <section
       aria-labelledby="remedy-heading"
-      className="border-l-[3px] border-status-good bg-status-good/[0.07] py-3 pr-4 pl-3.5"
+      className="rounded-r-xl border-l-[3px] border-status-good bg-status-good/[0.07] py-3 pr-4 pl-3.5"
     >
       <h3
         id="remedy-heading"
@@ -434,9 +494,9 @@ function Remedy({ text }: { text: string }) {
         <Lightbulb aria-hidden className="size-3.5" />
         What fixes it
       </h3>
-      <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-foreground">
+      <MathText as="p" className="mt-1.5 max-w-prose text-sm leading-relaxed text-foreground">
         {text}
-      </p>
+      </MathText>
     </section>
   );
 }
@@ -458,7 +518,7 @@ function Solution({
   correct: { label: string } | null;
 }) {
   return (
-    <details className="group rounded-lg border border-border">
+    <details className="group rounded-xl ring-1 ring-border">
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-3.5 py-2.5 text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
         <span
           aria-hidden
@@ -471,9 +531,12 @@ function Solution({
           <span className="font-normal">· answer ({correct.label})</span>
         ) : null}
       </summary>
-      <p className="max-w-prose px-3.5 pt-0.5 pb-3.5 text-sm leading-relaxed text-muted-foreground">
+      <MathText
+        as="p"
+        className="max-w-prose px-3.5 pt-0.5 pb-3.5 text-sm leading-relaxed text-muted-foreground"
+      >
         {text}
-      </p>
+      </MathText>
     </details>
   );
 }
