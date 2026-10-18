@@ -14,6 +14,7 @@ want for fixtures, and it is also the trap: an RLS test that forgets
 from __future__ import annotations
 
 import pytest
+from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from apps.reasoning.services import gemini as _gemini
@@ -24,6 +25,32 @@ from tests import factories as f
 #: build a client -- a path that returns None before the SDK is even
 #: imported, so it cannot reach the network either.
 REAL_GEMINI_CLIENT = _gemini._client
+
+
+@pytest.fixture(autouse=True)
+def clean_throttle_counters():
+    """Throttle counters live in Django's cache, which outlives a test.
+
+    Without this a test that signs in ten times would leave the next one
+    already over the limit, and the failure would depend on test order.
+    """
+    cache.clear()
+    yield
+    cache.clear()
+
+
+@pytest.fixture
+def fast_password_hasher(settings):
+    """Opt in with `pytestmark = pytest.mark.usefixtures("fast_password_hasher")`.
+
+    Django's default hasher is deliberately slow — about a second per
+    password here — and a test that builds a few accounts spends its whole
+    runtime on it. The tests that use this never depend on the hasher's
+    strength: they sign in through `force_login`, or through the real login
+    route, which verifies against whatever hasher made the stored hash.
+    Scoped to the modules that ask; the rest of the suite is untouched.
+    """
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 
 @pytest.fixture(autouse=True)

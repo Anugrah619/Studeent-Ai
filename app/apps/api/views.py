@@ -15,20 +15,25 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
-from apps.derived.models import Flag, Intervention, PlanBlock, TopicState
-from apps.derived.services import features
-from apps.events.models import Attempt, RevisionEvent, StudyLog
-from apps.events.services import mock_analysis
-from apps.ingestion.models import QuestionTopicMap, TestPaper
+from apps.derived.models import Flag, Intervention
+from apps.events.models import Attempt, RevisionEvent
+from apps.ingestion.models import QuestionTopicMap, Source, TestPaper
 from apps.tenancy.models import Batch, Mentor, Student
+from apps.tenancy.services import accounts
 
+from . import rollups
 from . import serializers as ser
 from .pagination import StandardPagination, SubResourcePagination
+from .permissions import IsConsoleUser
 
 logger = logging.getLogger(__name__)
 
-SUBJECTS = ["Physics", "Chemistry", "Maths"]
+#: Every console viewset below. A student is authenticated and belongs to an
+#: institute, so `IsAuthenticated` alone lets them through to
+#: `/api/students/{id}/` — see `permissions.py` for why that is the bug.
+CONSOLE_PERMISSIONS = [IsAuthenticated, IsConsoleUser]
 
 #: What the diagnosis endpoint says when it cannot produce one.
 #:
@@ -83,6 +88,18 @@ INSTITUTE_PARAM = OpenApiParameter(
         "mentor and student accounts, whose institute comes from the "
         "account itself. A superuser who omits it gets an empty result "
         "rather than every tenant's rows."
+    ),
+)
+
+#: Shared by `StudentViewSet.topic_states` and `MyViewSet.topic_states`, so
+#: the two routes cannot describe the same filter differently.
+WEAK_PARAM = OpenApiParameter(
+    "weak", bool,
+    description=(
+        "Only chapters with a measured `mastery` below 0.5. "
+        "Chapters below the evidence floor carry a null mastery "
+        "and are excluded, because 'not enough attempts to say' "
+        "is not the same claim as 'weak'."
     ),
 )
 
@@ -210,7 +227,7 @@ class BatchViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
     """
 
     serializer_class = ser.BatchSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = CONSOLE_PERMISSIONS
     pagination_class = StandardPagination
 
     def get_queryset(self):
@@ -247,7 +264,7 @@ class MentorViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
     """
 
     serializer_class = ser.MentorSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = CONSOLE_PERMISSIONS
     pagination_class = StandardPagination
 
     def get_queryset(self):
@@ -269,7 +286,7 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
     convenient).
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = CONSOLE_PERMISSIONS
 
     #: Sub-resources page at 200, collections at 50. `pagination_class` is
     #: a property rather than a constant because the two have genuinely
@@ -277,9 +294,10 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
     #: an institute's students are not. drf-spectacular instantiates the
     #: view before reading this, so the schema picks up the right one per
     #: operation.
-    SUB_RESOURCE_ACTIONS = frozenset(
-        {"topic_states", "mock_scores", "subject_breakdown", "attempts"}
-    )
+    SUB_RESOURCE_ACTIONS = frozenset({
+        "topic_states", "mock_scores", "subject_breakdown", "attempts", "plan",
+        "study_logs", "confidence", "revisions",
+    })
 
     @property
     def pagination_class(self):
@@ -300,7 +318,7 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         qs = self.scoped(
-            Student.objects.select_related("batch", "mentor", "state")
+            Student.objects.select_related("batch", "mentor", "state", "user")
         ).annotate(open_flags=Count("flags", filter=Q(flags__resolved_at__isnull=True)))
 
         batch = self.request.query_params.get("batch")
@@ -384,18 +402,7 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
         return super().list(request, *args, **kwargs)
 
     @extend_schema(
-        parameters=[
-            INSTITUTE_PARAM,
-            OpenApiParameter(
-                "weak", bool,
-                description=(
-                    "Only chapters with a measured `mastery` below 0.5. "
-                    "Chapters below the evidence floor carry a null mastery "
-                    "and are excluded, because 'not enough attempts to say' "
-                    "is not the same claim as 'weak'."
-                ),
-            ),
-        ],
+        parameters=[INSTITUTE_PARAM, WEAK_PARAM],
         responses=ser.TopicStateSerializer(many=True),
         tags=["students"],
     )
@@ -407,13 +414,9 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
         ascending sort, so chapters with too little evidence to score sit
         at the end rather than masquerading as the weakest ones.
         """
-        qs = (
-            TopicState.objects.filter(student_id=pk, institute_id=self.institute_id())
-            .select_related("topic__parent__parent")
-            .order_by("mastery", "id")
+        qs = rollups.topic_state_queryset(
+            self.institute_id(), pk, weak=request.query_params.get("weak") == "true"
         )
-        if request.query_params.get("weak") == "true":
-            qs = qs.filter(mastery__lt=0.5, mastery__isnull=False)
         return self.paginated(qs, ser.TopicStateSerializer)
 
     @extend_schema(
@@ -431,28 +434,9 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
         chart re-sorting defensively on arrival. It is a guarantee now:
         the payload is chart-ready in the order given, left to right.
         """
-        rows = (
-            Attempt.objects.filter(student_id=pk, institute_id=self.institute_id(),
-                                   test_paper__isnull=False)
-            .select_related("test_paper", "topic__parent__parent")
-            .values("test_paper_id", "test_paper__name", "test_paper__held_on",
-                    "topic__parent__parent__name")
-            .annotate(marks=Sum("marks"))
+        return self.paginated(
+            rollups.mock_score_rows(self.institute_id(), pk), ser.MockScoreSerializer
         )
-        papers: dict[int, dict] = {}
-        for r in rows:
-            p = papers.setdefault(r["test_paper_id"], {
-                "paper_id": r["test_paper_id"],
-                "paper_name": r["test_paper__name"],
-                "held_on": r["test_paper__held_on"],
-                "physics": 0.0, "chemistry": 0.0, "maths": 0.0, "total": 0.0,
-            })
-            subject = (r["topic__parent__parent__name"] or "").lower()
-            if subject in ("physics", "chemistry", "maths"):
-                p[subject] = round(r["marks"] or 0, 1)
-            p["total"] = round(p["physics"] + p["chemistry"] + p["maths"], 1)
-        out = sorted(papers.values(), key=lambda x: x["held_on"])
-        return self.paginated(out, ser.MockScoreSerializer)
 
     @extend_schema(
         parameters=[INSTITUTE_PARAM],
@@ -477,45 +461,10 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
         function the `subject_imbalance` detector reads, so the flag and
         this chart can no longer disagree.
         """
-        inst = self.institute_id()
-        if inst is None:
-            return self.paginated([], ser.SubjectBreakdownSerializer)
-        student_id = int(pk)
-
-        subjects = features.subject_map(inst)
-        lost_by = features.marks_lost_by_subject(
-            features.marks_lost_by_topic(inst, [student_id]), subjects
-        ).get(student_id, {})
-        time_by = features.study_minutes_by_subject(inst, [student_id], subjects).get(
-            student_id, {}
+        return self.paginated(
+            rollups.subject_breakdown_rows(self.institute_id(), int(pk)),
+            ser.SubjectBreakdownSerializer,
         )
-
-        att_by, cor_by = {}, {}
-        for r in (
-            Attempt.objects.filter(student_id=student_id, institute_id=inst)
-            .values("topic_id")
-            .annotate(
-                attempted=Count("id", filter=Q(status__in=[Attempt.CORRECT, Attempt.WRONG])),
-                correct=Count("id", filter=Q(status=Attempt.CORRECT)),
-            )
-        ):
-            name = subjects.get(r["topic_id"])
-            if name:
-                att_by[name] = att_by.get(name, 0) + r["attempted"]
-                cor_by[name] = cor_by.get(name, 0) + r["correct"]
-
-        t_tot = sum(time_by.values()) or 1
-        l_tot = sum(lost_by.values()) or 1
-        out = [
-            {
-                "subject": s,
-                "time_share_pct": round(time_by.get(s, 0) / t_tot * 100, 1),
-                "marks_lost_share_pct": round(lost_by.get(s, 0) / l_tot * 100, 1),
-                "accuracy_pct": round(cor_by.get(s, 0) / att_by[s] * 100, 1) if att_by.get(s) else None,
-            }
-            for s in SUBJECTS
-        ]
-        return self.paginated(out, ser.SubjectBreakdownSerializer)
 
     @extend_schema(
         parameters=[
@@ -545,31 +494,7 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
         `apps.events.services.mock_analysis` — it is an engine, not a
         view, and it is called by the planner and the narration layer too.
         """
-        inst = self.institute_id()
-        raw = request.query_params.get("paper")
-        try:
-            paper_id = int(raw)
-        except (TypeError, ValueError):
-            return Response(
-                {"detail": "A numeric ?paper=<id> is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if inst is None:
-            return Response({"detail": "No institute in scope."},
-                            status=status.HTTP_404_NOT_FOUND)
-
-        data = mock_analysis.analyse_mock(
-            institute_id=inst,
-            student_id=int(pk),
-            paper_id=paper_id,
-            include_questions=request.query_params.get("detail") == "true",
-        )
-        if data is None:
-            return Response(
-                {"detail": "No attempts recorded for that student on that paper."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        return Response(ser.MarksLostSerializer(data).data)
+        return rollups.marks_lost_response(request, self.institute_id(), int(pk))
 
     @extend_schema(
         parameters=[
@@ -780,6 +705,232 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
         # partial and page 2 can re-show a row from page 1.
         return self.paginated(qs.order_by("question_id", "id"), ser.AttemptSerializer)
 
+    @extend_schema(
+        parameters=[
+            INSTITUTE_PARAM,
+            OpenApiParameter(
+                "date", OpenApiTypes.DATE,
+                description=(
+                    "The day to show, `YYYY-MM-DD`. Defaults to today in the "
+                    "server's timezone. Anything else is a 400."
+                ),
+            ),
+        ],
+        responses=ser.PlanBlockSerializer(many=True),
+        tags=["students"],
+    )
+    @action(detail=True)
+    def plan(self, request, pk=None):
+        """This student's plan for one day — what a mentor sees on Student 360.
+
+        The student's own copy is `GET /api/my/plan/`, which answers for
+        whoever is signed in and so gives a mentor an empty list. That is
+        correct for the student app and was the wrong thing to build a
+        mentor's panel on: Student 360 asked it for a student's plan and
+        was told, truthfully, that the mentor had none. This is the same
+        rows, addressed by student id.
+
+        Ordered by `start_time`, as the student sees it. An unknown or
+        cross-institute student id returns an empty page, like every other
+        sub-resource here.
+        """
+        return self.paginated(
+            rollups.plan_block_queryset(self.institute_id(), pk, rollups.day_param(request)),
+            ser.PlanBlockSerializer,
+        )
+
+    @extend_schema(
+        parameters=[INSTITUTE_PARAM],
+        responses=ser.StudyLogCreateSerializer(many=True),
+        tags=["students"],
+    )
+    @action(detail=True, url_path="study-logs")
+    def study_logs(self, request, pk=None):
+        """What this student says they studied, most recent first.
+
+        Self-reported, so treat it as the least reliable data in the system
+        (`StudyLog`): `ts` is when they say they studied, and the gap to the
+        time they logged it is what shows a week entered on a Sunday.
+        """
+        return self.paginated(
+            rollups.study_log_queryset(self.institute_id(), pk), ser.StudyLogCreateSerializer
+        )
+
+    @extend_schema(
+        parameters=[INSTITUTE_PARAM],
+        responses=ser.ConfidenceRatingSerializer(many=True),
+        tags=["students"],
+    )
+    @action(detail=True)
+    def confidence(self, request, pk=None):
+        """How strong this student rates themselves, chapter by chapter, newest first.
+
+        The full history rather than the latest: how a rating moved is part
+        of the story. The latest per chapter is `TopicState.self_rating`.
+        """
+        return self.paginated(
+            rollups.confidence_queryset(self.institute_id(), pk), ser.ConfidenceRatingSerializer
+        )
+
+    @extend_schema(
+        parameters=[
+            INSTITUTE_PARAM,
+            OpenApiParameter(
+                "pending", bool,
+                description="`true` returns only revisions not yet done; anything else is ignored.",
+            ),
+        ],
+        responses=ser.MyRevisionSerializer(many=True),
+        tags=["students"],
+    )
+    @action(detail=True)
+    def revisions(self, request, pk=None):
+        """This student's scheduled revisions, soonest first, so overdue ones lead."""
+        return self.paginated(
+            rollups.revision_queryset(
+                self.institute_id(), pk, pending=request.query_params.get("pending") == "true"
+            ),
+            ser.MyRevisionSerializer,
+        )
+
+    # ------------------------------------------------------ student logins
+
+    #: Read by `ScopedRateThrottle`; the two credential actions below name
+    #: their scope in `@action(...)`. `None` here is what makes that legal —
+    #: DRF only accepts per-route attributes the class already has.
+    throttle_scope = None
+
+    def _credentials_response(self, student, plaintext: str, status_code: int) -> Response:
+        """The one place a plaintext password leaves the server.
+
+        `no-store` because this body is a secret: a browser or proxy that
+        cached it would keep a working password around after the student has
+        changed it, and after the page that showed it has been closed.
+        """
+        response = Response(
+            ser.StudentCredentialSerializer({
+                "student_id": student.id,
+                "name": student.name,
+                "roll_no": student.roll_no,
+                "temporary_password": plaintext,
+                "must_change_password": True,
+            }).data,
+            status=status_code,
+        )
+        response["Cache-Control"] = "no-store"
+        return response
+
+    def _may_manage(self, request, student) -> bool:
+        """A mentor manages their own students; a director, the institute's.
+
+        `get_object()` has already confined `student` to the caller's
+        institute. What is left to decide is whether a *mentor* may act on a
+        colleague's student, and issuing or resetting a login is exactly the
+        kind of act that should not cross that line.
+        """
+        mentor = getattr(request.user, "mentor", None)
+        return mentor is None or student.mentor_id == mentor.id
+
+    @extend_schema(
+        request=ser.StudentCredentialRequestSerializer,
+        responses={
+            201: ser.StudentCredentialSerializer,
+            400: ser.DetailSerializer,
+            403: ser.DetailSerializer,
+            409: ser.DetailSerializer,
+            429: ser.DetailSerializer,
+        },
+        tags=["students"],
+    )
+    @action(
+        detail=True, methods=["post"], url_path="account",
+        throttle_classes=[ScopedRateThrottle], throttle_scope="credentials",
+    )
+    def account(self, request, pk=None):
+        """Issue this student a login: their roll number and a temporary password.
+
+        The institute provides the credentials; the student signs in with
+        their **roll number** and must choose their own password before they
+        can do anything else. The temporary password comes back **once**, in
+        this response — hand it over, don't store it. Lost? `reset-password`.
+
+        409 if the student already has a login, and deliberately so: issuing
+        is not "make sure they can sign in", because re-sending it for a
+        student who had already chosen a password would not be harmless.
+        Students who have left the institute (`exited_at`) are refused.
+        """
+        student = self.get_object()
+        if not self._may_manage(request, student):
+            return Response({"detail": "That student is not assigned to you."},
+                            status=status.HTTP_403_FORBIDDEN)
+        if student.exited_at is not None:
+            return Response({"detail": "This student has left the institute."},
+                            status=status.HTTP_409_CONFLICT)
+
+        payload = ser.StudentCredentialRequestSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        try:
+            _, plaintext = accounts.issue_account(
+                student, password=payload.validated_data.get("password")
+            )
+        except accounts.AccountExists:
+            return Response(
+                {"detail": "This student already has a login. To give them a new "
+                           "temporary password, reset it."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except accounts.WeakInitialPassword as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Who did what, never the password.
+        logger.info("login issued for student %s by user %s", student.id, request.user.id)
+        return self._credentials_response(student, plaintext, status.HTTP_201_CREATED)
+
+    @extend_schema(
+        request=ser.StudentCredentialRequestSerializer,
+        responses={
+            200: ser.StudentCredentialSerializer,
+            400: ser.DetailSerializer,
+            403: ser.DetailSerializer,
+            409: ser.DetailSerializer,
+            429: ser.DetailSerializer,
+        },
+        tags=["students"],
+    )
+    @action(
+        detail=True, methods=["post"], url_path="account/reset-password",
+        throttle_classes=[ScopedRateThrottle], throttle_scope="credentials",
+    )
+    def reset_password(self, request, pk=None):
+        """Give this student a new temporary password, and make them change it.
+
+        For a forgotten password or a lost phone. It also signs the student
+        out everywhere — a changed password invalidates every session that
+        held the old one — and re-activates a disabled login. 409 if the
+        student has no login yet; issue one instead.
+        """
+        student = self.get_object()
+        if not self._may_manage(request, student):
+            return Response({"detail": "That student is not assigned to you."},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        payload = ser.StudentCredentialRequestSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        try:
+            _, plaintext = accounts.reset_password(
+                student, password=payload.validated_data.get("password")
+            )
+        except accounts.NoAccount:
+            return Response(
+                {"detail": "This student has no login yet. Issue one first."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except accounts.WeakInitialPassword as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info("login reset for student %s by user %s", student.id, request.user.id)
+        return self._credentials_response(student, plaintext, status.HTTP_200_OK)
+
 
 @extend_schema(tags=["flags"], parameters=[INSTITUTE_PARAM])
 class FlagViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
@@ -800,7 +951,7 @@ class FlagViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
     """
 
     serializer_class = ser.FlagSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = CONSOLE_PERMISSIONS
     pagination_class = StandardPagination
 
     def get_queryset(self):
@@ -935,6 +1086,25 @@ class FlagViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
             )
         return Response(ser.FlagSerializer(flag).data)
 
+    @extend_schema(
+        parameters=[INSTITUTE_PARAM],
+        responses=ser.InterventionSerializer(many=True),
+        tags=["flags"],
+    )
+    @action(detail=True, methods=["get"])
+    def interventions(self, request, pk=None):
+        """What has been done about this flag, newest first.
+
+        Until this route interventions were write-only: a mentor could log
+        one (`intervene`, or the note on `resolve`) and nothing could show
+        it back, so the closed-loop panel could say a flag was closed but not
+        what anyone did. The loop is the product's claim — flag, act,
+        outcome — and the middle step was invisible.
+        """
+        flag = self.get_object()
+        qs = flag.interventions.select_related("mentor").order_by("-taken_at", "-id")
+        return self.paginated(qs, ser.InterventionSerializer)
+
 
 @extend_schema(tags=["questions"], parameters=[INSTITUTE_PARAM])
 class QuestionViewSet(TenantScopedMixin, mixins.RetrieveModelMixin,
@@ -960,7 +1130,7 @@ class QuestionViewSet(TenantScopedMixin, mixins.RetrieveModelMixin,
     """
 
     serializer_class = ser.QuestionDetailSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = CONSOLE_PERMISSIONS
 
     def get_queryset(self):
         return self.scoped(
@@ -1020,58 +1190,62 @@ class QuestionViewSet(TenantScopedMixin, mixins.RetrieveModelMixin,
                 return Response({"detail": "No such student in this institute."},
                                 status=status.HTTP_404_NOT_FOUND)
 
-        attempt = None
-        if student is not None:
-            attempt = (
-                Attempt.objects
-                .filter(student=student, institute_id=self.institute_id(),
-                        test_paper_id=question.test_paper_id,
-                        question_id=question.question_id)
-                .order_by("-ts", "-id")
-                .first()
-            )
-
-        chosen = (attempt.chosen_option or None) if attempt else None
-        question.student_id = student.id if student else None
-        question.chosen_label = chosen
-        question.status = attempt.status if attempt else None
-        question.marks = attempt.marks if attempt else None
-        question.time_spent = attempt.time_spent if attempt else None
-
-        # `None` rather than `False` when no student was named. The two
-        # render differently and must: `False` on every option says "they
-        # answered nothing", which would be a claim we were never asked to
-        # make.
-        for option in question.options.all():
-            option.chosen = None if student is None else option.label == chosen
-
+        rollups.attach_answer(question, student, self.institute_id())
         return Response(ser.QuestionDetailSerializer(question).data)
 
 
 @extend_schema(tags=["papers"], parameters=[INSTITUTE_PARAM])
-class TestPaperViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
+class TestPaperViewSet(TenantScopedMixin, mixins.CreateModelMixin, viewsets.ReadOnlyModelViewSet):
     """Mock papers the institute has held.
 
     **Ordered by `held_on` descending** — most recent first, from
     `TestPaper.Meta.ordering`. The first element is therefore the paper
     `/api/dashboard/summary/` reports `batch_mock_avg` for, which is what
     lets the console label the KPI without a second request.
+
+    `POST` makes the institute's own mock — the first step of getting its
+    results in. Next: `POST /api/papers/{id}/blueprint/`, then
+    `POST /api/ingest/results/`.
     """
 
     serializer_class = ser.TestPaperSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = CONSOLE_PERMISSIONS
     pagination_class = StandardPagination
 
     def get_queryset(self):
         # `id` as tie-break: two papers can be held on the same day.
         return self.scoped(TestPaper.objects.all()).order_by("-held_on", "-id")
 
+    @extend_schema(
+        request=ser.TestPaperCreateSerializer,
+        responses={201: ser.TestPaperSerializer, 400: ser.DetailSerializer},
+    )
+    def create(self, request, *args, **kwargs):
+        """Create the institute's own mock paper.
+
+        Marked `source: institute` — not an official paper, not ours — and
+        belongs to the caller's institute whatever the body says. Marking
+        defaults to the exam's own scheme. A paper with the same name on the
+        same date is refused: the usual cause is a double-submit, and two
+        "Mock 15"s on the same day make every later upload ambiguous.
+        """
+        institute_id = self.institute_id()
+        if not institute_id:
+            return Response({"detail": "No institute in scope."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        form = ser.TestPaperCreateSerializer(
+            data=request.data, context={"request": request, "institute_id": institute_id}
+        )
+        form.is_valid(raise_exception=True)
+        paper = form.save(institute_id=institute_id, source=Source.INSTITUTE)
+        return Response(ser.TestPaperSerializer(paper).data, status=status.HTTP_201_CREATED)
+
 
 @extend_schema(tags=["dashboard"], parameters=[INSTITUTE_PARAM])
 class DashboardViewSet(TenantScopedMixin, viewsets.ViewSet):
     """The director's KPI strip. One endpoint, one request, no fan-out."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = CONSOLE_PERMISSIONS
 
     @extend_schema(
         parameters=[
@@ -1262,86 +1436,3 @@ class DashboardViewSet(TenantScopedMixin, viewsets.ViewSet):
             "recovery_rate_pct": round(recovered / closed_n * 100, 1) if closed_n else None,
         }
         return Response(ser.DashboardSummarySerializer(data).data)
-
-
-@extend_schema(tags=["student-app"])
-class MyPlanViewSet(TenantScopedMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
-    """Today's plan for the logged-in student.
-
-    Scoped by the account, not by a path parameter: there is no way to
-    ask for another student's plan. A caller with no linked `Student`
-    gets an empty list rather than a 403, because a mentor opening the
-    student PWA is a navigation mistake, not an attack.
-
-    Ordered by `start_time` ascending.
-    """
-
-    serializer_class = ser.PlanBlockSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = StandardPagination
-
-    def get_queryset(self):
-        student = getattr(self.request.user, "student", None)
-        if student is None:
-            return PlanBlock.objects.none()
-        day = self.request.query_params.get("date") or timezone.localdate()
-        return (
-            PlanBlock.objects.filter(student=student, date=day)
-            .select_related("topic__parent__parent")
-            .order_by("start_time", "id")
-        )
-
-    @extend_schema(
-        parameters=[
-            OpenApiParameter(
-                "date", OpenApiTypes.DATE,
-                description=(
-                    "The day to plan for, `YYYY-MM-DD`. Defaults to today in "
-                    "the server's local timezone. An unparseable date is a "
-                    "400 from the ORM."
-                ),
-            ),
-        ],
-        responses=ser.PlanBlockSerializer(many=True),
-    )
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
-    @extend_schema(request=None, responses=ser.PlanBlockSerializer, tags=["student-app"])
-    @action(detail=True, methods=["post"])
-    def complete(self, request, pk=None):
-        block = self.get_queryset().filter(pk=pk).first()
-        if block is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        block.completed = True
-        block.save(update_fields=["completed"])
-        return Response(ser.PlanBlockSerializer(block).data)
-
-
-@extend_schema(tags=["student-app"])
-class StudyLogViewSet(TenantScopedMixin, mixins.CreateModelMixin,
-                      mixins.ListModelMixin, viewsets.GenericViewSet):
-    """The logged-in student's own study log — read and append.
-
-    Ordered by `ts` descending, most recent first. Append-only by
-    construction: there is no update or delete route, matching the
-    append-only rule the admin enforces on `StudyLog` itself.
-    """
-
-    serializer_class = ser.StudyLogCreateSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = StandardPagination
-
-    def get_queryset(self):
-        student = getattr(self.request.user, "student", None)
-        if student is None:
-            return StudyLog.objects.none()
-        # The `[:100]` cap that used to be here made `count` lie: a
-        # sliced queryset counts the slice, so a student with 400 logs
-        # was told they had 100 and page 3 came back empty. Pagination
-        # already bounds the response; the cap only bounded the truth.
-        return StudyLog.objects.filter(student=student).order_by("-ts", "-id")
-
-    def perform_create(self, serializer):
-        student = self.request.user.student
-        serializer.save(student=student, institute=student.institute)

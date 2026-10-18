@@ -525,3 +525,127 @@ def test_a_student_who_never_recorded_an_option_is_refused_too(cohort):
     assert dx.build_context(student)["totals"]["answered"] == 0
     with pytest.raises(ValueError, match="No wrong answers"):
         dx.diagnose(student)
+
+
+# ============================================== 3 · Presenting what the model argued
+#
+# `present()` turns the model's JSON into what the console can use. These tests
+# are about the parts a client used to have to guess at: which questions the
+# counter-evidence sentence leans on, what the model was told, and who it
+# thought the student was.
+
+
+def model_output(counter_evidence: str) -> dict:
+    return {
+        "headline": "Directing effects are reversed.",
+        "pattern_found": True,
+        "hypotheses": [{
+            "misconception_code": "MIS-ORG-EAS",
+            "claim": "Believes deactivating groups direct ortho/para.",
+            "confidence": "high",
+            "evidence_questions": ["Q1", "Q5"],
+            "counter_evidence": counter_evidence,
+            "marks_at_stake": 10,
+        }],
+        "recommended_action": "Revisit the directing groups.",
+        "time_to_fix": "one_session",
+        "total_marks_at_stake": 10,
+    }
+
+
+def present(scene, counter_evidence: str, **kw) -> dict:
+    return dx.present(model_output(counter_evidence), context=scene.context,
+                      student=scene.student, paper=kw.get("paper", scene.paper))
+
+
+def counter_labels(presented: dict) -> list[str]:
+    return [e["label"] for e in presented["hypotheses"][0]["counter_evidence_questions"]]
+
+
+def test_the_questions_the_counter_evidence_names_come_back_linkable(scene):
+    out = present(scene, "He was right on Q3 and Q6, where the group was named outright.")
+    entries = out["hypotheses"][0]["counter_evidence_questions"]
+    assert [e["label"] for e in entries] == ["Q3", "Q6"]
+    assert entries[0]["question_id"] == scene.questions["Q3"].id
+    assert entries[1]["question_id"] == scene.questions["Q6"].id
+    assert entries[0]["chose"] == "C" and entries[1]["chose"] == "D"
+    # They are questions he got right, so there is nothing to claim for them.
+    assert {e["marks_at_stake"] for e in entries} == {0}
+
+
+def test_they_come_in_the_order_the_sentence_names_them(scene):
+    assert counter_labels(present(scene, "Q6 first, then Q3.")) == ["Q6", "Q3"]
+
+
+def test_only_questions_the_server_derived_as_counter_evidence_are_offered(scene):
+    """Q2 was answered correctly in the right chapter — but the bait was on
+    offer, so it is not counter-evidence. Q4 is the wrong chapter. Q99 does
+    not exist. A sentence that mentions all four must not make them linkable
+    as proof, or the model could cite its way past the derivation."""
+    out = present(scene, "Right on Q2, Q3, Q4 and Q99.")
+    assert counter_labels(out) == ["Q3"]
+
+
+def test_a_label_inside_a_longer_label_is_not_a_match(scene):
+    assert dx._labels_named_in("see Q30 and Q31", ["Q3"]) == []
+    assert dx._labels_named_in("Q3, Q6.", ["Q6", "Q3"]) == ["Q3", "Q6"]
+    assert dx._labels_named_in("(Q3)", ["Q3"]) == ["Q3"]
+    assert dx._labels_named_in("Q3Q6", ["Q3", "Q6"]) == [], "no boundary between them"
+
+
+def test_a_sentence_that_names_nothing_has_no_counter_evidence_questions(scene):
+    assert counter_labels(present(scene, "He handles these chapters well in general.")) == []
+    assert counter_labels(present(scene, "")) == []          # the substituted sentence names none
+
+
+def test_a_wrong_answer_is_never_offered_as_counter_evidence(scene):
+    """Q1 is a wrong answer. Even if the sentence names it, it is evidence
+    *for* the finding, not against it — so it cannot appear here."""
+    assert counter_labels(present(scene, "Q1 and Q3")) == ["Q3"]
+
+
+def test_the_pseudonym_the_model_saw_is_echoed(scene):
+    assert present(scene, "")["student_ref"] == f"S-{scene.student.id}"
+    # …and it carries no name: the response repeats only what left the building.
+    assert scene.student.name.split()[0].lower() not in present(scene, "")["student_ref"].lower()
+
+
+def test_the_tally_is_the_count_the_model_was_handed(scene):
+    tally = present(scene, "")["tally"]
+    assert tally["answered"] == 7 and tally["wrong"] == 3 and tally["wrong_with_known_cause"] == 2
+    assert tally["by_misconception"] == [
+        {"misconception_code": "MIS-ORG-EAS", "wrong_answers": 2, "marks": 10},
+    ]
+    # Wrong answers on untagged distractors are a real loss the tally admits to.
+    assert tally["wrong"] - tally["wrong_with_known_cause"] == 1
+
+
+def test_the_tally_is_read_from_the_stored_context_not_recomputed(scene):
+    """A replayed diagnosis must show the counts it was made from, even if
+    the student's attempts have changed since."""
+    stored = scene.context
+    Attempt.objects.filter(student=scene.student).delete()
+    out = dx.present(model_output(""), context=stored, student=scene.student, paper=scene.paper)
+    assert out["tally"]["wrong"] == 3
+
+
+def test_an_old_context_without_these_keys_still_presents():
+    """Traces recorded before the tally was exposed carry less. Presenting one
+    must not raise."""
+    out = dx.present(model_output(""), context={}, student=None, paper=None)
+    assert out["student_ref"] == "" and out["tally"] == {
+        "answered": 0, "wrong": 0, "wrong_with_known_cause": 0, "by_misconception": []}
+    assert out["hypotheses"][0]["counter_evidence_questions"] == []
+
+
+def test_the_serialiser_carries_all_of_it_and_a_real_verdict_value(scene):
+    from apps.api import serializers as ser
+
+    body = ser.DiagnosisSerializer({
+        **present(scene, "Right on Q3."), "trace_id": 1, "from_cache": False,
+        "human_verdict": "unreviewed",
+    }).data
+    assert body["student_ref"] == f"S-{scene.student.id}"
+    assert body["tally"]["wrong"] == 3
+    assert body["hypotheses"][0]["counter_evidence_questions"][0]["label"] == "Q3"
+    assert body["human_verdict"] == "unreviewed"

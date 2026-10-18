@@ -60,6 +60,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
   /api/auth/logout/:
     post:
       operationId: auth_logout_create
@@ -71,6 +77,52 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/auth/password/:
+    post:
+      operationId: auth_password_create
+      description: |-
+        Replace my password. For a new student this is the end of first sign-in.
+
+        Needs the current password even though the caller is signed in: a
+        session left open on a shared phone should not be enough to take over
+        the account. On success the session survives (the hash that ties a
+        session to a password is refreshed) and `must_change_password` clears, so
+        the same tab carries straight on into the app.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
   /api/batches/:
     get:
       operationId: batches_list
@@ -417,6 +469,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/Intervention'
           description: ''
+  /api/flags/{id}/interventions/:
+    get:
+      operationId: flags_interventions_list
+      description: |-
+        What has been done about this flag, newest first.
+
+        Until this route interventions were write-only: a mentor could log
+        one (`intervene`, or the note on `resolve`) and nothing could show
+        it back, so the closed-loop panel could say a flag was closed but not
+        what anyone did. The loop is the product's claim — flag, act,
+        outcome — and the middle step was invisible.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this flag.
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - flags
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInterventionList'
+          description: ''
   /api/flags/{id}/resolve/:
     post:
       operationId: flags_resolve_create
@@ -478,6 +579,231 @@ paths:
           description: ''
         '409':
           description: Already resolved
+  /api/ingest/batches/:
+    get:
+      operationId: ingest_batches_list
+      description: |-
+        Every results file that has been imported, newest first.
+
+        There is deliberately no delete. Attempts are an append-only log, and a
+        batch is the receipt for the ones it wrote; removing the receipt would
+        leave the attempts with nothing saying where they came from.
+      parameters:
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - ingest
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedIngestBatchList'
+          description: ''
+  /api/ingest/batches/{id}/:
+    get:
+      operationId: ingest_batches_retrieve
+      description: |-
+        Every results file that has been imported, newest first.
+
+        There is deliberately no delete. Attempts are an append-only log, and a
+        batch is the receipt for the ones it wrote; removing the receipt would
+        leave the attempts with nothing saying where they came from.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ingest batch.
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      tags:
+      - ingest
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestBatch'
+          description: ''
+  /api/ingest/mappings/:
+    get:
+      operationId: ingest_mappings_list
+      description: |-
+        Saved column renamings — so the second upload of a format is automatic.
+
+        An institute's export names its columns however its software does
+        (`Candidate No`, `Seat`), and the same software names them the same way
+        next month. Save the mapping once and name it on later uploads.
+      parameters:
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - ingest
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedColumnMappingProfileList'
+          description: ''
+    post:
+      operationId: ingest_mappings_create
+      description: |-
+        Saved column renamings — so the second upload of a format is automatic.
+
+        An institute's export names its columns however its software does
+        (`Candidate No`, `Seat`), and the same software names them the same way
+        next month. Save the mapping once and name it on later uploads.
+      parameters:
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      tags:
+      - ingest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ColumnMappingProfileRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ColumnMappingProfileRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ColumnMappingProfileRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ColumnMappingProfile'
+          description: ''
+  /api/ingest/results/:
+    post:
+      operationId: ingest_results_create
+      description: |-
+        Upload a class's results for one paper. Run it with `dry_run` first.
+
+        A dry run does everything an import does except write, and returns the
+        same report — which students would fail and why, which questions the
+        blueprint is missing, how many answers are new. The cheapest way to find
+        out a file is wrong is to ask before it is real.
+      parameters:
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      tags:
+      - ingest
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ResultsUploadRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultsReport'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultsReport'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '409':
+          description: 'This exact file was already imported. Body: `{detail, batch_id}`.'
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultsReport'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
   /api/me/:
     get:
       operationId: me_retrieve
@@ -597,6 +923,203 @@ paths:
               schema:
                 $ref: '#/components/schemas/Mentor'
           description: ''
+  /api/my/attempts/:
+    get:
+      operationId: my_attempts_list
+      description: |-
+        Every answer I have given — the way into reviewing my mistakes.
+
+        Each row carries `question_pk`, which `GET /api/my/questions/{id}/` opens
+        onto the question, the correct answer and the worked solution. Ordered by
+        paper then question label.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: paper
+        schema:
+          type: integer
+        description: Only answers on this paper (`paper_id` from `mock-scores`).
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - blank
+          - correct
+          - not_reached
+          - wrong
+        description: Only answers with this outcome — `wrong` is the usual review
+          list. `blank` (chose to skip) and `not_reached` (ran out of time) are different
+          things.
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMyAttemptList'
+          description: ''
+  /api/my/confidence/:
+    get:
+      operationId: my_confidence_list
+      description: |-
+        How confident I am in a chapter — the write path that did not exist.
+
+        Overconfidence detection compares this against measured mastery, and
+        until now `ConfidenceRating` had no way in except the seeder. Append
+        only: rating a chapter again adds a row, and the latest by `ts` wins in
+        `TopicState.self_rating`, so the history of how someone's confidence
+        moved is kept rather than overwritten. `ts` is stamped by the server.
+
+        Ordered by `ts` descending.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedConfidenceRatingList'
+          description: ''
+    post:
+      operationId: my_confidence_create
+      description: |-
+        How confident I am in a chapter — the write path that did not exist.
+
+        Overconfidence detection compares this against measured mastery, and
+        until now `ConfidenceRating` had no way in except the seeder. Append
+        only: rating a chapter again adds a row, and the latest by `ts` wins in
+        `TopicState.self_rating`, so the history of how someone's confidence
+        moved is kept rather than overwritten. `ts` is stamped by the server.
+
+        Ordered by `ts` descending.
+      tags:
+      - student-app
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfidenceRatingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConfidenceRatingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConfidenceRatingRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfidenceRating'
+          description: ''
+  /api/my/marks-lost/:
+    get:
+      operationId: my_marks_lost_retrieve
+      description: |-
+        Why I lost marks on one paper, by cause.
+
+        A paper I did not sit is a 404 — including a paper that exists but
+        that only other students sat. This route never confirms that.
+      parameters:
+      - in: query
+        name: detail
+        schema:
+          type: boolean
+        description: Include the per-question cause breakdown.
+      - in: query
+        name: paper
+        schema:
+          type: integer
+        description: The `paper_id` of a paper I sat, from `GET /api/my/mock-scores/`.
+          Non-numeric or missing is a 400, not an empty result.
+        required: true
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarksLost'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/my/mock-scores/:
+    get:
+      operationId: my_mock_scores_list
+      description: |-
+        Per-subject totals for every paper I sat, oldest first.
+
+        The `paper_id` here is what `GET /api/my/marks-lost/?paper=` takes.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMockScoreList'
+          description: ''
   /api/my/plan/:
     get:
       operationId: my_plan_list
@@ -606,7 +1129,8 @@ paths:
         Scoped by the account, not by a path parameter: there is no way to
         ask for another student's plan. A caller with no linked `Student`
         gets an empty list rather than a 403, because a mentor opening the
-        student PWA is a navigation mistake, not an attack.
+        student PWA is a navigation mistake, not an attack. (A mentor who wants
+        a student's plan asks `GET /api/students/{id}/plan/`.)
 
         Ordered by `start_time` ascending.
       parameters:
@@ -616,7 +1140,7 @@ paths:
           type: string
           format: date
         description: The day to plan for, `YYYY-MM-DD`. Defaults to today in the server's
-          local timezone. An unparseable date is a 400 from the ORM.
+          local timezone. Anything else is a 400.
       - name: page
         required: false
         in: query
@@ -643,21 +1167,12 @@ paths:
   /api/my/plan/{id}/complete/:
     post:
       operationId: my_plan_complete_create
-      description: |-
-        Today's plan for the logged-in student.
-
-        Scoped by the account, not by a path parameter: there is no way to
-        ask for another student's plan. A caller with no linked `Student`
-        gets an empty list rather than a 403, because a mentor opening the
-        student PWA is a navigation mistake, not an attack.
-
-        Ordered by `start_time` ascending.
+      description: 'Tick a block off. Idempotent: ticking a done block changes nothing.'
       parameters:
       - in: path
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this plan block.
         required: true
       tags:
       - student-app
@@ -670,6 +1185,231 @@ paths:
               schema:
                 $ref: '#/components/schemas/PlanBlock'
           description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: No such block among this student's own.
+  /api/my/plan/{id}/uncomplete/:
+    post:
+      operationId: my_plan_uncomplete_create
+      description: Undo a tick. Idempotent. For the mis-tap, which `complete` alone
+        made permanent.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanBlock'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: No such block among this student's own.
+  /api/my/plan/generate/:
+    post:
+      operationId: my_plan_generate_create
+      description: |-
+        Make my plan for a day — three explicit rules, each block saying which.
+
+        **Rules, not a model.** Overdue revisions first, then my weakest
+        *taught* chapters, then one chapter taught but never attempted; sized
+        to what I actually log on a typical day. Every block's `reason_text`
+        names the rule that chose it, so the plan can be argued with. See
+        `apps/derived/services/planner.py` for the rules and for why blocks
+        carry no start time.
+
+        Idempotent: if a plan already exists it is returned as it stands
+        (200). `replace: true` rebuilds it, keeping anything I have ticked.
+        An empty `blocks` with 201/200 is a real answer — nothing qualifies
+        yet — not an error.
+      tags:
+      - student-app
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanGenerateRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PlanGenerateRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PlanGenerateRequestRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanGeneration'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanGeneration'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/my/profile/:
+    get:
+      operationId: my_profile_retrieve
+      description: |-
+        Who I am: name, batch, mentor, target, and how I am progressing.
+
+        `progress` is the student-safe slice of `StudentState` — no
+        `risk_score`. See `MyProgressSerializer` for what is withheld and
+        why.
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyProfile'
+          description: ''
+  /api/my/questions/{id}/:
+    get:
+      operationId: my_questions_retrieve
+      description: |-
+        A question I answered: the stem, what I chose, the right answer, the working.
+
+        **Only questions I have an answer recorded for.** Showing the stem,
+        key and solution of a paper I have not sat would hand out the answers to
+        a test still to come, so anything else is a 404 — the same 404 as a
+        question that does not exist, so the route cannot be used to ask what
+        papers an institute holds. Retrieve only, like the console's.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyQuestion'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: No such question, or one I have not answered.
+  /api/my/revisions/:
+    get:
+      operationId: my_revisions_list
+      description: |-
+        My scheduled revisions, soonest first — overdue ones lead.
+
+        Marking one done (`complete`) is the single permitted change to a row in
+        the event log, and it is permitted because of its shape: `done_at` goes
+        from null to a timestamp **once** and never moves again. That keeps what
+        the append-only rule is for — replaying history reproduces exactly what
+        happened, because the row says both *that* it was done and *when*. What
+        the rule forbids is overwriting facts; a deadline that was open and then
+        closed once is not one.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: pending
+        schema:
+          type: boolean
+        description: '`true` returns only revisions not yet done. A presence filter
+          like `?open=` on flags: any other value is ignored and returns everything.'
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMyRevisionList'
+          description: ''
+  /api/my/revisions/{id}/complete/:
+    post:
+      operationId: my_revisions_complete_create
+      description: |-
+        I did this revision. Write-once and idempotent.
+
+        The first call records when; any later call returns the revision as it
+        stands and does not move the timestamp. The conditional `UPDATE … WHERE
+        done_at IS NULL` is what makes that true under two simultaneous
+        requests, which a read-then-write would not be.
+
+        Also refreshes my derived state (`revision_debt`, `last_revised`,
+        `retention`) so the screen reflects it straight away; see
+        `refresh_derived_state` for why that cannot fail the request.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyRevision'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: No such revision among this student's own.
   /api/my/study-logs/:
     get:
       operationId: my_study_logs_list
@@ -679,6 +1419,10 @@ paths:
         Ordered by `ts` descending, most recent first. Append-only by
         construction: there is no update or delete route, matching the
         append-only rule the admin enforces on `StudyLog` itself.
+
+        The `topic` must be a chapter of the student's own syllabus
+        (`GET /api/my/topics/`), `minutes` is 1–720, and `ts` may be in the past
+        but not the future. A mentor posting here is a 403; it used to be a 500.
       parameters:
       - name: page
         required: false
@@ -711,6 +1455,10 @@ paths:
         Ordered by `ts` descending, most recent first. Append-only by
         construction: there is no update or delete route, matching the
         append-only rule the admin enforces on `StudyLog` itself.
+
+        The `topic` must be a chapter of the student's own syllabus
+        (`GET /api/my/topics/`), `minutes` is 1–720, and `ts` may be in the past
+        but not the future. A mentor posting here is a 403; it used to be a 500.
       tags:
       - student-app
       requestBody:
@@ -734,6 +1482,108 @@ paths:
               schema:
                 $ref: '#/components/schemas/StudyLogCreate'
           description: ''
+  /api/my/subject-breakdown/:
+    get:
+      operationId: my_subject_breakdown_list
+      description: Where my study time goes against where my marks go. Three rows,
+        fixed order.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSubjectBreakdownList'
+          description: ''
+  /api/my/topic-states/:
+    get:
+      operationId: my_topic_states_list
+      description: |-
+        My per-chapter mastery, weakest first.
+
+        `mastery` is null below the evidence floor — null is "not enough
+        attempts to say", never zero.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: weak
+        schema:
+          type: boolean
+        description: Only chapters with a measured `mastery` below 0.5. Chapters below
+          the evidence floor carry a null mastery and are excluded, because 'not enough
+          attempts to say' is not the same claim as 'weak'.
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTopicStateList'
+          description: ''
+  /api/my/topics/:
+    get:
+      operationId: my_topics_list
+      description: |-
+        The chapters of my syllabus, in teaching order.
+
+        The pick-list for `POST /api/my/study-logs/` and
+        `POST /api/my/confidence/`, both of which take a chapter id that
+        nothing else in the API could previously produce. Chapters only —
+        study time and confidence are recorded at chapter grain.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMyTopicList'
+          description: ''
   /api/papers/:
     get:
       operationId: papers_list
@@ -744,6 +1594,10 @@ paths:
         `TestPaper.Meta.ordering`. The first element is therefore the paper
         `/api/dashboard/summary/` reports `batch_mock_avg` for, which is what
         lets the console label the KPI without a second request.
+
+        `POST` makes the institute's own mock — the first step of getting its
+        results in. Next: `POST /api/papers/{id}/blueprint/`, then
+        `POST /api/ingest/results/`.
       parameters:
       - in: query
         name: institute
@@ -776,6 +1630,54 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedTestPaperList'
           description: ''
+    post:
+      operationId: papers_create
+      description: |-
+        Create the institute's own mock paper.
+
+        Marked `source: institute` — not an official paper, not ours — and
+        belongs to the caller's institute whatever the body says. Marking
+        defaults to the exam's own scheme. A paper with the same name on the
+        same date is refused: the usual cause is a double-submit, and two
+        "Mock 15"s on the same day make every later upload ambiguous.
+      parameters:
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      tags:
+      - papers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestPaperCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TestPaperCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TestPaperCreateRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestPaper'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
   /api/papers/{id}/:
     get:
       operationId: papers_retrieve
@@ -786,6 +1688,10 @@ paths:
         `TestPaper.Meta.ordering`. The first element is therefore the paper
         `/api/dashboard/summary/` reports `batch_mock_avg` for, which is what
         lets the console label the KPI without a second request.
+
+        `POST` makes the institute's own mock — the first step of getting its
+        results in. Next: `POST /api/papers/{id}/blueprint/`, then
+        `POST /api/ingest/results/`.
       parameters:
       - in: path
         name: id
@@ -811,6 +1717,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TestPaper'
+          description: ''
+  /api/papers/{id}/blueprint/:
+    post:
+      operationId: papers_blueprint_create
+      description: |-
+        Set which chapter each question tests and what its right answer is.
+
+        Once per paper, before any results. All or nothing: one bad row and
+        nothing is written, with every problem listed at once. 200 means applied
+        (or, with `dry_run`, that it would be); 422 means it was not and why.
+        Idempotent — uploading the same blueprint again changes nothing.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      tags:
+      - ingest
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BlueprintUploadRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlueprintReport'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlueprintReport'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
           description: ''
   /api/questions/{id}/:
     get:
@@ -980,6 +1951,153 @@ paths:
               schema:
                 $ref: '#/components/schemas/StudentDetail'
           description: ''
+  /api/students/{id}/account/:
+    post:
+      operationId: students_account_create
+      description: |-
+        Issue this student a login: their roll number and a temporary password.
+
+        The institute provides the credentials; the student signs in with
+        their **roll number** and must choose their own password before they
+        can do anything else. The temporary password comes back **once**, in
+        this response — hand it over, don't store it. Lost? `reset-password`.
+
+        409 if the student already has a login, and deliberately so: issuing
+        is not "make sure they can sign in", because re-sending it for a
+        student who had already chosen a password would not be harmless.
+        Students who have left the institute (`exited_at`) are refused.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentCredentialRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentCredentialRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentCredentialRequestRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentCredential'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/students/{id}/account/reset-password/:
+    post:
+      operationId: students_account_reset_password_create
+      description: |-
+        Give this student a new temporary password, and make them change it.
+
+        For a forgotten password or a lost phone. It also signs the student
+        out everywhere — a changed password invalidates every session that
+        held the old one — and re-activates a disabled login. 409 if the
+        student has no login yet; issue one instead.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentCredentialRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentCredentialRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentCredentialRequestRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentCredential'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
   /api/students/{id}/attempts/:
     get:
       operationId: students_attempts_list
@@ -1036,6 +2154,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedAttemptList'
+          description: ''
+  /api/students/{id}/confidence/:
+    get:
+      operationId: students_confidence_list
+      description: |-
+        How strong this student rates themselves, chapter by chapter, newest first.
+
+        The full history rather than the latest: how a rating moved is part
+        of the story. The latest per chapter is `TopicState.self_rating`.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - students
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedConfidenceRatingList'
           description: ''
   /api/students/{id}/diagnosis/:
     get:
@@ -1276,6 +2440,163 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedMockScoreList'
           description: ''
+  /api/students/{id}/plan/:
+    get:
+      operationId: students_plan_list
+      description: |-
+        This student's plan for one day — what a mentor sees on Student 360.
+
+        The student's own copy is `GET /api/my/plan/`, which answers for
+        whoever is signed in and so gives a mentor an empty list. That is
+        correct for the student app and was the wrong thing to build a
+        mentor's panel on: Student 360 asked it for a student's plan and
+        was told, truthfully, that the mentor had none. This is the same
+        rows, addressed by student id.
+
+        Ordered by `start_time`, as the student sees it. An unknown or
+        cross-institute student id returns an empty page, like every other
+        sub-resource here.
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+        description: The day to show, `YYYY-MM-DD`. Defaults to today in the server's
+          timezone. Anything else is a 400.
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - students
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPlanBlockList'
+          description: ''
+  /api/students/{id}/revisions/:
+    get:
+      operationId: students_revisions_list
+      description: This student's scheduled revisions, soonest first, so overdue ones
+        lead.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: pending
+        schema:
+          type: boolean
+        description: '`true` returns only revisions not yet done; anything else is
+          ignored.'
+      tags:
+      - students
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMyRevisionList'
+          description: ''
+  /api/students/{id}/study-logs/:
+    get:
+      operationId: students_study_logs_list
+      description: |-
+        What this student says they studied, most recent first.
+
+        Self-reported, so treat it as the least reliable data in the system
+        (`StudyLog`): `ts` is when they say they studied, and the gap to the
+        time they logged it is what shows a week entered on a Sunday.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - students
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStudyLogCreateList'
+          description: ''
   /api/students/{id}/subject-breakdown/:
     get:
       operationId: students_subject_breakdown_list
@@ -1457,6 +2778,61 @@ components:
     BlankEnum:
       enum:
       - ''
+    BlueprintReport:
+      type: object
+      properties:
+        dry_run:
+          type: boolean
+        ok:
+          type: boolean
+          description: No errors; a real run would apply this file.
+        paper_id:
+          type: integer
+        questions_in_file:
+          type: integer
+        expected_questions:
+          type: integer
+          description: '`total_questions` on the paper. Fewer in the file is a warning,
+            not an error.'
+        created:
+          type: integer
+        updated:
+          type: integer
+        unchanged:
+          type: integer
+        errors_total:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/IngestRowError'
+          description: At most the first 100.
+      required:
+      - created
+      - dry_run
+      - errors
+      - errors_total
+      - expected_questions
+      - ok
+      - paper_id
+      - questions_in_file
+      - unchanged
+      - updated
+    BlueprintUploadRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: 'CSV: question_id, chapter, correct_option (or answer for a
+            numeric question).'
+        dry_run:
+          type: boolean
+          default: false
+          description: Check the file and report what would happen without saving
+            anything.
+      required:
+      - file
     CauseEnum:
       enum:
       - conceptual_gap
@@ -1471,6 +2847,72 @@ components:
         * `time_exhaustion` - time_exhaustion
         * `avoidable_skip` - avoidable_skip
         * `insufficient_evidence` - insufficient_evidence
+    ColumnMappingProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        mapping:
+          type: object
+          additionalProperties:
+            enum:
+            - answer
+            - batch
+            - ignore
+            - question_id
+            - roll_no
+            - time_spent
+            type: string
+            description: |-
+              * `answer` - answer
+              * `batch` - batch
+              * `ignore` - ignore
+              * `question_id` - question_id
+              * `roll_no` - roll_no
+              * `time_spent` - time_spent
+          description: '`{the column''s name in the file: the field it holds}`.'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - mapping
+      - name
+    ColumnMappingProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        mapping:
+          type: object
+          additionalProperties:
+            enum:
+            - answer
+            - batch
+            - ignore
+            - question_id
+            - roll_no
+            - time_spent
+            type: string
+            description: |-
+              * `answer` - answer
+              * `batch` - batch
+              * `ignore` - ignore
+              * `question_id` - question_id
+              * `roll_no` - roll_no
+              * `time_spent` - time_spent
+          description: '`{the column''s name in the file: the field it holds}`.'
+      required:
+      - mapping
+      - name
     ConfidenceEnum:
       enum:
       - high
@@ -1481,6 +2923,63 @@ components:
         * `high` - high
         * `medium` - medium
         * `low` - low
+    ConfidenceRating:
+      type: object
+      description: |-
+        How strong the student *thinks* they are in one chapter.
+
+        Compared against measured mastery to find overconfidence (see
+        `TopicState.confidence_gap`), so the value has to be the student's own
+        honest answer *now*. That is why there is no `ts` on the request: the
+        server stamps it. The feature store takes the latest rating by `ts`, so a
+        client that could send its own timestamp could pin a rating for ever by
+        dating it in the future.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        topic:
+          type: integer
+        topic_name:
+          type: string
+          readOnly: true
+        self_rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+          description: 1 = not confident at all, 5 = fully confident.
+        ts:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - self_rating
+      - topic
+      - topic_name
+      - ts
+    ConfidenceRatingRequest:
+      type: object
+      description: |-
+        How strong the student *thinks* they are in one chapter.
+
+        Compared against measured mastery to find overconfidence (see
+        `TopicState.confidence_gap`), so the value has to be the student's own
+        honest answer *now*. That is why there is no `ts` on the request: the
+        server stamps it. The feature store takes the latest rating by `ts`, so a
+        client that could send its own timestamp could pin a rating for ever by
+        dating it in the future.
+      properties:
+        topic:
+          type: integer
+        self_rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+          description: 1 = not confident at all, 5 = fully confident.
+      required:
+      - self_rating
+      - topic
     DashboardSummary:
       type: object
       description: |-
@@ -1640,6 +3139,14 @@ components:
             * `one_session` - one_session
             * `several_sessions` - several_sessions
             * `term_long` - term_long
+        student_ref:
+          type: string
+          description: The pseudonym the model was sent in place of the student's
+            name (`S-{id}`). Echoed so the privacy claim can be read off the response
+            — this is the only identity the model ever saw — instead of restated by
+            the client.
+        tally:
+          $ref: '#/components/schemas/DiagnosisTally'
         trace_id:
           type: integer
           description: Feed back agreement/disagreement against this id.
@@ -1647,7 +3154,14 @@ components:
           type: boolean
           description: True if replayed rather than freshly generated.
         human_verdict:
-          type: string
+          allOf:
+          - $ref: '#/components/schemas/HumanVerdictEnum'
+          description: |-
+            What a mentor has said about this diagnosis. **`unreviewed` is a value, not an absence**: nobody has answered yet, which is not the same as having disagreed. A client that treats any non-`agreed` string as a disagreement tells a teacher who never answered that they did.
+
+            * `agreed` - agreed
+            * `disagreed` - disagreed
+            * `unreviewed` - unreviewed
       required:
       - from_cache
       - headline
@@ -1657,6 +3171,8 @@ components:
       - paper_name
       - pattern_found
       - recommended_action
+      - student_ref
+      - tally
       - time_to_fix
       - total_marks_at_stake
       - trace_id
@@ -1720,6 +3236,14 @@ components:
             $ref: '#/components/schemas/DiagnosisEvidence'
           description: '`evidence_questions`, resolved. One entry per cited label,
             in the order the model gave them.'
+        counter_evidence_questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosisEvidence'
+          description: |-
+            The questions `counter_evidence` names, resolved — the correct answers the argument leans on, now linkable. Until this existed the strongest line on the card was the one line that could not open the question behind it.
+
+            Found by matching whole labels in the sentence against the counter-evidence candidates **the server derived** for this misconception, so a label the model invented is never offered. `marks_at_stake` is 0 on every entry: these are questions the student got right. Empty when the sentence names none.
         counter_evidence:
           type: string
           description: |-
@@ -1736,10 +3260,57 @@ components:
       - claim
       - confidence
       - counter_evidence
+      - counter_evidence_questions
       - evidence
       - evidence_questions
       - marks_at_stake
       - misconception_code
+    DiagnosisTally:
+      type: object
+      description: |-
+        The counting done in code before the model was asked anything.
+
+        Step two of the pipeline is "we count, exactly": tagged wrong options are
+        tallied deterministically and the model reasons over the result. This is
+        that tally for **every** wrong answer on the paper, not just the ones the
+        diagnosis cites, so a reader can hold the model's story against the
+        arithmetic it was given.
+      properties:
+        answered:
+          type: integer
+          description: Questions with a recorded choice.
+        wrong:
+          type: integer
+        wrong_with_known_cause:
+          type: integer
+          description: Wrong answers whose chosen option carries a misconception tag.
+            The rest are wrong for a reason the taxonomy has not described — real
+            losses, and nothing a diagnosis can say about.
+        by_misconception:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosisTallyRow'
+          description: Largest cost first.
+      required:
+      - answered
+      - by_misconception
+      - wrong
+      - wrong_with_known_cause
+    DiagnosisTallyRow:
+      type: object
+      properties:
+        misconception_code:
+          type: string
+        wrong_answers:
+          type: integer
+          description: Wrong answers whose chosen option is tagged with this misconception.
+        marks:
+          type: integer
+          description: What those cost, at the diagnosis's per-wrong rate.
+      required:
+      - marks
+      - misconception_code
+      - wrong_answers
     DiagnosisVerdictRequest:
       type: object
       description: |-
@@ -1899,6 +3470,82 @@ components:
           description: Optional. If given, also logged as an Intervention.
       required:
       - outcome
+    HumanVerdictEnum:
+      enum:
+      - agreed
+      - disagreed
+      - unreviewed
+      type: string
+      description: |-
+        * `agreed` - agreed
+        * `disagreed` - disagreed
+        * `unreviewed` - unreviewed
+    IngestBatch:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        filename:
+          type: string
+          maxLength: 500
+        paper_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        paper_name:
+          type: string
+          readOnly: true
+        row_count:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        rows_ok:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        rows_failed:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        status:
+          $ref: '#/components/schemas/IngestBatchStatusEnum'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - filename
+      - id
+      - paper_id
+      - paper_name
+    IngestBatchStatusEnum:
+      enum:
+      - pending
+      - done
+      - failed
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `done` - Done
+        * `failed` - Failed
+    IngestRowError:
+      type: object
+      properties:
+        row:
+          type: integer
+          description: Line in the file, counting the header as line 1.
+        roll_no:
+          type: string
+        question_id:
+          type: string
+        message:
+          type: string
+          description: A sentence for the person who sent the file.
+      required:
+      - message
+      - row
     Institute:
       type: object
       properties:
@@ -1976,13 +3623,32 @@ components:
         username:
           type: string
           minLength: 1
+          description: A staff username, **or a student's roll number**. One field
+            because the login form has one box; the password decides which account
+            it was.
         password:
           type: string
           writeOnly: true
           minLength: 1
+        institute:
+          type: string
+          writeOnly: true
+          description: Optional institute code (its slug). Roll numbers are only unique
+            within a batch, so this narrows the search for a student whose number
+            exists elsewhere; sign-in works without it.
       required:
       - password
       - username
+    LoginStatusEnum:
+      enum:
+      - none
+      - awaiting_first_sign_in
+      - active
+      type: string
+      description: |-
+        * `none` - none
+        * `awaiting_first_sign_in` - awaiting_first_sign_in
+        * `active` - active
     LossTopic:
       type: object
       description: Where the marks actually went, by chapter.
@@ -2187,6 +3853,12 @@ components:
           type: boolean
         is_superuser:
           type: boolean
+        must_change_password:
+          type: boolean
+          description: 'True while this account is signed in on a temporary password.
+            Until it is changed (`POST /api/auth/password/`) every other route answers
+            403 with `code: password_change_required`, so a client should route straight
+            to the change-password screen.'
       required:
       - email
       - id
@@ -2194,6 +3866,7 @@ components:
       - is_staff
       - is_superuser
       - mentor_id
+      - must_change_password
       - name
       - role
       - student_id
@@ -2300,6 +3973,348 @@ components:
         * `learn` - Learn
         * `practice` - Practice
         * `revise` - Revise
+    MyAttempt:
+      type: object
+      description: One answer of mine. `question_pk` opens the question behind it.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        paper_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        paper_name:
+          type: string
+          readOnly: true
+        question_id:
+          type: string
+          maxLength: 100
+        question_pk:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Id for `GET /api/my/questions/{id}/`. Null when the paper has
+            no question content on file (an imported mock with scores only) — there
+            is then nothing to open.
+        topic_name:
+          type: string
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        chosen_option:
+          type: string
+          maxLength: 2
+        marks:
+          type: number
+          format: double
+        time_spent:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        source:
+          $ref: '#/components/schemas/SourceEnum'
+        ts:
+          type: string
+          format: date-time
+      required:
+      - id
+      - paper_id
+      - paper_name
+      - question_id
+      - question_pk
+      - status
+      - topic_name
+      - ts
+    MyProfile:
+      type: object
+      description: Who the signed-in student is, and where they stand.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        roll_no:
+          type: string
+          maxLength: 50
+        target:
+          type: string
+          maxLength: 100
+        joined_at:
+          type: string
+          format: date
+        batch:
+          allOf:
+          - $ref: '#/components/schemas/Batch'
+          readOnly: true
+        mentor_name:
+          type: string
+          readOnly: true
+        progress:
+          allOf:
+          - $ref: '#/components/schemas/MyProgress'
+          readOnly: true
+          nullable: true
+      required:
+      - batch
+      - id
+      - joined_at
+      - mentor_name
+      - name
+      - progress
+      - roll_no
+    MyProgress:
+      type: object
+      description: |-
+        The slice of `StudentState` a student is shown about themselves.
+
+        `risk_score`, `load_index` and `balance_index` are withheld. They are
+        inputs to a mentor's triage, not feedback for a seventeen-year-old: a
+        number that says "critical" with no conversation around it is a poor way
+        to learn it. Nothing is hidden that the student cannot see another way —
+        `/api/my/subject-breakdown/` carries the balance in plain terms. Whether
+        students should see a risk band at all is a product decision, and showing
+        less first is the one that can be undone.
+      properties:
+        consistency:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Study regularity, 0–1. Share of recent days with any logged
+            study.
+        revision_debt:
+          type: integer
+          readOnly: true
+          description: Count of revision cycles now past due and not done.
+        mock_avg:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Mean total marks across this student's papers.
+        mock_trend:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Marks gained or lost across recent papers. **Signed marks,
+            not a percentage** — negative is a decline, and -40 is the point where
+            the decline component of `risk_score` saturates.
+        syllabus_pct:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: 'Share of the *batch''s* chapters marked taught, 0–100. A batch
+            property, not a student one: a student cannot be behind on a chapter nobody
+            has taught yet.'
+        computed_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - computed_at
+      - consistency
+      - mock_avg
+      - mock_trend
+      - revision_debt
+      - syllabus_pct
+    MyQuestion:
+      type: object
+      description: A question I answered, with the correct answer and the working.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        label:
+          type: string
+          readOnly: true
+          description: The question as the paper prints it — `"D16"`. Unique within
+            a paper, **not** across papers, which is why `id` and not this is what
+            `DiagnosisEvidence.question_id` carries. Stored as `QuestionTopicMap.question_id`.
+        paper_id:
+          type: integer
+          readOnly: true
+        paper_name:
+          type: string
+          readOnly: true
+        topic:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Chapter. Null on a question nobody has mapped yet.
+        subject:
+          type: string
+          nullable: true
+          readOnly: true
+        difficulty:
+          oneOf:
+          - $ref: '#/components/schemas/DifficultyEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        question_text:
+          type: string
+        solution:
+          type: string
+          description: The worked method, not just the final answer.
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/MyQuestionOption'
+          readOnly: true
+        chosen_label:
+          type: string
+          readOnly: true
+          nullable: true
+          description: The option letter this student picked. Null when `?student=`
+            was not given, and also when it was but the student left this question
+            blank or never reached it — `status` distinguishes those.
+        status:
+          readOnly: true
+          nullable: true
+          description: |-
+            What became of this question for this student. A closed set, because `blank` and `not_reached` are the distinction the whole marks-lost taxonomy rests on — choosing to skip and running out of time need opposite advice. Null when `?student=` was not given, or when this student has no attempt recorded here.
+
+            * `correct` - Correct
+            * `wrong` - Wrong
+            * `blank` - Skipped deliberately
+            * `not_reached` - Ran out of time
+          oneOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        marks:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Marks scored on this question after negative marking. Null
+            as above.
+        time_spent:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Seconds spent. Often genuinely absent even when the attempt
+            exists.
+        source:
+          $ref: '#/components/schemas/PaperSourceEnum'
+        source_ref:
+          type: string
+          maxLength: 160
+      required:
+      - chosen_label
+      - id
+      - label
+      - marks
+      - options
+      - paper_id
+      - paper_name
+      - status
+      - subject
+      - time_spent
+      - topic
+    MyQuestionOption:
+      type: object
+      description: |-
+        An option as the student who answered it sees it: no misconception.
+
+        `QuestionOptionSerializer` explains *why a wrong option was tempting* —
+        "reverses the directing-effect rule". That is the diagnosis, written for
+        the mentor who decides how to say it. A student reviewing a mistake gets
+        the question, the answer and the worked solution; whether they are also
+        told which belief the system thinks they hold is the product decision
+        recorded in `MyProgressSerializer`, and is held back for the same reason.
+      properties:
+        label:
+          type: string
+          maxLength: 2
+        text:
+          type: string
+          maxLength: 500
+        is_correct:
+          type: boolean
+        chosen:
+          type: boolean
+          readOnly: true
+      required:
+      - chosen
+      - label
+      - text
+    MyRevision:
+      type: object
+      description: 'One scheduled revision cycle: R1, R2, R3 of a chapter.'
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        topic:
+          allOf:
+          - $ref: '#/components/schemas/Topic'
+          readOnly: true
+        cycle:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        scheduled_for:
+          type: string
+          format: date
+        done_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_overdue:
+          type: boolean
+          readOnly: true
+          description: Scheduled before today and not yet done.
+      required:
+      - cycle
+      - id
+      - is_overdue
+      - scheduled_for
+      - topic
+    MyTopic:
+      type: object
+      description: |-
+        A chapter as the student's pick-list shows it.
+
+        `ncert_ref` is the point of the extra weight: where to re-read the
+        chapter in the current NCERT textbooks, loaded from the official
+        syllabus documents. Until this route nothing returned it, so the links
+        existed in the database and nowhere a student could follow them.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        kind:
+          $ref: '#/components/schemas/KindEnum'
+        weight:
+          type: number
+          format: double
+        subject:
+          type: string
+          readOnly: true
+        unit:
+          type: string
+          readOnly: true
+        ncert_ref:
+          readOnly: true
+          nullable: true
+          description: 'Where to re-read this chapter in the NCERT textbooks: a list
+            of `{class, subject, book, chapter, title, pdf, sections?}`. Null when
+            the chapter has no NCERT counterpart or has not been linked yet. `sections`
+            appears only when just part of the NCERT chapter applies.'
+      required:
+      - id
+      - kind
+      - name
+      - ncert_ref
+      - subject
+      - unit
     NullEnum:
       enum:
       - null
@@ -2349,6 +4364,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Batch'
+    PaginatedColumnMappingProfileList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColumnMappingProfile'
+    PaginatedConfidenceRatingList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConfidenceRating'
     PaginatedFlagList:
       type: object
       required:
@@ -2372,6 +4433,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Flag'
+    PaginatedIngestBatchList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/IngestBatch'
+    PaginatedInterventionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Intervention'
     PaginatedMentorList:
       type: object
       required:
@@ -2418,6 +4525,75 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MockScore'
+    PaginatedMyAttemptList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MyAttempt'
+    PaginatedMyRevisionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MyRevision'
+    PaginatedMyTopicList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MyTopic'
     PaginatedPlanBlockList:
       type: object
       required:
@@ -2556,6 +4732,38 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TopicState'
+    PaperSourceEnum:
+      enum:
+      - official_pyq
+      - demo
+      - generated
+      - institute
+      type: string
+      description: |-
+        * `official_pyq` - Official past paper
+        * `demo` - Demo (written by us)
+        * `generated` - Generated
+        * `institute` - Institute's own mock
+    PasswordChangeRequest:
+      type: object
+      description: Replace my password. The first sign-in of a new student ends here.
+      properties:
+        current_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: The password I signed in with — the temporary one, the first
+            time.
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: At least 8 characters; not a common password, not all digits,
+            not like my name, and not my roll number.
+          maxLength: 128
+      required:
+      - current_password
+      - new_password
     PlanBlock:
       type: object
       properties:
@@ -2600,6 +4808,39 @@ components:
       - start_time
       - subject
       - topic_name
+    PlanGenerateRequestRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: 'The day to plan, `YYYY-MM-DD`: today (the default) up to a
+            week ahead. Further out, the state the plan is built from will have moved.'
+        replace:
+          type: boolean
+          default: false
+          description: Rebuild a plan that already exists. Only blocks not yet ticked
+            are replaced; anything completed stays. Without it, an existing plan is
+            returned as it is.
+    PlanGeneration:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        generated:
+          type: boolean
+          description: 'True if this call made blocks. False if the plan already existed,
+            or if nothing qualifies yet — `blocks` then says which: empty means there
+            was nothing to plan, not that the call failed.'
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanBlock'
+      required:
+      - blocks
+      - date
+      - generated
     QuestionDetail:
       type: object
       description: |-
@@ -2693,6 +4934,11 @@ components:
           nullable: true
           description: Seconds spent. Often genuinely absent even when the attempt
             exists.
+        source:
+          $ref: '#/components/schemas/PaperSourceEnum'
+        source_ref:
+          type: string
+          maxLength: 160
       required:
       - chosen_label
       - id
@@ -2747,6 +4993,135 @@ components:
       - label
       - misconception
       - text
+    ResultsReport:
+      type: object
+      description: |-
+        What happened to a results file — every student accounted for.
+
+        A student is ingested completely or not at all, so
+        `students_ingested + students_already_recorded + students_failed` is
+        `students_in_file`, with nobody half-counted.
+      properties:
+        dry_run:
+          type: boolean
+        ok:
+          type: boolean
+          description: A real run would write something (or has nothing left to).
+        paper_id:
+          type: integer
+        layout:
+          type: string
+          description: '`wide` (a column per question) or `long` (a row per answer).'
+        batch_id:
+          type: integer
+          nullable: true
+        students_in_file:
+          type: integer
+        students_ingested:
+          type: integer
+        students_already_recorded:
+          type: integer
+          description: Every answer in their row was already on file. Counted, not
+            doubled.
+        students_failed:
+          type: integer
+        attempts_created:
+          type: integer
+        attempts_already_recorded:
+          type: integer
+        unmapped_questions:
+          type: array
+          items:
+            type: string
+          description: Questions in the file the paper's blueprint does not know.
+            Non-empty means nothing was written.
+        unkeyed_questions:
+          type: array
+          items:
+            type: string
+          description: Questions with no answer key. Non-empty means nothing was written.
+        ignored_columns:
+          type: array
+          items:
+            type: string
+        questions_not_in_file:
+          type: array
+          items:
+            type: string
+          description: 'Paper questions the file does not cover. A warning: a partial
+            sitting is real.'
+        duplicate_of_batch:
+          type: integer
+          nullable: true
+          description: 'On a dry run: this exact file was already imported as this
+            batch.'
+        derived_refreshed:
+          type: boolean
+          description: Counts were recomputed for the students this file touched.
+        flags_raised:
+          type: integer
+          nullable: true
+          description: Flags the detectors raised for those students afterwards.
+        errors_total:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/IngestRowError'
+          description: At most the first 100.
+      required:
+      - attempts_already_recorded
+      - attempts_created
+      - batch_id
+      - derived_refreshed
+      - dry_run
+      - duplicate_of_batch
+      - errors
+      - errors_total
+      - flags_raised
+      - ignored_columns
+      - layout
+      - ok
+      - paper_id
+      - questions_not_in_file
+      - students_already_recorded
+      - students_failed
+      - students_in_file
+      - students_ingested
+      - unkeyed_questions
+      - unmapped_questions
+    ResultsUploadRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: CSV. Either one row per student with a column per question
+            (`roll_no, Q1, Q2, …`), or one row per answer (`roll_no, question_id,
+            answer`).
+        paper:
+          type: integer
+          description: The `TestPaper.id` the file is the results of.
+        dry_run:
+          type: boolean
+          default: false
+          description: Check the file and report what would happen without saving
+            anything.
+        mapping_profile:
+          type: integer
+          description: A saved column mapping (`/api/ingest/mappings/`) to apply.
+        column_map:
+          type: string
+          description: 'JSON object renaming this file''s columns, e.g. `{"Candidate
+            No": "roll_no", "Seat": "ignore"}`. Fields: answer, batch, ignore, question_id,
+            roll_no, time_spent. Wins over a saved profile.'
+        save_mapping_as:
+          type: string
+          description: 'With `column_map`: save it under this name for the next upload.'
+          maxLength: 100
+      required:
+      - file
+      - paper
     RoleEnum:
       enum:
       - mentor
@@ -2789,8 +5164,54 @@ components:
         * `wrong` - Wrong
         * `blank` - Skipped deliberately
         * `not_reached` - Ran out of time
+    StudentCredential:
+      type: object
+      description: |-
+        What staff are handed after issuing or resetting a student's login.
+
+        **Shown once.** `temporary_password` is not stored anywhere in a form
+        that can be read back, so there is no endpoint to fetch it again; the
+        only recovery is a reset. The response is sent with `Cache-Control:
+        no-store`.
+      properties:
+        student_id:
+          type: integer
+        name:
+          type: string
+        roll_no:
+          type: string
+          description: What the student types into the username box.
+        temporary_password:
+          type: string
+        must_change_password:
+          type: boolean
+          description: 'Always true: the student must choose their own at first sign-in.'
+      required:
+      - must_change_password
+      - name
+      - roll_no
+      - student_id
+      - temporary_password
+    StudentCredentialRequestRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Optional. Use this password as the temporary one instead of
+            a generated one — at least 6 characters. Omit it to have a random one
+            made, which is the better default.
+          maxLength: 128
     StudentDetail:
       type: object
+      description: |-
+        Whether a student can sign in yet — so staff know which button to show.
+
+        `none` has no login (offer to issue one); `awaiting_first_sign_in` has
+        one but has not yet replaced the temporary password (the credentials slip
+        is still live); `active` has chosen their own. Only the state is exposed:
+        nothing here can be used to sign in.
       properties:
         id:
           type: integer
@@ -2823,10 +5244,15 @@ components:
           allOf:
           - $ref: '#/components/schemas/StudentState'
           readOnly: true
+        login_status:
+          allOf:
+          - $ref: '#/components/schemas/LoginStatusEnum'
+          readOnly: true
       required:
       - batch
       - id
       - joined_at
+      - login_status
       - mentor
       - name
       - roll_no
@@ -2890,9 +5316,14 @@ components:
           type: string
           format: date
           nullable: true
+        login_status:
+          allOf:
+          - $ref: '#/components/schemas/LoginStatusEnum'
+          readOnly: true
       required:
       - batch_name
       - id
+      - login_status
       - mentor_name
       - mock_avg
       - mock_trend
@@ -2988,16 +5419,27 @@ components:
       - syllabus_pct
     StudyLogCreate:
       type: object
+      description: |-
+        A self-reported study session, as the student enters it.
+
+        Tier-1 data — see `StudyLog`. Backdating is allowed and expected (people
+        log in the evening for the afternoon); the model keeps `logged_at`
+        separately so a week entered on Sunday is visible as one signal rather
+        than seven. Only the future is refused.
       properties:
         id:
           type: integer
           readOnly: true
         topic:
           type: integer
+        topic_name:
+          type: string
+          readOnly: true
         minutes:
           type: integer
-          maximum: 2147483647
-          minimum: -2147483648
+          maximum: 720
+          minimum: 1
+          description: Minutes studied, 1–720.
         mode:
           $ref: '#/components/schemas/ModeEnum'
         ts:
@@ -3008,16 +5450,25 @@ components:
       - minutes
       - mode
       - topic
+      - topic_name
       - ts
     StudyLogCreateRequest:
       type: object
+      description: |-
+        A self-reported study session, as the student enters it.
+
+        Tier-1 data — see `StudyLog`. Backdating is allowed and expected (people
+        log in the evening for the afternoon); the model keeps `logged_at`
+        separately so a week entered on Sunday is visible as one signal rather
+        than seven. Only the future is refused.
       properties:
         topic:
           type: integer
         minutes:
           type: integer
-          maximum: 2147483647
-          minimum: -2147483648
+          maximum: 720
+          minimum: 1
+          description: Minutes studied, 1–720.
         mode:
           $ref: '#/components/schemas/ModeEnum'
         ts:
@@ -3073,9 +5524,70 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
+        source:
+          allOf:
+          - $ref: '#/components/schemas/PaperSourceEnum'
+          readOnly: true
+          description: |-
+            Where the paper came from: an official past paper, the institute's own mock, one we wrote for the demo, or generated. The product must always be able to say this out loud.
+
+            * `official_pyq` - Official past paper
+            * `demo` - Demo (written by us)
+            * `generated` - Generated
+            * `institute` - Institute's own mock
       required:
       - held_on
       - id
+      - name
+      - source
+    TestPaperCreateRequest:
+      type: object
+      description: |-
+        The institute's own mock, before its blueprint and results.
+
+        `exam` is the exam's code (`JEE_MAIN`, `NEET_UG`), the same string the
+        batches payload calls `exam_code`. Marking defaults to the exam's own
+        scheme, so a plain JEE Main mock needs no marking fields at all.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        exam:
+          type: string
+          minLength: 1
+        held_on:
+          type: string
+          format: date
+        total_questions:
+          type: integer
+          maximum: 300
+          minimum: 1
+        max_marks:
+          type: integer
+          maximum: 2147483647
+          minimum: 1
+        marks_correct:
+          type: integer
+          maximum: 2147483647
+          minimum: 1
+        marks_wrong:
+          type: integer
+          maximum: 0
+          minimum: -2147483648
+        duration_min:
+          type: integer
+          maximum: 600
+          minimum: 1
+        shift_or_booklet:
+          type: string
+          description: NEET test-booklet code or JEE Main date and shift — the official
+            key is per booklet / per shift, so this is part of the paper's identity,
+            not a label.
+          maxLength: 80
+      required:
+      - exam
+      - held_on
       - name
     TimeToFixEnum:
       enum:

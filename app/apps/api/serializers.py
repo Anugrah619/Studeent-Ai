@@ -5,18 +5,28 @@ source of truth every agent works against. Changing a field here changes
 the contract — regenerate the schema and tell the frontend.
 """
 
+import datetime as dt
+
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.derived.models import Flag, Intervention, PlanBlock, StudentState, TopicState
-from apps.events.models import Attempt, StudyLog
+from apps.events.models import Attempt, ConfidenceRating, RevisionEvent, StudyLog
 from apps.ingestion.models import (
+    ColumnMappingProfile,
+    IngestBatch,
     Misconception,
     QuestionOption,
     QuestionTopicMap,
     TestPaper,
 )
+from apps.ingestion.services.results import MAPPABLE_FIELDS
 from apps.reasoning.services.diagnose import MARKS_PER_WRONG
-from apps.syllabus.models import Topic
+from apps.syllabus.models import Exam, Topic
+from apps.syllabus.services import chapters_for_student
 from apps.tenancy.models import Batch, Institute, Mentor, Student
 
 
@@ -182,7 +192,28 @@ class StudentStateSerializer(serializers.ModelSerializer):
         ]
 
 
-class StudentListSerializer(serializers.ModelSerializer):
+LOGIN_STATUSES = ["none", "awaiting_first_sign_in", "active"]
+
+
+class LoginStatusMixin(serializers.Serializer):
+    """Whether a student can sign in yet — so staff know which button to show.
+
+    `none` has no login (offer to issue one); `awaiting_first_sign_in` has
+    one but has not yet replaced the temporary password (the credentials slip
+    is still live); `active` has chosen their own. Only the state is exposed:
+    nothing here can be used to sign in.
+    """
+
+    login_status = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.ChoiceField(choices=LOGIN_STATUSES))
+    def get_login_status(self, obj) -> str:
+        if obj.user_id is None:
+            return "none"
+        return "awaiting_first_sign_in" if obj.user.must_change_password else "active"
+
+
+class StudentListSerializer(LoginStatusMixin, serializers.ModelSerializer):
     """Row in the director's triage table.
 
     Sortable on `risk_score`, `mock_avg`, `mock_trend`, `open_flags`,
@@ -213,10 +244,11 @@ class StudentListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "roll_no", "batch_name", "mentor_name", "target",
             "risk_score", "mock_trend", "mock_avg", "open_flags", "exited_at",
+            "login_status",
         ]
 
 
-class StudentDetailSerializer(serializers.ModelSerializer):
+class StudentDetailSerializer(LoginStatusMixin, serializers.ModelSerializer):
     batch = BatchSerializer(read_only=True)
     mentor = MentorSerializer(read_only=True)
     state = StudentStateSerializer(read_only=True)
@@ -225,7 +257,7 @@ class StudentDetailSerializer(serializers.ModelSerializer):
         model = Student
         fields = [
             "id", "name", "roll_no", "target", "joined_at", "exited_at",
-            "batch", "mentor", "state",
+            "batch", "mentor", "state", "login_status",
         ]
 
 
@@ -443,6 +475,20 @@ class DiagnosisHypothesisSerializer(serializers.Serializer):
             "the order the model gave them."
         ),
     )
+    counter_evidence_questions = DiagnosisEvidenceSerializer(
+        many=True,
+        help_text=(
+            "The questions `counter_evidence` names, resolved — the correct "
+            "answers the argument leans on, now linkable. Until this existed "
+            "the strongest line on the card was the one line that could not "
+            "open the question behind it.\n\n"
+            "Found by matching whole labels in the sentence against the "
+            "counter-evidence candidates **the server derived** for this "
+            "misconception, so a label the model invented is never offered. "
+            "`marks_at_stake` is 0 on every entry: these are questions the "
+            "student got right. Empty when the sentence names none."
+        ),
+    )
     counter_evidence = serializers.CharField(
         help_text=(
             "The correct answers that narrow this finding — the strongest "
@@ -471,6 +517,38 @@ class DiagnosisHypothesisSerializer(serializers.Serializer):
             "resolved, in which case there is nothing better to offer and "
             "`evidence` will show why."
         )
+    )
+
+
+class DiagnosisTallyRowSerializer(serializers.Serializer):
+    misconception_code = serializers.CharField()
+    wrong_answers = serializers.IntegerField(
+        help_text="Wrong answers whose chosen option is tagged with this misconception."
+    )
+    marks = serializers.IntegerField(help_text="What those cost, at the diagnosis's per-wrong rate.")
+
+
+class DiagnosisTallySerializer(serializers.Serializer):
+    """The counting done in code before the model was asked anything.
+
+    Step two of the pipeline is "we count, exactly": tagged wrong options are
+    tallied deterministically and the model reasons over the result. This is
+    that tally for **every** wrong answer on the paper, not just the ones the
+    diagnosis cites, so a reader can hold the model's story against the
+    arithmetic it was given.
+    """
+
+    answered = serializers.IntegerField(help_text="Questions with a recorded choice.")
+    wrong = serializers.IntegerField()
+    wrong_with_known_cause = serializers.IntegerField(
+        help_text=(
+            "Wrong answers whose chosen option carries a misconception tag. "
+            "The rest are wrong for a reason the taxonomy has not described — "
+            "real losses, and nothing a diagnosis can say about."
+        )
+    )
+    by_misconception = DiagnosisTallyRowSerializer(
+        many=True, help_text="Largest cost first."
     )
 
 
@@ -545,13 +623,33 @@ class DiagnosisSerializer(serializers.Serializer):
         ),
     )
 
+    student_ref = serializers.CharField(
+        allow_blank=True,
+        help_text=(
+            "The pseudonym the model was sent in place of the student's name "
+            "(`S-{id}`). Echoed so the privacy claim can be read off the "
+            "response — this is the only identity the model ever saw — "
+            "instead of restated by the client."
+        ),
+    )
+    tally = DiagnosisTallySerializer()
+
     trace_id = serializers.IntegerField(
         help_text="Feed back agreement/disagreement against this id."
     )
     from_cache = serializers.BooleanField(
         help_text="True if replayed rather than freshly generated."
     )
-    human_verdict = serializers.CharField()
+    human_verdict = serializers.ChoiceField(
+        choices=["agreed", "disagreed", "unreviewed"],
+        help_text=(
+            "What a mentor has said about this diagnosis. **`unreviewed` is a "
+            "value, not an absence**: nobody has answered yet, which is not "
+            "the same as having disagreed. A client that treats any "
+            "non-`agreed` string as a disagreement tells a teacher who never "
+            "answered that they did."
+        ),
+    )
 
 
 class DiagnosisVerdictSerializer(serializers.Serializer):
@@ -687,6 +785,7 @@ class QuestionDetailSerializer(serializers.ModelSerializer):
             "id", "label", "paper_id", "paper_name", "topic", "subject",
             "difficulty", "question_text", "solution", "options",
             "student_id", "chosen_label", "status", "marks", "time_spent",
+            "source", "source_ref",
         ]
 
     @staticmethod
@@ -697,6 +796,57 @@ class QuestionDetailSerializer(serializers.ModelSerializer):
         while node.parent_id is not None:
             node = node.parent
         return node.name
+
+
+class MyQuestionOptionSerializer(serializers.ModelSerializer):
+    """An option as the student who answered it sees it: no misconception.
+
+    `QuestionOptionSerializer` explains *why a wrong option was tempting* —
+    "reverses the directing-effect rule". That is the diagnosis, written for
+    the mentor who decides how to say it. A student reviewing a mistake gets
+    the question, the answer and the worked solution; whether they are also
+    told which belief the system thinks they hold is the product decision
+    recorded in `MyProgressSerializer`, and is held back for the same reason.
+    """
+
+    chosen = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = QuestionOption
+        fields = ["label", "text", "is_correct", "chosen"]
+
+
+class MyQuestionSerializer(QuestionDetailSerializer):
+    """A question I answered, with the correct answer and the working."""
+
+    options = MyQuestionOptionSerializer(many=True, read_only=True)
+
+    class Meta(QuestionDetailSerializer.Meta):
+        fields = [f for f in QuestionDetailSerializer.Meta.fields if f != "student_id"]
+
+
+class MyAttemptSerializer(serializers.ModelSerializer):
+    """One answer of mine. `question_pk` opens the question behind it."""
+
+    paper_id = serializers.IntegerField(source="test_paper_id", read_only=True, allow_null=True)
+    paper_name = serializers.CharField(source="test_paper.name", read_only=True, default=None)
+    topic_name = serializers.CharField(source="topic.name", read_only=True)
+    question_pk = serializers.IntegerField(
+        read_only=True, allow_null=True,
+        help_text=(
+            "Id for `GET /api/my/questions/{id}/`. Null when the paper has no "
+            "question content on file (an imported mock with scores only) — "
+            "there is then nothing to open."
+        ),
+    )
+
+    class Meta:
+        model = Attempt
+        fields = [
+            "id", "paper_id", "paper_name", "question_id", "question_pk",
+            "topic_name", "status", "chosen_option", "marks", "time_spent",
+            "source", "ts",
+        ]
 
 
 class FlagResolveSerializer(serializers.Serializer):
@@ -884,9 +1034,194 @@ class MarksLostSerializer(serializers.Serializer):
 
 
 class TestPaperSerializer(serializers.ModelSerializer):
+    source = serializers.ChoiceField(
+        choices=TestPaper._meta.get_field("source").choices,
+        read_only=True,
+        help_text=(
+            "Where the paper came from: an official past paper, the institute's "
+            "own mock, one we wrote for the demo, or generated. The product must "
+            "always be able to say this out loud."
+        ),
+    )
+
     class Meta:
         model = TestPaper
-        fields = ["id", "name", "held_on", "total_questions", "max_marks", "duration_min"]
+        fields = [
+            "id", "name", "held_on", "total_questions", "max_marks", "duration_min",
+            "source",
+        ]
+
+
+class TestPaperCreateSerializer(serializers.ModelSerializer):
+    """The institute's own mock, before its blueprint and results.
+
+    `exam` is the exam's code (`JEE_MAIN`, `NEET_UG`), the same string the
+    batches payload calls `exam_code`. Marking defaults to the exam's own
+    scheme, so a plain JEE Main mock needs no marking fields at all.
+    """
+
+    exam = serializers.SlugRelatedField(slug_field="code", queryset=Exam.objects.all())
+
+    class Meta:
+        model = TestPaper
+        fields = [
+            "name", "exam", "held_on", "total_questions", "max_marks",
+            "marks_correct", "marks_wrong", "duration_min", "shift_or_booklet",
+        ]
+        extra_kwargs = {
+            "total_questions": {"min_value": 1, "max_value": 300, "required": False},
+            "max_marks": {"min_value": 1, "required": False},
+            "marks_correct": {"min_value": 1, "required": False},
+            "marks_wrong": {"max_value": 0, "required": False},
+            "duration_min": {"min_value": 1, "max_value": 600, "required": False},
+        }
+
+    def validate(self, attrs):
+        exam = attrs["exam"]
+        attrs.setdefault("marks_correct", exam.marks_correct)
+        attrs.setdefault("marks_wrong", exam.marks_wrong)
+        attrs.setdefault("max_marks", exam.total_marks)
+        institute_id = self.context["institute_id"]
+        if TestPaper.objects.filter(
+            institute_id=institute_id, name__iexact=attrs["name"].strip(), held_on=attrs["held_on"]
+        ).exists():
+            raise serializers.ValidationError(
+                {"name": "A paper with that name and date already exists."}
+            )
+        return attrs
+
+
+class BlueprintUploadSerializer(serializers.Serializer):
+    file = serializers.FileField(
+        help_text="CSV: question_id, chapter, correct_option (or answer for a numeric question)."
+    )
+    dry_run = serializers.BooleanField(
+        required=False, default=False,
+        help_text="Check the file and report what would happen without saving anything.",
+    )
+
+
+class ResultsUploadSerializer(serializers.Serializer):
+    file = serializers.FileField(
+        help_text=(
+            "CSV. Either one row per student with a column per question (`roll_no, "
+            "Q1, Q2, …`), or one row per answer (`roll_no, question_id, answer`)."
+        )
+    )
+    paper = serializers.IntegerField(help_text="The `TestPaper.id` the file is the results of.")
+    dry_run = serializers.BooleanField(
+        required=False, default=False,
+        help_text="Check the file and report what would happen without saving anything.",
+    )
+    mapping_profile = serializers.IntegerField(
+        required=False, help_text="A saved column mapping (`/api/ingest/mappings/`) to apply."
+    )
+    column_map = serializers.CharField(
+        required=False, allow_blank=True,
+        help_text=(
+            "JSON object renaming this file's columns, e.g. "
+            '`{"Candidate No": "roll_no", "Seat": "ignore"}`. Fields: '
+            + ", ".join(sorted(MAPPABLE_FIELDS)) + ". Wins over a saved profile."
+        ),
+    )
+    save_mapping_as = serializers.CharField(
+        required=False, allow_blank=True, max_length=100,
+        help_text="With `column_map`: save it under this name for the next upload.",
+    )
+
+
+class IngestRowErrorSerializer(serializers.Serializer):
+    row = serializers.IntegerField(help_text="Line in the file, counting the header as line 1.")
+    roll_no = serializers.CharField(allow_blank=True, required=False)
+    question_id = serializers.CharField(allow_blank=True, required=False)
+    message = serializers.CharField(help_text="A sentence for the person who sent the file.")
+
+
+class BlueprintReportSerializer(serializers.Serializer):
+    dry_run = serializers.BooleanField()
+    ok = serializers.BooleanField(help_text="No errors; a real run would apply this file.")
+    paper_id = serializers.IntegerField()
+    questions_in_file = serializers.IntegerField()
+    expected_questions = serializers.IntegerField(
+        help_text="`total_questions` on the paper. Fewer in the file is a warning, not an error."
+    )
+    created = serializers.IntegerField()
+    updated = serializers.IntegerField()
+    unchanged = serializers.IntegerField()
+    errors_total = serializers.IntegerField()
+    errors = IngestRowErrorSerializer(many=True, help_text="At most the first 100.")
+
+
+class ResultsReportSerializer(serializers.Serializer):
+    """What happened to a results file — every student accounted for.
+
+    A student is ingested completely or not at all, so
+    `students_ingested + students_already_recorded + students_failed` is
+    `students_in_file`, with nobody half-counted.
+    """
+
+    dry_run = serializers.BooleanField()
+    ok = serializers.BooleanField(help_text="A real run would write something (or has nothing left to).")
+    paper_id = serializers.IntegerField()
+    layout = serializers.CharField(help_text="`wide` (a column per question) or `long` (a row per answer).")
+    batch_id = serializers.IntegerField(allow_null=True)
+    students_in_file = serializers.IntegerField()
+    students_ingested = serializers.IntegerField()
+    students_already_recorded = serializers.IntegerField(
+        help_text="Every answer in their row was already on file. Counted, not doubled."
+    )
+    students_failed = serializers.IntegerField()
+    attempts_created = serializers.IntegerField()
+    attempts_already_recorded = serializers.IntegerField()
+    unmapped_questions = serializers.ListField(
+        child=serializers.CharField(),
+        help_text="Questions in the file the paper's blueprint does not know. Non-empty means nothing was written.",
+    )
+    unkeyed_questions = serializers.ListField(
+        child=serializers.CharField(),
+        help_text="Questions with no answer key. Non-empty means nothing was written.",
+    )
+    ignored_columns = serializers.ListField(child=serializers.CharField())
+    questions_not_in_file = serializers.ListField(
+        child=serializers.CharField(),
+        help_text="Paper questions the file does not cover. A warning: a partial sitting is real.",
+    )
+    duplicate_of_batch = serializers.IntegerField(
+        allow_null=True,
+        help_text="On a dry run: this exact file was already imported as this batch.",
+    )
+    derived_refreshed = serializers.BooleanField(
+        help_text="Counts were recomputed for the students this file touched."
+    )
+    flags_raised = serializers.IntegerField(
+        allow_null=True, help_text="Flags the detectors raised for those students afterwards."
+    )
+    errors_total = serializers.IntegerField()
+    errors = IngestRowErrorSerializer(many=True, help_text="At most the first 100.")
+
+
+class IngestBatchSerializer(serializers.ModelSerializer):
+    paper_id = serializers.IntegerField(source="test_paper_id", read_only=True, allow_null=True)
+    paper_name = serializers.CharField(source="test_paper.name", read_only=True, default=None)
+
+    class Meta:
+        model = IngestBatch
+        fields = [
+            "id", "filename", "paper_id", "paper_name", "row_count", "rows_ok",
+            "rows_failed", "status", "created_at",
+        ]
+
+
+class ColumnMappingProfileSerializer(serializers.ModelSerializer):
+    mapping = serializers.DictField(
+        child=serializers.ChoiceField(choices=sorted(MAPPABLE_FIELDS)),
+        help_text="`{the column's name in the file: the field it holds}`.",
+    )
+
+    class Meta:
+        model = ColumnMappingProfile
+        fields = ["id", "name", "mapping", "created_at"]
+        read_only_fields = ["created_at"]
 
 
 class AttemptSerializer(serializers.ModelSerializer):
@@ -920,10 +1255,206 @@ class PlanBlockSerializer(serializers.ModelSerializer):
         return node.name
 
 
-class StudyLogCreateSerializer(serializers.ModelSerializer):
+class PlanGenerateRequestSerializer(serializers.Serializer):
+    date = serializers.DateField(
+        required=False,
+        help_text=(
+            "The day to plan, `YYYY-MM-DD`: today (the default) up to a week "
+            "ahead. Further out, the state the plan is built from will have moved."
+        ),
+    )
+    replace = serializers.BooleanField(
+        required=False, default=False,
+        help_text=(
+            "Rebuild a plan that already exists. Only blocks not yet ticked "
+            "are replaced; anything completed stays. Without it, an existing "
+            "plan is returned as it is."
+        ),
+    )
+
+
+class PlanGenerationSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    generated = serializers.BooleanField(
+        help_text=(
+            "True if this call made blocks. False if the plan already existed, "
+            "or if nothing qualifies yet — `blocks` then says which: empty "
+            "means there was nothing to plan, not that the call failed."
+        )
+    )
+    blocks = PlanBlockSerializer(many=True)
+
+
+#: The longest single study log a student may enter. A sanity bound, not a
+#: view on how long anyone should study: the only purpose is that one typo
+#: (`4500` for `45`) cannot become a 75-hour session that skews the
+#: `overload` detector and the subject-balance chart for weeks. Twelve hours
+#: is longer than anyone sits in one go, so an honest entry never meets it.
+MAX_STUDY_LOG_MINUTES = 720
+
+#: How far ahead of the server's clock a client's timestamp may run. A phone
+#: that is a minute fast should still be able to log "just now".
+FUTURE_SKEW = dt.timedelta(minutes=5)
+
+NOT_YOUR_CHAPTER = "That chapter is not part of your syllabus."
+
+
+class OwnChapterMixin:
+    """For serializers whose `topic` must be a chapter of the caller's syllabus.
+
+    `topic` is a bare primary key on the wire, so left alone it would accept
+    any topic id the database can see. Row-level security narrows that to the
+    institute, which is not enough: an institute teaching both JEE and NEET
+    holds two syllabi, and a JEE student logging time against a Biology
+    chapter would write a row no TopicState, detector or plan can place.
+
+    The queryset is swapped per request for the student's own chapters, so
+    "no such topic" and "someone else's topic" give the same answer — the
+    first would otherwise confirm that an id exists elsewhere. With no
+    student to scope to (schema generation, or a non-student caller) the
+    queryset is empty and nothing validates.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        student = getattr(getattr(request, "user", None), "student", None)
+        field = self.fields["topic"]
+        field.queryset = (
+            chapters_for_student(student) if student is not None else Topic.objects.none()
+        )
+        field.error_messages["does_not_exist"] = NOT_YOUR_CHAPTER
+        field.error_messages["incorrect_type"] = NOT_YOUR_CHAPTER
+
+
+class StudyLogCreateSerializer(OwnChapterMixin, serializers.ModelSerializer):
+    """A self-reported study session, as the student enters it.
+
+    Tier-1 data — see `StudyLog`. Backdating is allowed and expected (people
+    log in the evening for the afternoon); the model keeps `logged_at`
+    separately so a week entered on Sunday is visible as one signal rather
+    than seven. Only the future is refused.
+    """
+
+    topic_name = serializers.CharField(source="topic.name", read_only=True)
+    minutes = serializers.IntegerField(
+        min_value=1,
+        max_value=MAX_STUDY_LOG_MINUTES,
+        help_text=f"Minutes studied, 1–{MAX_STUDY_LOG_MINUTES}.",
+    )
+
     class Meta:
         model = StudyLog
-        fields = ["id", "topic", "minutes", "mode", "ts"]
+        fields = ["id", "topic", "topic_name", "minutes", "mode", "ts"]
+
+    def validate_ts(self, value):
+        if value > timezone.now() + FUTURE_SKEW:
+            raise serializers.ValidationError(
+                "That time has not happened yet. Log study time after you have done it."
+            )
+        return value
+
+
+class ConfidenceRatingSerializer(OwnChapterMixin, serializers.ModelSerializer):
+    """How strong the student *thinks* they are in one chapter.
+
+    Compared against measured mastery to find overconfidence (see
+    `TopicState.confidence_gap`), so the value has to be the student's own
+    honest answer *now*. That is why there is no `ts` on the request: the
+    server stamps it. The feature store takes the latest rating by `ts`, so a
+    client that could send its own timestamp could pin a rating for ever by
+    dating it in the future.
+    """
+
+    topic_name = serializers.CharField(source="topic.name", read_only=True)
+    self_rating = serializers.IntegerField(
+        min_value=1,
+        max_value=5,
+        help_text="1 = not confident at all, 5 = fully confident.",
+    )
+
+    class Meta:
+        model = ConfidenceRating
+        fields = ["id", "topic", "topic_name", "self_rating", "ts"]
+        read_only_fields = ["ts"]
+
+
+class MyTopicSerializer(TopicSerializer):
+    """A chapter as the student's pick-list shows it.
+
+    `ncert_ref` is the point of the extra weight: where to re-read the
+    chapter in the current NCERT textbooks, loaded from the official
+    syllabus documents. Until this route nothing returned it, so the links
+    existed in the database and nowhere a student could follow them.
+    """
+
+    unit = serializers.SerializerMethodField()
+    ncert_ref = serializers.JSONField(
+        read_only=True,
+        allow_null=True,
+        help_text=(
+            "Where to re-read this chapter in the NCERT textbooks: a list of "
+            "`{class, subject, book, chapter, title, pdf, sections?}`. Null "
+            "when the chapter has no NCERT counterpart or has not been linked "
+            "yet. `sections` appears only when just part of the NCERT chapter "
+            "applies."
+        ),
+    )
+
+    class Meta(TopicSerializer.Meta):
+        fields = [*TopicSerializer.Meta.fields, "unit", "ncert_ref"]
+
+    @staticmethod
+    def get_unit(obj) -> str:
+        return obj.parent.name if obj.parent_id is not None else ""
+
+
+class MyProgressSerializer(StudentStateSerializer):
+    """The slice of `StudentState` a student is shown about themselves.
+
+    `risk_score`, `load_index` and `balance_index` are withheld. They are
+    inputs to a mentor's triage, not feedback for a seventeen-year-old: a
+    number that says "critical" with no conversation around it is a poor way
+    to learn it. Nothing is hidden that the student cannot see another way —
+    `/api/my/subject-breakdown/` carries the balance in plain terms. Whether
+    students should see a risk band at all is a product decision, and showing
+    less first is the one that can be undone.
+    """
+
+    class Meta(StudentStateSerializer.Meta):
+        fields = [
+            "consistency", "revision_debt", "mock_avg", "mock_trend",
+            "syllabus_pct", "computed_at",
+        ]
+
+
+class MyProfileSerializer(serializers.ModelSerializer):
+    """Who the signed-in student is, and where they stand."""
+
+    batch = BatchSerializer(read_only=True)
+    mentor_name = serializers.CharField(source="mentor.name", read_only=True, default=None)
+    progress = MyProgressSerializer(source="state", read_only=True, allow_null=True)
+
+    class Meta:
+        model = Student
+        fields = [
+            "id", "name", "roll_no", "target", "joined_at",
+            "batch", "mentor_name", "progress",
+        ]
+
+
+class MyRevisionSerializer(serializers.ModelSerializer):
+    """One scheduled revision cycle: R1, R2, R3 of a chapter."""
+
+    topic = TopicSerializer(read_only=True)
+    is_overdue = serializers.BooleanField(
+        read_only=True,
+        help_text="Scheduled before today and not yet done.",
+    )
+
+    class Meta:
+        model = RevisionEvent
+        fields = ["id", "topic", "cycle", "scheduled_for", "done_at", "is_overdue"]
 
 
 class DashboardSummarySerializer(serializers.Serializer):
@@ -1015,9 +1546,111 @@ class DetailSerializer(serializers.Serializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
+    username = serializers.CharField(
+        help_text=(
+            "A staff username, **or a student's roll number**. One field "
+            "because the login form has one box; the password decides which "
+            "account it was."
+        ),
+    )
     password = serializers.CharField(
         style={"input_type": "password"}, trim_whitespace=False, write_only=True
+    )
+    institute = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        write_only=True,
+        help_text=(
+            "Optional institute code (its slug). Roll numbers are only unique "
+            "within a batch, so this narrows the search for a student whose "
+            "number exists elsewhere; sign-in works without it."
+        ),
+    )
+
+
+#: Django's own validators run on top of these: minimum length, not a common
+#: password, not all digits, not too like the account's name.
+PASSWORD_MAX_LENGTH = 128
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    """Replace my password. The first sign-in of a new student ends here."""
+
+    current_password = serializers.CharField(
+        style={"input_type": "password"}, trim_whitespace=False, write_only=True,
+        help_text="The password I signed in with — the temporary one, the first time.",
+    )
+    new_password = serializers.CharField(
+        style={"input_type": "password"}, trim_whitespace=False, write_only=True,
+        max_length=PASSWORD_MAX_LENGTH,
+        help_text=(
+            "At least 8 characters; not a common password, not all digits, "
+            "not like my name, and not my roll number."
+        ),
+    )
+
+    def validate_current_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("That is not your current password.")
+        return value
+
+    def validate(self, attrs):
+        user = self.context["request"].user
+        new = attrs["new_password"]
+
+        if new == attrs["current_password"]:
+            raise serializers.ValidationError(
+                {"new_password": ["Choose a password different from the one you have now."]}
+            )
+
+        # A roll number is printed on the ID card and known to every
+        # classmate, so a password built on it protects nothing. Four
+        # characters and up, so a roll number of "7" does not outlaw every
+        # password containing a seven.
+        student = getattr(user, "student", None)
+        if student is not None and len(student.roll_no) >= 4 and (
+            student.roll_no.lower() in new.lower()
+        ):
+            raise serializers.ValidationError(
+                {"new_password": ["Your password cannot contain your roll number."]}
+            )
+
+        try:
+            validate_password(new, user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"new_password": list(exc.messages)})
+        return attrs
+
+
+class StudentCredentialSerializer(serializers.Serializer):
+    """What staff are handed after issuing or resetting a student's login.
+
+    **Shown once.** `temporary_password` is not stored anywhere in a form
+    that can be read back, so there is no endpoint to fetch it again; the
+    only recovery is a reset. The response is sent with `Cache-Control:
+    no-store`.
+    """
+
+    student_id = serializers.IntegerField()
+    name = serializers.CharField()
+    roll_no = serializers.CharField(
+        help_text="What the student types into the username box."
+    )
+    temporary_password = serializers.CharField()
+    must_change_password = serializers.BooleanField(
+        help_text="Always true: the student must choose their own at first sign-in."
+    )
+
+
+class StudentCredentialRequestSerializer(serializers.Serializer):
+    password = serializers.CharField(
+        required=False, trim_whitespace=False, write_only=True, max_length=PASSWORD_MAX_LENGTH,
+        help_text=(
+            "Optional. Use this password as the temporary one instead of a "
+            "generated one — at least 6 characters. Omit it to have a random "
+            "one made, which is the better default."
+        ),
     )
 
 
@@ -1039,3 +1672,11 @@ class MeSerializer(serializers.Serializer):
     student_id = serializers.IntegerField(allow_null=True)
     is_staff = serializers.BooleanField()
     is_superuser = serializers.BooleanField()
+    must_change_password = serializers.BooleanField(
+        help_text=(
+            "True while this account is signed in on a temporary password. "
+            "Until it is changed (`POST /api/auth/password/`) every other "
+            "route answers 403 with `code: password_change_required`, so a "
+            "client should route straight to the change-password screen."
+        )
+    )

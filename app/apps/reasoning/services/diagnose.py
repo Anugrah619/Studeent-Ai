@@ -12,6 +12,7 @@ how confident to be, and what follows from it.
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 
 from apps.events.models import Attempt
@@ -464,8 +465,30 @@ def present(output: dict, *, context: dict, student, paper=None) -> dict:
     resolved = _resolve_evidence(student, paper, cited)
     derived_counter = context.get("counter_evidence_by_pattern") or {}
 
+    # Counter-evidence: the correct answers the model's sentence leans on.
+    # The sentence names them in prose ("D22 and D23, both right"); a client
+    # cannot link prose. So the labels it names are found here — but only
+    # among the candidates the server derived for that misconception, which
+    # is what makes this safe: the model can phrase the argument, it cannot
+    # invent a question to cite.
+    named: dict[int, list[str]] = {}
+    for i, h in enumerate(out["hypotheses"]):
+        candidates = [c["q"] for c in derived_counter.get(h.get("misconception_code") or "", [])]
+        named[i] = _labels_named_in(h.get("counter_evidence") or "", candidates)
+    counter_resolved = _resolve_evidence(
+        student, paper, {label for labels in named.values() for label in labels},
+        status=Attempt.CORRECT, marks_at_stake=0,
+    )
+
     accounted: set[str] = set()
-    for h in out["hypotheses"]:
+    for i, h in enumerate(out["hypotheses"]):
+        h["counter_evidence_questions"] = [
+            counter_resolved.get(
+                label,
+                {"question_id": None, "label": label, "chose": "", "marks_at_stake": 0},
+            )
+            for label in named[i]
+        ]
         labels = list(dict.fromkeys(h.get("evidence_questions") or []))
         h["evidence"] = [
             resolved.get(
@@ -490,11 +513,72 @@ def present(output: dict, *, context: dict, student, paper=None) -> dict:
     out["total_marks_at_stake"] = MARKS_PER_WRONG * len(accounted)
     out["paper_id"] = paper.id if paper is not None else None
     out["paper_name"] = paper.name if paper is not None else None
+    # Echoed from the payload that was actually sent, not recomputed: the
+    # point of showing it is "this is the name the model saw".
+    out["student_ref"] = context.get("student_ref") or ""
+    out["tally"] = _tally(context)
     return out
 
 
-def _resolve_evidence(student, paper, labels: set[str]) -> dict[str, dict]:
+def _labels_named_in(text: str, candidates: list[str]) -> list[str]:
+    """Which candidate labels a sentence names, in the order it names them.
+
+    A whole-label match: `D2` is not found inside `D22`, and `Q1` is not found
+    inside `Q10`. The same rule the console used to apply itself
+    (`labelsNamedIn` in `lib/explainer.ts`); doing it here means the client
+    stops guessing, and the link is only ever to a question the server itself
+    derived as counter-evidence for that finding.
+    """
+    found = []
+    for label in dict.fromkeys(candidates):
+        match = re.search(rf"(?<![A-Za-z0-9]){re.escape(label)}(?![A-Za-z0-9])", text)
+        if match:
+            found.append((match.start(), label))
+    return [label for _, label in sorted(found)]
+
+
+def _tally(context: dict) -> dict:
+    """The counts the model was handed, before it was asked anything.
+
+    "We count, exactly" is the second step of the pipeline: tagged wrong
+    options are tallied in code, and the model reasons over the tally. This
+    is that tally, exposed — so a reader can check the model's story against
+    the arithmetic it was given, over *every* wrong answer rather than only
+    the ones the diagnosis happens to cite.
+
+    Read from the stored context, so a replayed diagnosis shows the tally it
+    was made from even if the student's attempts have changed since.
+    """
+    totals = context.get("totals") or {}
+    by_pattern = context.get("marks_lost_by_pattern") or {}
+    return {
+        "answered": totals.get("answered", 0),
+        "wrong": totals.get("wrong", 0),
+        "wrong_with_known_cause": totals.get("wrong_with_known_cause", 0),
+        "by_misconception": sorted(
+            (
+                {
+                    "misconception_code": code,
+                    "wrong_answers": marks // MARKS_PER_WRONG,
+                    "marks": marks,
+                }
+                for code, marks in by_pattern.items()
+            ),
+            key=lambda row: (-row["marks"], row["misconception_code"]),
+        ),
+    }
+
+
+def _resolve_evidence(
+    student, paper, labels: set[str], *,
+    status: str = Attempt.WRONG, marks_at_stake: int = MARKS_PER_WRONG,
+) -> dict[str, dict]:
     """Map each cited label onto the attempt behind it, and a routable id.
+
+    `status` is which kind of answer a citation must be to count: a wrong one
+    for evidence, a right one for counter-evidence. A label that is the other
+    kind does not resolve — citing a question the student got right as proof
+    of a mistake is exactly the error this check exists to refuse.
 
     Resolved against `Attempt` rather than `QuestionTopicMap` directly,
     because the attempt is what says *which paper* a label like `"D16"`
@@ -509,7 +593,7 @@ def _resolve_evidence(student, paper, labels: set[str]) -> dict[str, dict]:
         Attempt.objects
         .filter(
             student=student,
-            status=Attempt.WRONG,
+            status=status,
             chosen_option__gt="",
             question_id__in=labels,
         )
@@ -537,7 +621,7 @@ def _resolve_evidence(student, paper, labels: set[str]) -> dict[str, dict]:
             "question_id": pk_by.get((a.test_paper_id, a.question_id)),
             "label": label,
             "chose": a.chosen_option,
-            "marks_at_stake": MARKS_PER_WRONG,
+            "marks_at_stake": marks_at_stake,
         }
         for label, a in by_label.items()
     }

@@ -26,6 +26,10 @@ class Source(models.TextChoices):
     OFFICIAL_PYQ = "official_pyq", "Official past paper"
     DEMO = "demo", "Demo (written by us)"
     GENERATED = "generated", "Generated"
+    #: A paper the institute itself set and sat — created through the API with
+    #: its own blueprint and results. Its keys are the institute's, not NTA's
+    #: and not ours, and nothing downstream should present it as either.
+    INSTITUTE = "institute", "Institute's own mock"
 
 
 class TestPaper(tenancy.TenantScoped):

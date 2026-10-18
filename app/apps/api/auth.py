@@ -3,7 +3,16 @@
     GET  /api/auth/csrf/     hand the browser a CSRF cookie
     POST /api/auth/login/    {username, password} -> the caller's identity
     POST /api/auth/logout/   end the session
+    POST /api/auth/password/ change my password (required on first sign-in)
     GET  /api/me/            who am I, what am I allowed to see
+
+SIGNING IN
+    `username` is a staff username *or a student's roll number*; the password
+    decides which. A student's first password is a temporary one issued by the
+    institute, and `must_change_password` in the response says so. Until it is
+    changed every route except this module's returns 403
+    `password_change_required` (see `middleware.py`) — enforced on the server,
+    not by the login screen.
 
 WHY SESSIONS AND NOT TOKENS
     Not inertia. `TenantMiddleware` reads `request.user` to decide which
@@ -31,13 +40,14 @@ CSRF
 
 from __future__ import annotations
 
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from . import serializers as ser
@@ -84,6 +94,7 @@ def identity(user) -> dict:
         "student_id": student.id if student else None,
         "is_staff": user.is_staff,
         "is_superuser": user.is_superuser,
+        "must_change_password": user.must_change_password,
     }
 
 
@@ -116,20 +127,28 @@ class LoginView(APIView):
 
     authentication_classes: list = []
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
     @extend_schema(
         request=ser.LoginSerializer,
-        responses={200: ser.MeSerializer, 400: ser.DetailSerializer},
+        responses={
+            200: ser.MeSerializer,
+            400: ser.DetailSerializer,
+            429: ser.DetailSerializer,
+        },
         tags=["auth"],
     )
     def post(self, request):
         form = ser.LoginSerializer(data=request.data)
         form.is_valid(raise_exception=True)
-        user = authenticate(
-            request,
-            username=form.validated_data["username"],
-            password=form.validated_data["password"],
-        )
+        credentials = {
+            "username": form.validated_data["username"],
+            "password": form.validated_data["password"],
+        }
+        if form.validated_data.get("institute"):
+            credentials["institute"] = form.validated_data["institute"]
+        user = authenticate(request, **credentials)
         if user is None:
             # One message for both "no such user" and "wrong password".
             # Distinguishing them tells an attacker which usernames exist.
@@ -155,6 +174,38 @@ class LogoutView(APIView):
     def post(self, request):
         logout(request)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PasswordChangeView(APIView):
+    """Replace my password. For a new student this is the end of first sign-in.
+
+    Needs the current password even though the caller is signed in: a
+    session left open on a shared phone should not be enough to take over
+    the account. On success the session survives (the hash that ties a
+    session to a password is refreshed) and `must_change_password` clears, so
+    the same tab carries straight on into the app.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password"
+
+    @extend_schema(
+        request=ser.PasswordChangeSerializer,
+        responses={200: ser.MeSerializer, 400: ser.DetailSerializer, 429: ser.DetailSerializer},
+        tags=["auth"],
+    )
+    def post(self, request):
+        form = ser.PasswordChangeSerializer(data=request.data, context={"request": request})
+        form.is_valid(raise_exception=True)
+        user = request.user
+        user.set_password(form.validated_data["new_password"])
+        user.must_change_password = False
+        user.save(update_fields=["password", "must_change_password"])
+        # `set_password` changes the value the session is bound to; without
+        # this the caller is logged out by their own successful request.
+        update_session_auth_hash(request, user)
+        return Response(ser.MeSerializer(identity(user)).data)
 
 
 class MeView(APIView):

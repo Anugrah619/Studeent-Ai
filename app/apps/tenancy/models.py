@@ -20,6 +20,14 @@ class User(AbstractUser):
       never logs in, so Student.user stays null.
     """
 
+    #: Set when an account is issued or reset by staff, cleared when the
+    #: person chooses their own password. While it is true the API answers
+    #: nothing except "who am I", "change my password" and "log out" — see
+    #: `apps.api.middleware.PasswordChangeRequiredMiddleware`. A temporary
+    #: password has been read aloud, printed on a slip and typed into a chat;
+    #: it must not be the thing that protects a student's data.
+    must_change_password = models.BooleanField(default=False)
+
     class Meta:
         db_table = "auth_user_custom"
 
