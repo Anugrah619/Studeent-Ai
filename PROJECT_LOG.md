@@ -601,3 +601,404 @@ calls (hero diagnoses read from stored traces).
 someone outside this chat — most likely the user's parallel session; kept as is.
 `README.md` status, `TASKS.md` status/next steps/demo traps, and the
 `gemini.py` free-tier comment (said 500/day) updated to match reality.
+
+### 2026-10-11 — who the product is for (checked against code)
+
+User confirmed the audience as directors, teachers and HODs. Checked: the system
+knows three roles — `director` (no model of its own; falls back to `is_staff`),
+`mentor` (teacher), `student`. **There is no HOD / department concept anywhere.**
+Every built screen is staff-facing; students and parents have no screen today
+(student endpoints exist, no UI). Suggested an HOD view — the most common
+misconceptions across all students in one subject — as a natural, high-value
+addition: it turns individual diagnoses into a re-teaching plan for a department.
+
+### 2026-10-14 — frontend tooling for the pitch redesign (options only, nothing built)
+
+User: the frontend is messy and not eye-catching; a director has to study small
+details to find the important thing. Asked for a list of frontend tools (Motion
+etc.) to choose from before any change.
+
+Checked first: the stack is React 19 + Vite + Tailwind 4 + shadcn/ui. **There is
+no chart library.** All four charts are hand-drawn SVG, and the only animation is
+CSS (`tw-animate-css`). Options listed in five groups: animation (Motion, GSAP,
+AutoAnimate, Lottie), charts (shadcn Charts/Recharts, Tremor, Nivo, ECharts),
+ready-made animated components (Magic UI, Aceternity, NumberFlow), diagrams
+(React Flow), and maths (KaTeX, needed in any case for the real papers).
+Offered three packages: A Polished, B Showcase (recommended), C Cinematic.
+All are free, which keeps the "no charges" rule.
+
+Point made alongside the list: a new library makes the screens feel alive, but
+the "messy" complaint is about layout. Too many things are given the same
+weight, so the redesign has to give each screen one obvious headline. That
+part is design work, not a library.
+
+Same day: the user asked what shadcn is. I explained it (the details belong in
+the parallel tech-stack chat). Finding from that check that matters for the
+redesign: **10 of the 17 installed shadcn components are never used**,
+including card, table, tabs, tooltip and badge. The screens hand-build those
+pieces instead, which is part of why they look inconsistent.
+
+Follow-up: gave a plain overview of shadcn (who made it, how it is available, how it is used). This was learning only, with no decisions made.
+
+### 2026-10-15 — redesign started: package B
+
+The user chose **B (Showcase)**. The work is on branch `redesign/package-b`, so
+`main` stays the working demo until the redesign is checked.
+
+What the "before" screenshots showed, and what the redesign fixes: the whole
+colour scheme was grey, and every element had equal weight (six equal KPI
+boxes, a 10-column table), so nothing drew the eye. Rule for every screen:
+**one headline sentence that answers "what do I need to know?"**, then a few
+key numbers, then the details.
+
+The agents run in three phases:
+1. **Foundation** (running): brand colour, animation rules, shared building
+   blocks (headline, animated numbers, maths renderer) and all installs.
+2. **Four screen agents in parallel**, each owning its own files: director
+   console · student page + AI diagnosis · charts · How it works + Data & trust.
+3. **Checker**: types, tests, build, and screenshots of every screen in light
+   and dark.
+
+Agents work in mock mode only, so there are no Gemini calls and the database
+is not touched. They make no commits and create no new docs. They see their
+work through a headless-Edge screenshot helper kept in the session scratchpad.
+
+Note: the screens the user reviewed on 14 Oct were running on **mock data**.
+The Vite server was started without `VITE_USE_MOCKS=false`.
+
+**Foundation done.** It added a petrol-teal brand colour (aqua in dark mode),
+used for the frame only and never for data. Also new: tinted page with white
+cards and shadows, an animation system that respects "reduce motion",
+shared building blocks (big headline, animated numbers, KPI card, maths
+display with chemistry support, flowchart canvas), 14 Magic UI pieces and 19
+shadcn pieces installed, and a test runner that is safe to run in parallel.
+Typecheck clean, 27/27 tests, build passes.
+Open points: the main bundle is 760 kB, so the checker should lazy-load the
+routes. `npm audit` reports 8 high-severity findings, origin unchecked. Dark aqua
+sits close to the light purple data steps for colour-blind viewers, which is
+fine only while the brand stays out of charts.
+
+**The four screen agents have started in parallel:** director console, student
+page + AI diagnosis, charts, and How it works + Data & trust. The Data & trust
+agent was given the verified facts to replace its out-of-date line that real
+papers are "being added now".
+
+**Console agent done.**
+- The headline now reads "8 students need you this week. 2 are critical."
+- The old "6 flagged this week" was the server counting *flags raised in the
+  last 7 days*; there are really 10 open flags across 8 students. Headline,
+  hero card and table now all count the same thing.
+- The table shows one row per student, and a student's other flags fold
+  underneath.
+- "Loop closed" is marked Seeded, and Recently closed says it outright.
+- The intervention dialog said logging an intervention "closes the flag"; the
+  real API never does that, so the wording was corrected.
+
+Left for the checker:
+1. The mock server still closes the flag on intervention, unlike the real
+   API, and a smoke test asserts it.
+2. `useDashboardSummary` doesn't send the batch filter, so three KPI cards stay
+   institute-wide when a batch is picked.
+
+**Student agent done.**
+- The AI diagnosis is now the hero of Student 360: Gemini's headline, "25 marks
+  at stake", the main finding beside a "Key insight: why this is a trigger, not
+  a topic gap" panel, and larger Agree/Disagree buttons.
+- Weaker secondary findings (Tanvi, Ishita) sit in a separate muted band that
+  says in words that they add to the headline's figure.
+- The question panel renders maths, and the chosen and correct answers are
+  marked with an icon and words.
+- Mock Intelligence has a data-built headline. Paper 7 doesn't exist in the
+  mock data, so it now shows a calm "No answer sheet" state.
+- **Clickable D22/D23 is blocked on the backend.** Those questions were
+  answered correctly, so they aren't in `evidence[]`, and attempts carry only a
+  label, no question id. Two possible fixes: `counter_evidence_refs:
+  [{label, question_id}]` on each hypothesis, or a numeric question id on
+  attempt rows. For now each label shows "D22 answered correctly" from the
+  answer sheet.
+
+**Overclaim removed (I fixed it myself; it predates the redesign).** The
+Agree/Disagree text said agreeing "raises this misconception's weight for your
+papers". No code does that: a verdict is only stored on the ReasoningTrace as a
+training label. It now says the answer is saved as a teacher-checked example
+for training our own model. Same class of risk as the "closes the flag"
+wording: a screen claiming behaviour the system doesn't have.
+
+**Story agent done.**
+- How it works now opens on "The system counts. The AI explains. A teacher
+  decides."
+- It has a clickable six-step pipeline. Each step is explained in plain words
+  beside Aarav's real data.
+- The page now shows the AI's recommended action, which the API returned but
+  the page never displayed.
+- It closes with five "remember these" cards.
+- Data & trust has its out-of-date claims corrected: both real papers are named
+  with question counts, the cross-check figures are shown (66/75, 157/180), it
+  says 32 disagreements are "not yet reviewed by a person", and it says the
+  diagnosis doesn't run on the real papers yet.
+- These figures can't be served by the API, so they live in
+  `explainer/importRecords.ts`, labelled "Import records".
+- The trust test now requires these exact figures.
+
+My Agree/Disagree wording fix broke one smoke-test assertion
+("trains the system"); updated it to check "teacher-checked". Left for the
+checker: `src/api/gaps.ts` QUESTION_PROVENANCE comment still says "no count".
+
+**Charts agent done.**
+- The mock trend moved to Recharts: a crosshair tooltip, a line that draws
+  once, and arrow-key stepping through the mocks.
+- The neglect, marks-lost and sparkline charts were kept hand-built and given
+  Motion, because their exact label placement doesn't survive Recharts.
+- The long-standing defect where neglect-chart labels drifted from short bars
+  is fixed. Root cause: `1fr` columns let the half with the wider label grow;
+  now `minmax(0,1fr)`.
+- In dark mode, white numbers on two light cause steps failed contrast (3.2:1
+  and 2.2:1); they now use dark ink.
+- All props are unchanged.
+
+**Phase 3 started: the checker.** It handles the leftovers (mock intervention
+behaviour, batch filter on the summary, stale gaps.ts comment, a useInView
+check), lazy-loads the routes, makes the four screens consistent, and sweeps
+every screen for claims the code doesn't back up. Then visual QA (every route,
+light/dark, 1440/390, reduced motion), the gates, and checking whether the
+npm audit findings predate this work. The live-mode check stays with the main
+session, to control Gemini usage.
+
+**Checker done.** Typecheck, all 27 tests and the build pass.
+- **Bundle:** the main chunk went from 1,672 kB to 378 kB through route
+  lazy-loading.
+- **Mock vs API:** the mock no longer closes a flag on intervention, matching
+  the API.
+- **Batch filter:** now sent to the summary.
+- **Honesty sweep:** about 45 overclaims fixed. The biggest ones:
+  - "The AI never does the maths" → "The AI does none of the counting". The
+    AI does write figures into its sentences, such as "costing 25 marks", so
+    those are its wording, not the count.
+  - The NEET paper was labelled "Official" → "Publisher's copy (PW)".
+  - "a person reviews disagreements" → "first pass by an AI assistant, no
+    person yet".
+  - "Recomputed nightly" was removed, because no scheduler exists.
+  - The day plan is now labelled a seeded example.
+- **npm audit:** the 8 high findings predate the redesign.
+Spot-checked by me: the "2 copying errors" claim holds. The stored reviews
+for JEE Q21 and NEET Q44 both say cause=transcription.
+**NEET Q44's stored options are still in the wrong order, so the database
+marks the wrong option text as correct. Fix this before any NEET demo round.**
+
+**Privacy verified on real data:** 0 of 195 stored reasoning traces contain a
+student name, in either the input or the output. The Faizan sample diagnosis
+(an invented fixture, never a real transcript) said "Faizan's paper", which a
+model sent only "S-3" can't write. I took the name out.
+
+**Live-mode check (main session, port 5174, only hero students):** every
+diagnosis request was served from the cache (`from_cache=true`, 0.1–0.3 s), and
+no Gemini call was made. All four heroes are cached for paper 17, which is
+each hero's latest mock, so the student page asks for exactly the cached
+context. Aarav is also cached with no paper. The live screens render correctly.
+
+Two things only the live data showed:
+1. **Flag details printed raw detector fields** (rule version, topic id, ISO
+   timestamps, baseline prose), 11–18 rows per flag. I rewrote `EvidenceList`:
+   the 4 most telling facts lead, with plain labels and units, and everything
+   else stays one click away under "All recorded evidence". Nothing is dropped.
+2. **Live data says "44 students need you this week. 11 are critical."**
+   That's every active student, with 80 open flags (41 of them weak-topic),
+   all raised 16–21 Sept and none in the last 7 days. The weak-topic detector
+   fires on almost everyone in the seeded data, and the seed dates are going
+   stale. In front of a director, "every student needs you" undercuts "the
+   system only interrupts you when it can justify it". Mock mode shows 8 of
+   298. **Decision for the user:** pitch in sample mode, or retune the
+   weak-topic detector and refresh the flag dates without re-seeding (a
+   re-seed would cascade-delete the traces).
+
+Also open: the verdict endpoint attaches a verdict to the student's newest
+trace for any paper, which could mislabel training data later.
+Clickable D22/D23 needs a backend field (`counter_evidence_refs`).
+
+### 2026-10-15 — the user's design guide (SKILL.md)
+
+The user shared `SKILL.md` ("frontend-design"), a design guide written in Claude
+Code's skill format. I measured the redesign against its list of signs that a
+design was generated rather than chosen. The redesign has many of them: 30
+all-caps labels, 40 "A · B · C" meta strings, 31 arrows on links, 6 headlines
+with one word picked out in colour, about 60 fade-up entrances, the default
+Geist font, identical rounded cards, and a "big number + small label" hero.
+The redesign fixed hierarchy and honesty, not distinctiveness.
+
+How the file can be used:
+1. As a skill: move it to `.claude/skills/frontend-design/SKILL.md`, so it
+   loads automatically for design work and for agents.
+2. As the brief for a second, "identity" pass. The process is a design plan
+   first (palette, type, layout wireframes, principles), checked against the
+   brief and approved by the user before any build.
+3. As a review checklist.
+The file refers to a LICENSE.txt that isn't in the repo, so check where it
+came from before committing it, because the repo is public. Nothing built
+yet; waiting for the user's choice.
+
+### 2026-10-15 — what `E:\Student_AI_agents` is (checked, nothing changed)
+
+User asked what that folder is for and why it is separate from the project.
+It is not a second project. `E:\Student_AI_agents\frontend` is a **git
+worktree**: a second checkout of this same repo, on branch `agent/frontend`.
+Its `.git` is a one-line pointer file back to `.git/worktrees/frontend` in the
+main repo, so both folders share one history and one set of branches. It comes
+from the 2026-09-20 decision (35–39) to run agents in parallel: the frontend
+agent needs only `openapi.yaml` and the MSW mocks, so it could have its own
+folder, while the db/backend agents shared the main tree (`.venv` is
+gitignored and they share one Postgres). Git's records put its creation at
+2026-09-23. Why it sits beside the repo and not inside it was not recorded; the
+usual reason is that a checkout nested in another checkout shows up as
+untracked files and gets scanned by search and build watchers.
+
+State today: idle. `agent/frontend` @ `8fce1c6` has **0 commits that are not in
+`main`** (all merged), is 3 behind, and its tree is clean. The redesign is
+being done in the main tree (`web/`, branch `redesign/package-b`), not there.
+Of its 236 MB, 233 MB is a second `node_modules` (20,185 files); real source is
+3 MB. Not removed. If the user wants the space back, the right command is
+`git worktree remove E:/Student_AI_agents/frontend`: it keeps the branch and
+git refuses if there are uncommitted changes. Waiting for the user's call.
+
+**Installed:** `SKILL.md` moved from the repo root to
+`.claude/skills/frontend-design/SKILL.md`, where Claude Code loads it as the
+`frontend-design` skill for design work, including subagents. It is not
+committed: `.claude/` is untracked, and the file's `LICENSE.txt` source is
+still unknown, which matters because the repo is public.
+
+### 2026-10-15 — the student API, and an audit of what else is missing
+
+Asked: "create the student apis and check for any other missing apis."
+
+**How I read it.** The student-facing surface the codebase had half-promised
+(a `student-app` tag, `/api/my/plan`, `/api/my/study-logs`, `role: student` in
+`/api/me/`), not CRUD on student records: creating and reassigning students
+stays in the Django admin, as decided earlier.
+
+**Probed on the unmodified code before changing anything** (all five were real):
+1. **A signed-in student could read any classmate**: `GET /api/students/{other}/`
+   returned 200 and `GET /api/students/` listed everyone. RLS cannot stop it,
+   because a student and their classmates share an institute. Latent today,
+   since no student has a login, but it becomes live the moment one does.
+2. `?date=garbage` on `my/plan` raised an unhandled exception (a 500).
+3. A mentor POSTing a study log was a 500.
+4. Ticking off yesterday's block was a 404 (`complete` reused the day filter).
+5. Study logs accepted `minutes` of -5 and 10,000,000, and a timestamp in 2030.
+
+**Built.** `/api/my/` is addressed by account, never by id: `profile`,
+`topics` (the pick-list, with NCERT links), `topic-states`, `mock-scores`,
+`subject-breakdown`, `marks-lost`, `confidence` (new write path),
+`revisions` (read), plus the two existing routes hardened. `IsConsoleUser`
+closes every console route to student accounts. `GET /api/students/{id}/plan/`
+is new, for the mentor's Student 360 panel. The four per-student read models
+moved into `api/rollups.py` so the console and the student app compute the same
+numbers from one function.
+
+**Verified.** 280 backend tests (190 + 90 new); 27 frontend tests and the
+typecheck pass on regenerated types. Mutation check: 12 deliberate breakages
+of the new guards, each caught. Contract 28 -> 37 paths, 39 operations; the
+only edits to existing paths are doc text and tightened bounds. **Not done:** a
+real sign-in as a student, because none can exist yet. The routes are
+exercised through Django's test client with the real middleware and RLS role.
+
+**Calls made on your behalf, all reversible:** students are not shown
+`risk_score`, flags, interventions or the diagnosis; a confidence rating's
+timestamp is set by the server (the feature store takes the *latest*, so a
+client-set one could pin a rating for ever); study logs are capped at 720
+minutes and cannot be future-dated; revisions are read-only; lists degrade to an
+empty page for a non-student while writes and singletons are 403.
+
+**The audit.** The contract matched the live backend exactly before I started,
+every route the frontend calls exists, and every mock handler has a real route.
+So what is missing is not routes the UI wants but paths the data needs: no
+student login can be created, nothing ingests a results file, interventions
+are write-only, revisions and plan ticks have no sound completion path. Four of
+them need your decision, not code. All in `TASKS.md` under "Student API".
+
+**Process.** The mutation harness first reported every case "MISSED"; the fault
+was my own case-sensitive check, not the tests, and I fixed the harness. The new
+test file took 319 s because each test hashed three passwords with PBKDF2; a
+fast hasher scoped to that file brought it to 15 s.
+
+Not committed. The frontend is untouched apart from regenerating
+`web/src/api/schema.d.ts` (additive; nothing imports the new types yet).
+
+### 2026-10-18 — roll-number sign-in, the rest of the APIs, and results upload
+
+Asked: "complete the remaining APIs and features", and for login: roll number
+and a password the institute provides, with a forced password change at first
+sign-in. That answered the one decision on the list that was yours; I took the
+rest on the defaults below. Everything is in `TASKS.md` under "Student API,
+login and results upload".
+
+**Sign-in.** One auth backend answers for a staff username *or* a roll number
+(roll numbers are only unique per batch, so the password decides when they
+clash). Staff issue a login (`POST /api/students/{id}/account/`): random
+temporary password, shown once, stored hashed, `Cache-Control: no-store`.
+Issue and reset are two verbs so a repeat cannot overwrite a password a student
+chose. While a temporary password is pending, middleware answers every route but
+`auth/*` and `me/` with 403 `password_change_required` — enforced on the server,
+not by the login screen. Throttles on login, password change, credentials,
+student writes, plan generation and uploads; `NUM_PROXIES = 0` so an
+`X-Forwarded-For` header cannot dodge them.
+
+**Built.** Revision completion (write-once), plan undo, `my/attempts` and
+`my/questions/{id}` (answer, key and working, no misconception), mentor-side
+reads of study log / confidence / revisions / interventions, a rules-based day
+planner (`my/plan/generate/`, `generate_plans`), and results-file upload: paper
+→ blueprint → CSV results, a student ingested completely or not at all, an
+unmapped question stopping the whole file, re-sends never doubling an answer.
+The diagnosis response gained the four things the frontend had recorded as
+missing (`student_ref`, `tally`, resolved counter-evidence, a real verdict
+enum), so D22/D23 are clickable on the real traces. Frontend: a change-password
+screen and gate, a holding page for students, types regenerated, mocks updated.
+
+**Calls made on your behalf (reversible):** a revision's `done_at` may be set
+once — the one event-log field written after insert; plan ticks stay in
+`PlanBlock.completed` and the planner never deletes a ticked block; students
+still do not see `risk_score`, flags, interventions or misconception tags; the
+planner is rules, untimed; CSV only (xlsx needs a new dependency).
+
+**Verified.** Backend 490 tests, frontend 36, typecheck clean. 33 deliberate
+sabotages of the new guards, all caught — after two survived and exposed real
+gaps in my tests (a cap on blocks hid a drifted planner threshold; Postgres RLS
+hid a deleted institute filter in the upload, so that filter is now tested
+directly). **A real sign-in over real HTTP** against the dev database: staff
+issue a login, the student signs in by roll number, is held at the password
+change, is refused a weak password with the server's reasons, chooses one, and
+reaches `/api/my/…` on the same session; the console answers 403. I then
+removed that login and the plan blocks the check created, so the dev data is as
+it was (the two migrations stay applied).
+
+**Caught before shipping.** (1) The new `source` field made drf-spectacular
+rename `SourceEnum`/`StatusEnum` to hashed names the frontend imports —
+pinned with `ENUM_NAME_OVERRIDES`. (2) The question-review route returned two
+different 404 bodies for "not yours" and "does not exist", an existence oracle
+that also leaked a model name. (3) Restricting ids to digits changed the
+generated path parameter from integer to string. A structural diff of the old
+and new contracts now shows nothing removed and only additive changes.
+
+**What this is not.** No screen yet for staff to issue logins or upload results;
+an institute's own paper has no option tags, so no misconception diagnosis for
+it; bulk logins are a command because a password hash costs ~1 s; throttle
+counters are per-process. Your server on port 8000 was started before these
+changes — if it runs with `--noreload`, restart it. Not committed.
+
+### 2026-10-18 — committed: backend, frontend, docs
+
+Asked to commit the frontend and the backend, with no mention of the assistant
+in the messages (the standing rule), because the frontend will be redesigned
+further on another laptop. Three commits on `redesign/package-b`, in this order
+so each one builds on the last:
+
+1. **Backend + contract** (`app/`, `openapi.yaml`) — the student API, roll-number
+   sign-in with the forced first-password change, throttles, planner, results
+   upload, diagnosis additions, the two migrations, and their tests (490 pass).
+2. **Frontend** (`web/`) — the redesign work in progress *and* the login gate,
+   change-password screen and student holding page, on regenerated types. These
+   could not be split cleanly: the new screens use the redesign's colour tokens
+   and its test runner, and four files carry both. Typecheck clean, 36 tests pass.
+3. **Docs** — README, TASKS, TECHNICAL_DOC, LEARNING_PATH, this log.
+
+Not committed: `.claude/` (the `LICENSE.txt` question for the design skill is
+still open, and the repo is public). Nothing pushed — the other laptop needs a
+push to see any of this.

@@ -60,6 +60,8 @@ layered architecture, testing strategy.
 - [The Twelve-Factor App](https://12factor.net/) — short, free, foundational for anything deployable
 - [Microsoft REST API Guidelines](https://github.com/microsoft/api-guidelines) — free, opinionated, practical
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/) — free; read before writing auth, not after
+- [OWASP API Security 2023 — API1: Broken Object Level Authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/) — the bug class behind the student/console wall: tenant isolation passes, and the wrong person in the right tenant still reads someone else's record
+- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) and [Password Storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) — why the login gives one message for "no such student" and "wrong password", why a hash is made slow on purpose (and what that costs a bulk import), and why per-account lockout hands an attacker a denial of service
 - [Testing Library / test pyramid — Martin Fowler](https://martinfowler.com/articles/practical-test-pyramid.html)
 
 ---

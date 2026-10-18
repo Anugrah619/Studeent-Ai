@@ -2,7 +2,7 @@
 
 **What to do next.** For *why*, see [`PROJECT_LOG.md`](PROJECT_LOG.md). For the full spec, [`TECHNICAL_DOC.md`](TECHNICAL_DOC.md). Start at [`README.md`](README.md).
 
-Last updated: 25 Sep 2026
+Last updated: 18 Oct 2026
 
 ---
 
@@ -25,7 +25,14 @@ A task that doesn't serve that doesn't belong on this list.
 ✅ Screens           live API · diagnosis card · question panel · How it works · Data & trust
 ✅ Real data         official JEE Main + NEET 2026 syllabi (NCERT-linked);
                      NEET 2025 + JEE Main 2026 papers, cross-checked vs NTA keys
-✅ Safety net        190 backend + 21 frontend tests
+✅ Safety net        490 backend + 36 frontend tests
+✅ Student API       /api/my/… ; roll-number sign-in with a forced first-password
+                     change, verified over real HTTP; students walled off from the
+                     console. No student app screens yet (a holding page stands in)
+✅ Results upload    paper → blueprint → CSV results, per-student all-or-nothing,
+                     idempotent. xlsx not yet; an institute's own paper has no
+                     option tags, so no misconception diagnosis for it
+✅ Day planner v1    three explicit rules, each block saying which; not the LLM plan_week
 🟡 Training data     195 traces, 1 mentor verdict (a test click) — corpus has started
 ❌ NEET on screen    syllabus and paper loaded, no screen shows Biology yet
 ```
@@ -80,6 +87,43 @@ Moves the pitch onto a real exam: *"This is the actual NEET 2025 paper — here'
 - [ ] `analyse_decline` · `plan_week` · `read_paper` · `answer_forensics` · `generate_practice`
 - [ ] Cache on a state hash — unchanged state must never regenerate
 - [ ] Batch overnight generation (50% cheaper, and nudges aren't latency-sensitive)
+
+---
+
+## 🟣 Student API, login and results upload — done 18 Oct; what is left
+
+Built and tested end to end. The calls I made where the answer was yours are listed first so you can overturn them; each is reversible.
+
+**Decisions made (overturn any of these)**
+- [x] **Student login** — roll number + a password the institute provides, and a forced change at first sign-in (your call). Staff issue it with `POST /api/students/{id}/account/`; the temporary password is random, shown once, stored hashed. Issue and reset are two verbs so a repeat cannot overwrite a password a student already chose.
+- [x] **A revision is marked done once.** `done_at` goes null → a time and never moves (a conditional `UPDATE … WHERE done_at IS NULL`). It is the one field in the event log written after insert; the alternative is a separate completion row, which changes the six readers of `done_at`. Documented in `TECHNICAL_DOC` §7 and §12.
+- [x] **Plan ticks stay in `PlanBlock.completed`**, and the planner never deletes a ticked block (`replace=true` rebuilds only the un-ticked ones; tested). Cheaper than a completion-event table and enough while nothing else deletes plan blocks.
+- [x] **A student still does not see** `risk_score`, flags, interventions, or the misconception behind a wrong option. A test pins each. Adding any later is additive.
+- [x] **The planner is rules, not a model**: overdue revisions, then the weakest *taught* chapters, then one taught-but-untouched chapter, sized to what the student actually logs; no start times, because nothing says when a student studies.
+
+**Built since the last list**
+- [x] Results-file upload — `POST /api/papers/`, `…/blueprint/`, `/api/ingest/results/`, `/batches/`, `/mappings/` (CSV; encodings and delimiters Excel really produces; saved column mappings; `dry_run`)
+- [x] Student logins: issue, reset, forced change, `login_status` on the student payloads, `provision_student_accounts` for a whole batch
+- [x] `my/revisions/{id}/complete/`, `my/plan/{id}/uncomplete/`, `my/plan/generate/`, `my/attempts/`, `my/questions/{id}/`
+- [x] Mentor-side: `students/{id}/study-logs|confidence|revisions`, `flags/{id}/interventions/`
+- [x] Throttles on login, password change, credentials, student writes, plan generation and uploads
+- [x] The four diagnosis gaps the frontend had recorded: `student_ref`, the `tally`, resolved `counter_evidence_questions` (D22/D23 are now clickable on real traces), a real `human_verdict` enum; `source` on papers and questions
+
+**Still open**
+- [ ] **xlsx upload.** Needs `openpyxl` parsing zip files from strangers — your call to add the dependency. The API says "Save As → CSV" until then.
+- [ ] **Diagnosis for an institute's own paper.** Its blueprint has chapter + key only, no option text or misconception tags, so `diagnosis` answers 422. Tagging distractors is the factory's job, or a person's.
+- [ ] **Re-marking after a key correction.** A key cannot change under recorded answers (it is refused); there is no deliberate re-mark step yet.
+- [ ] **Bulk logins over HTTP.** One password hash is ~1 s, so a batch is the command, not a request. A background job runner would let a director press a button.
+- [ ] **Per-process throttle counters.** Swap Django's default cache for a shared one before running more than one worker. Per-account lockout is left out on purpose (it lets anyone who knows a roll number lock that student out).
+- [ ] An LLM `plan_week` (Phase 4) to reorder and word the rules-based plan.
+
+**Frontend**
+- [x] Change-password screen and gate, a holding page for students (a console of 403s is not a fallback), typed against the new contract; the mock layer enforces the same rule as the server
+- [ ] **Screens for staff**: issue/reset a student's login, create a paper, upload a blueprint and results. All API-only today.
+- [ ] Sign-in field label: "Username" → "Username or roll number" (`routes/Login.tsx` is mid-redesign, so not touched)
+- [ ] Move Student 360's Day plan onto `GET /api/students/{id}/plan/`; a mentor still sees an empty plan
+- [ ] Delete the `gaps.ts` entries the server now answers (`COUNTER_EVIDENCE_UNRESOLVED`, `DISTRACTOR_TALLY_NOT_EXPOSED`, `STUDENT_REF_NOT_EXPOSED`, `QUESTION_PROVENANCE`, `MOCK_SCORES_ORDER`) together with the code that compensates for each; `ProvenanceExhibit` can count `usePapers()` by `source`
+- [ ] The real student app
 
 ---
 

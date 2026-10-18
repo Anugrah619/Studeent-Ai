@@ -153,7 +153,10 @@ Because reasoning and counting are cleanly separated, **Gemini can be swapped fo
 cd app
 docker compose up -d                                   # database
 .venv\Scripts\python.exe manage.py runserver           # backend  → localhost:8000
-.venv\Scripts\python.exe -m pytest -q                  # 68 tests
+.venv\Scripts\python.exe -m pytest -q                  # 490 tests
+.venv\Scripts\python.exe manage.py provision_student_accounts --institute aarambh --out slips.csv
+                                                       # student logins: roll no + temporary password, printed once
+.venv\Scripts\python.exe manage.py generate_plans      # today's study plan for every active student
 
 cd ../web && npm run dev                               # screens  → localhost:5173
 ```

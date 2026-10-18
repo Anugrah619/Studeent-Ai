@@ -19,7 +19,7 @@ It ingests the mock-test results an institute already has and produces the judge
 
 Every piece of reasoning Gemini does is logged, and those transcripts become the training set for our own fine-tuned model.
 
-The buyer is the institute director, not the student. The built product is therefore a **director / mentor console**; there is no student-facing app.
+The buyer is the institute director, not the student. The built product is therefore a **director / mentor console**; there is no student-facing app. (Its API now exists — `/api/my/…`, §7 — but no screen uses it yet.)
 
 ### The correction from v1.0
 
@@ -187,6 +187,10 @@ Each is a defined job with **structured JSON output** — not an open chat promp
 
 > The `PlanBlock` table has **no engine**: it is written only by the seeder. A "day plan" panel exists in the console, but nothing plans.
 
+### What the diagnosis response carries beyond the model's text
+
+The reasoning call is untouched; `present()` re-presents data the trace already stores, so a replayed diagnosis shows exactly what it was made from. Four additions: `student_ref` (the `S-{id}` pseudonym the model saw, so the privacy claim can be read off the response); `tally` (the deterministic counts the model was handed — every wrong answer, not only the cited ones — so its story can be held against the arithmetic); `hypotheses[].counter_evidence_questions` (the correct answers the counter-evidence sentence names, resolved to routable question ids, but only from candidates the server itself derived, so the model can phrase the argument and cannot invent a question to cite); and `human_verdict` as a real three-value enum, where `unreviewed` is a value and not an absence.
+
 ### Privacy — non-negotiable
 
 Users are minors, and Gemini's free tier may use submitted content for training, with human review. **PII is stripped before every call** and re-attached locally afterwards. The real payload (`diagnose.build_context`):
@@ -278,7 +282,7 @@ Two corrections to v2.0: there is **no cost field** (tokens only), and the `reas
 | Derived (5) | `TopicState` · `StudentState` · `Flag` · `Intervention` · `PlanBlock` |
 | Reasoning (1) | `ReasoningTrace` |
 
-There is **no separate `Question` table**: `QuestionTopicMap` holds text, solution, difficulty, topic mapping and — for official papers — `official_answer`, `model_answer`, `nta_question_id` and `verification` (agreed / disagreed / unverifiable). `IngestBatch` and `ColumnMappingProfile` are **models and admin only; nothing writes to them** (§8.2).
+There is **no separate `Question` table**: `QuestionTopicMap` holds text, solution, difficulty, topic mapping and — for official papers — `official_answer`, `model_answer`, `nta_question_id` and `verification` (agreed / disagreed / unverifiable). `IngestBatch` and `ColumnMappingProfile` are written by the results upload (§8.2); an `IngestBatch` is the receipt for every attempt it created.
 
 **Provenance.** `TestPaper.provenance` is `official_pyq` / `demo` / `generated`, with `source_ref`. The console and the "Data & trust" page use it to say what is real.
 
@@ -320,13 +324,28 @@ cross-tenant INSERT → refused
 
 ### Authentication ✅
 
-Django **session cookie + CSRF**. Endpoints: `GET /api/auth/csrf/` · `POST /api/auth/login/` · `POST /api/auth/logout/` · `GET /api/me/`. Role is derived from the user's link: `mentor` → mentor, `student` → student, else `is_staff` → director (`api/auth.py`). Pagination is 50 (max 200) per page, and 200 (max 500) for bulk routes.
+Django **session cookie + CSRF**. Endpoints: `GET /api/auth/csrf/` · `POST /api/auth/login/` · `POST /api/auth/logout/` · `POST /api/auth/password/` · `GET /api/me/`. Role is derived from the user's link: `mentor` → mentor, `student` → student, else `is_staff` → director (`api/auth.py`). Pagination is 50 (max 200) per page, and 200 (max 500) for bulk routes.
+
+**Student sign-in is roll number + a password the institute provides, and the first sign-in must change it.** `username` on the login form is a staff username *or a roll number*; one backend (`tenancy/auth_backends.py`) gathers the candidate accounts and the password decides which it was, because roll numbers are only unique per batch — a clash resolves to whichever student knows the password, and an optional institute code narrows it. Staff issue a login with `POST /api/students/{id}/account/` (a random `XXXX-XXXX` temporary password, returned once, `Cache-Control: no-store`, stored hashed) and replace it with `…/account/reset-password/`. They are two verbs on purpose: one "make sure they can sign in" call could overwrite a password a student had already chosen. Bulk onboarding is `manage.py provision_student_accounts`, because each account costs one password hash (~1 s) and a batch of sixty does not belong inside a web request.
+
+**The forced change is enforced on the server.** While `User.must_change_password` is set, `PasswordChangeRequiredMiddleware` answers every `/api/` route except `auth/*` and `me/` with 403 `code: password_change_required`; the login screen is only the friendly half. `POST /api/auth/password/` needs the current password, runs Django's validators plus a rule against containing the roll number, keeps the session alive, and clears the flag. A reset sets it again and signs the student out everywhere.
+
+**Throttles** (`ScopedRateThrottle`, opt-in per view): login 10/min per client, password change 5/min per account, credentials 30/h, student writes 120/h, plan generation 30/h, uploads 20/h. Clients are identified by socket address (`NUM_PROXIES = 0`), never by an `X-Forwarded-For` header they wrote themselves. Not built, deliberately: per-account lockout, which would let anyone who knows a roll number lock that student out. The counters live in Django's default per-process cache — fine for one worker, and the thing to swap for a shared cache before running more than one.
+
+### Two surfaces, and the wall between them ✅
+
+The API has two surfaces, and a caller belongs to one:
+
+- **`/api/my/…` — the student app.** Addressed by *account*, never by id: the student is whoever the session says, so there is no id to tamper with. Plan (`generate`, `complete`, `uncomplete`), study log (read/append), confidence ratings (append), revisions (read, and `complete` once), `attempts` + `questions/{id}` (review my mistakes — the stem, my answer, the key and the working, but **not** the misconception behind a wrong option), and the read models — `profile`, `topics` (the pick-list, with NCERT links), `topic-states`, `mock-scores`, `subject-breakdown`, `marks-lost`. Computed by the same functions as the console's (`api/rollups.py`), so a student and their mentor never see different numbers. Not shown to a student: `risk_score`, flags, interventions, the misconception diagnosis — a product decision (see TASKS.md), and the one that can be reversed.
+- **Everything else — the console.** Addressed by id and scoped to the *institute*. Closed to student accounts by `IsConsoleUser`.
+
+The wall is not optional and RLS cannot provide it. A student and their classmates share an institute, so row-level security is satisfied on both sides of the fence: before `IsConsoleUser`, a student logged in could read any classmate's record, risk score and flags through `/api/students/{id}/`. That is broken object-level authorization (OWASP API1:2023), a different failure from a cross-tenant leak; `tests/test_student_api.py` pins it route by route. A revision's `done_at` is the one field in the event log written after insert, and only ever once (null → a time, by a conditional `UPDATE … WHERE done_at IS NULL`): the row says both *that* it happened and *when*, so replaying history still reproduces what happened, which is what the append-only rule is for. Writes by students are validated at the door: a chapter must belong to the student's own syllabus, `minutes` is 1–720, a study log cannot be dated in the future, and a confidence rating's timestamp is set by the server (the feature store takes the *latest* rating, so a client-set `ts` could pin one for ever).
 
 ---
 
 ## 8 · Content and ingestion
 
-There are two ingestion problems. One is built; one is only designed.
+There are two ingestion problems. Both are built, at different depths: public papers go through the factory (§8.1), an institute's own results through an upload (§8.2).
 
 ### 8.1 · The question factory — official paper to tagged, checked questions ✅
 
@@ -372,9 +391,9 @@ Limits to state plainly:
 - **All 32 disagreements are unreviewed** (`confirmed_at` empty everywhere). The agent notes are labelled *not a human review*.
 - **The console has no maths renderer** (no KaTeX): real questions show raw LaTeX.
 
-### 8.2 · Mock-file ingestion — designed, **not built** ❌
+### 8.2 · Mock-file ingestion — built for CSV ✅ (xlsx not yet)
 
-The pipeline below is the intended path from an institute's mock-test export to insight. **No code parses xlsx/csv, applies a column mapping, resolves students or emits attempts.** Only the `IngestBatch` / `ColumnMappingProfile` tables and their admin exist. Today all attempts arrive via `seed_demo` / `seed_questions`.
+The pipeline below is the path from an institute's mock-test export to insight. Steps 1–7 and 9 are built; step 8 (the reasoning call) runs when a mentor opens a diagnosis.
 
 ```mermaid
 graph TD
@@ -396,7 +415,20 @@ graph TD
 
 **Step 5 is the gate.** An unmapped question is a number with no meaning. Mapping is a one-time cost per paper that pays out on every future student who sits it — so it is stored permanently with human confirmation, **never inferred at runtime**. The factory (§8.1) is exactly this idea applied to public papers; `QuestionTopicMapAdmin` already carries the review filters (unmapped / proposed / confirmed / verification) and a confirm action.
 
-Mapping ladder, cheapest first: institute already tags by chapter → paper blueprint → **Gemini proposes, human confirms**.
+Mapping ladder, cheapest first: institute already tags by chapter → paper blueprint → **Gemini proposes, human confirms**. The first two rungs are built.
+
+**What is built** (`ingestion/services/`, `api/ingest_views.py`):
+
+1. `POST /api/papers/` makes the institute's own mock (`source: institute` — not an official paper, not ours), marking defaulting to the exam's scheme.
+2. `POST /api/papers/{id}/blueprint/` sets, once, which chapter each question tests and its right answer. **All or nothing**: one bad row writes nothing and every problem is listed. A key cannot change under recorded answers, because their stored correct/wrong and marks were decided by it.
+3. `POST /api/ingest/results/` reads a class's answers against that blueprint, in either layout — a column per question (`roll_no, Q1, Q2 …`) or a row per answer (`roll_no, question_id, answer, time_spent`; the only one that carries per-question time). Three promises:
+   - **A student is ingested completely or not at all.** One bad cell fails that student's whole row; the others go through, and each failure is reported with its row.
+   - **An unmapped or unkeyed question stops the upload.** Dropping a column silently would make every total wrong. The fix is the blueprint, once, for everyone.
+   - **Re-sending is always safe.** The same file is refused (409, by hash); a corrected file that overlaps writes only what is new. A duplicate is not a correction.
+   Blank (chose to skip) and `NR` (ran out of time) are never conflated or guessed — the marks-lost taxonomy rests on the difference. `dry_run` returns the same report and writes nothing.
+4. After a write, features are recomputed and detectors re-run for exactly the students the file touched, best-effort: the attempts are the truth and the nightly rebuild heals the rest.
+
+**Limits, stated plainly.** CSV only: `.xlsx` needs `openpyxl` parsing zip files from strangers, a dependency worth adding on purpose rather than as a side effect, and the API says "Save As → CSV" when handed a workbook. A blueprint carries chapter and key only — **no option text and no misconception tags** — so an institute's own paper yields scores, marks-lost, derived state and flags, but *not* a misconception diagnosis (the diagnosis endpoint answers 422 "options not described" for it). Tagging distractors is the factory's job (§8.1) and a human's. A correct key discovered after results are in has no re-marking step yet.
 
 ---
 
@@ -517,7 +549,15 @@ Open:
 | Low | `GEMINI_MODEL` default is `gemini-2.5-flash` in `settings.py` but `gemini-3.8-flash` in `.env.example`; the code-side fallback never fires | backend |
 | Low | `openapi.yaml` help text is wrong in places: `subject_imbalance` severity quotes `weak_topic`'s 50 marks / 10% (real: gap of 18 / 24 / 30 points); `type` lists `mock_decline`, which nothing emits; `retention` describes a forecast that is always NULL | backend |
 | Low | Code comments cite TECHNICAL_DOC sections (§6.1–6.4, §7.6, §8, §12.5, §14) that belong to the v0.2 numbering and no longer exist; a few cite deleted files | backend |
-| Low | `/api/my/plan/` is student-scoped, so a mentor sees an empty plan; `NotFound` says "three views" (there are five); the nav hard-codes `/students/1` | frontend |
+| Medium | **Student 360's "Day plan" still shows nothing for a mentor.** It calls `/api/my/plan/`, which answers for whoever is signed in. The mentor-side route now exists — `GET /api/students/{id}/plan/` — and the panel (`usePlan`, `DayPlanPanel`) has not been moved onto it | frontend |
+| Low | **A plan tick is a fact stored in a table that is meant to be rebuildable.** `PlanBlock.completed` lives in `derived/`. It is safe today because nothing deletes plan blocks except the planner, and the planner never deletes a ticked one (tested) — but a future `--rebuild` of derived state must not drop `PlanBlock`, or a completion event table is needed | backend |
+| Low | **`RevisionEvent.done_at` is the one event-log field written after insert.** `POST /api/my/revisions/{id}/complete/` sets it once (null → a time) and never moves it; the admin still refuses edits. If the log ever needs to be strictly insert-only, completion becomes its own event row and the six readers of `done_at` change | backend |
+| Medium | **No screen issues a student's login, makes a paper or uploads results.** All three are API-only (`POST /api/students/{id}/account/`, `/api/papers/` + blueprint, `/api/ingest/results/`), so a director cannot yet do them from the console | frontend |
+| Medium | **An institute's own paper cannot be diagnosed.** Its blueprint has no option text and no misconception tags (§8.2), so `diagnosis` answers 422 "options not described". Scores, marks-lost, mastery and flags all work | content |
+| Medium | **Throttle counters are per-process.** Fine for one worker; more than one needs a shared cache, or the limits multiply by the worker count | backend |
+| Low | The sign-in screen's field is labelled "Username"; a student types a roll number (`routes/Login.tsx`, mid-redesign) | frontend |
+| Low | `web/src/api/gaps.ts` still lists `COUNTER_EVIDENCE_UNRESOLVED`, `DISTRACTOR_TALLY_NOT_EXPOSED`, `STUDENT_REF_NOT_EXPOSED` and `QUESTION_PROVENANCE`, and `MOCK_SCORES_ORDER` — the server now sends all of them (§5), and the code that compensates for each can go | frontend |
+| Low | `NotFound` says "three views" (there are five); the nav hard-codes `/students/1` | frontend |
 | Low | `verdict` stamps the latest diagnose trace, not necessarily the one on screen | backend |
 
 ---
@@ -538,9 +578,12 @@ Open:
 ## 14 · Current state
 
 ```
-✅ 25 tables · RLS verified · 190 backend tests pass · 21 frontend tests
+✅ 25 tables · RLS verified · 490 backend tests pass · 36 frontend tests
 ✅ Tier A engine · mock analysis (5 causes) · 8 detectors · 4 hygiene rules
-✅ 28 API paths / 29 operations · OpenAPI in sync · session auth + CSRF
+✅ 54 API paths / 58 operations · OpenAPI in sync · session auth + CSRF + throttles
+✅ Student API (`/api/my/…`) · roll-number sign-in with a forced first-password change · students walled off from the console routes
+✅ Results upload (CSV): paper → blueprint → results, per-student all-or-nothing, idempotent
+✅ Day planner v1 — three explicit rules, each block saying which (`derived/services/planner.py`)
 ✅ React console on the live API · Director console, Student 360, Mock intelligence,
    How it works, Data & trust
 ✅ Tier B: diagnose_misconception live — 4/4 hero students correct, PII-stripped, traced
@@ -550,8 +593,8 @@ Open:
 🟡 ReasoningTrace collecting — 14 diagnose traces, 1 mentor-verdict
 🟡 Real-paper misconception tags are drafts · 32 disagreements unreviewed · no maths rendering
 ⚪ analyse_decline · plan_week · answer_forensics · generate_practice · weekly_summary
-❌ Mock-file ingestion (§8.2) — models only, no parser
-❌ Student-facing app · planner · revision scheduler · knowledge tracing beyond decayed accuracy
+❌ xlsx upload · re-marking after a key correction · diagnosis for an institute's own paper (no option tags)
+❌ Student-facing screens (the API is built) · an LLM `plan_week` (the rules-based planner stands in) · knowledge tracing beyond decayed accuracy
 ❌ Scheduler / background jobs · CI · app container
 ❌ Training pipeline — no trace export, no fine-tune harness
 ```
