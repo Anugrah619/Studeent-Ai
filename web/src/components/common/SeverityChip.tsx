@@ -24,13 +24,13 @@ export function SeverityChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full font-medium whitespace-nowrap",
-        size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs",
+        "inline-flex items-center gap-1.5 rounded-sm font-medium whitespace-nowrap",
+        size === "sm" ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-sm",
         token.chip,
         className,
       )}
     >
-      <Icon aria-hidden className={size === "sm" ? "size-3" : "size-3.5"} />
+      <Icon aria-hidden className={size === "sm" ? "size-3.5" : "size-4"} />
       {label ?? token.label}
     </span>
   );

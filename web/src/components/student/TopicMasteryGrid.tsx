@@ -49,16 +49,22 @@ export function TopicMasteryGrid({ states }: { states: TopicState[] }) {
   const total = SUBJECT_LIST.reduce((acc, s) => acc + grouped[s.key].length, 0);
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div>
-          <h2 className="text-base font-semibold tracking-tight">Topic mastery</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <h2 className="text-lg font-semibold tracking-tight">Topic mastery</h2>
+          <p className="mt-1 max-w-[62ch] text-sm text-muted-foreground">
             Measured mastery per chapter, weakest first. The bar restates the
             number beside it — nothing here is colour-only.
           </p>
         </div>
-        <div role="group" aria-label="Filter chapters" className="flex flex-wrap gap-1.5">
+        {/* A segmented control, not a row of pills: these are four views of one
+            list, and exactly one is always on. */}
+        <div
+          role="group"
+          aria-label="Filter chapters"
+          className="flex flex-wrap rounded-md border border-border bg-card p-0.5"
+        >
           {FILTERS.map((item) => (
             <button
               key={item.key}
@@ -66,10 +72,10 @@ export function TopicMasteryGrid({ states }: { states: TopicState[] }) {
               aria-pressed={filter === item.key}
               onClick={() => setFilter(item.key)}
               className={cn(
-                "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                "rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
                 filter === item.key
-                  ? "border-transparent bg-secondary text-secondary-foreground"
-                  : "border-border text-muted-foreground hover:text-foreground",
+                  ? "bg-foreground text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {item.label}
@@ -84,25 +90,25 @@ export function TopicMasteryGrid({ states }: { states: TopicState[] }) {
           body="No chapter in this student's tree meets the condition."
         />
       ) : (
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3">
           {SUBJECT_LIST.map((subject) => {
             const rows = grouped[subject.key];
             const weak = rows.filter((r) => (r.mastery ?? 1) < MASTERY_FLOOR).length;
             return (
               <div
                 key={subject.key}
-                className="rounded-xl border border-border bg-card"
+                className="rounded-xl border border-border bg-card shadow-xs"
               >
-                <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+                <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
                   <span
                     aria-hidden
-                    className="size-2.5 shrink-0 rounded-[2px]"
+                    className="size-3 shrink-0 rounded-[2px]"
                     style={{ background: subject.color }}
                   />
                   <h3 className="text-sm font-semibold">{subject.label}</h3>
-                  <span className="tnum ml-auto text-[11px] text-muted-foreground">
-                    {weak > 0 ? `${weak} below floor · ` : ""}
-                    {rows.length} shown
+                  <span className="tnum ml-auto flex gap-x-3 text-xs text-muted-foreground">
+                    {weak > 0 ? <span>{weak} below floor</span> : null}
+                    <span>{rows.length} shown</span>
                   </span>
                 </div>
                 <ul className="divide-y divide-border">
@@ -110,7 +116,7 @@ export function TopicMasteryGrid({ states }: { states: TopicState[] }) {
                     <TopicRow key={state.id} state={state} color={subject.color} />
                   ))}
                   {rows.length === 0 ? (
-                    <li className="px-4 py-6 text-center text-xs text-muted-foreground">
+                    <li className="px-5 py-6 text-center text-sm text-muted-foreground">
                       Nothing in {subject.label}
                     </li>
                   ) : null}
@@ -133,14 +139,14 @@ function TopicRow({ state, color }: { state: TopicState; color: string }) {
     Date.now() - Date.parse(state.last_revised) > STALE_DAYS * 86_400_000;
 
   return (
-    <li className="px-4 py-2.5">
+    <li className="px-5 py-3">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
           {state.topic.name}
         </span>
         <span
           className={cn(
-            "tnum text-xs font-semibold",
+            "tnum text-sm font-semibold",
             weak ? "text-status-critical" : "text-foreground",
           )}
         >
@@ -149,26 +155,26 @@ function TopicRow({ state, color }: { state: TopicState; color: string }) {
       </div>
 
       <Meter
-        className="mt-1.5"
+        className="mt-2"
         value={mastery}
         color={weak ? "var(--status-critical)" : color}
         label={`${state.topic.name} mastery ${Math.round(mastery * 100)} percent`}
       />
 
-      <div className="tnum mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+      <div className="tnum mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>
           {num(state.correct_n)}/{num(state.attempts_n)} correct
         </span>
         <span>{num(state.topic.weight, 1)}% of paper</span>
         {stale ? (
           <span className="inline-flex items-center gap-1 text-status-warn">
-            <Clock aria-hidden className="size-2.5" />
+            <Clock aria-hidden className="size-3" />
             Revised {daysAgo(state.last_revised)}
           </span>
         ) : null}
         {mismatch ? (
           <span className="inline-flex items-center gap-1 text-status-warn">
-            <AlertTriangle aria-hidden className="size-2.5" />
+            <AlertTriangle aria-hidden className="size-3" />
             Rates it {num(state.self_rating)}/5
           </span>
         ) : null}

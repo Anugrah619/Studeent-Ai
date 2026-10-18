@@ -147,11 +147,11 @@ export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
     >
       <div ref={ref} className="pt-1">
         <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-end gap-x-3">
-          <div className="text-right text-[11px] font-medium text-muted-foreground">
+          <div className="text-right text-xs font-medium text-muted-foreground">
             ← Share of study time
           </div>
           <div style={{ width: CENTRE_W }} />
-          <div className="text-[11px] font-medium text-muted-foreground">
+          <div className="text-xs font-medium text-muted-foreground">
             Share of marks lost →
           </div>
         </div>
@@ -183,7 +183,7 @@ export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
                     {row.label}
                   </span>
                 </div>
-                <div className="tnum text-[10px] text-muted-foreground">
+                <div className="tnum text-xs text-muted-foreground">
                   {pct(row.accuracy_pct)} accuracy
                 </div>
               </div>
@@ -201,7 +201,7 @@ export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
           ))}
         </ul>
 
-        <div className="mt-3 grid grid-cols-[1fr_auto_1fr] gap-x-3 text-[10px] text-muted-foreground">
+        <div className="mt-3 grid grid-cols-[1fr_auto_1fr] gap-x-3 text-xs text-muted-foreground">
           <div className="tnum text-left">{max}%</div>
           <div style={{ width: CENTRE_W }} className="text-center">0</div>
           <div className="tnum text-right">{max}%</div>
@@ -261,7 +261,7 @@ function Half({
   const label = (
     <span
       data-label-placement={inside ? "inside" : "outside"}
-      className="tnum shrink-0 text-[11px] font-medium"
+      className="tnum shrink-0 text-xs font-medium"
       style={{ color: inside ? ink : "var(--foreground)" }}
     >
       {text}

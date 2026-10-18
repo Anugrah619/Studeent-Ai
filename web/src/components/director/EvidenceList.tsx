@@ -24,10 +24,10 @@ export function EvidenceList({ evidence }: { evidence: unknown }) {
       {entries.map(([key, value]) => (
         <div
           key={key}
-          className="flex items-baseline justify-between gap-2 border-b border-border/60 pb-1"
+          className="flex items-baseline justify-between gap-2 border-b border-border pb-1.5"
         >
-          <dt className="text-[11px] text-muted-foreground">{humanise(key)}</dt>
-          <dd className="tnum text-xs font-medium text-foreground">
+          <dt className="text-xs text-muted-foreground">{humanise(key)}</dt>
+          <dd className="tnum text-sm font-medium text-foreground">
             {typeof value === "number" ? num(value, value % 1 ? 2 : 0) : String(value)}
           </dd>
         </div>

@@ -48,25 +48,25 @@ export function Student360() {
 
   if (student.error) {
     return (
-      <div className="py-6">
+      <div className="py-10">
         <ErrorState error={student.error} onRetry={() => student.refetch()} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 py-6">
+    <div className="space-y-10 py-10">
       <Link
         to="/"
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
       >
-        <ChevronLeft aria-hidden className="size-3.5" />
+        <ChevronLeft aria-hidden className="size-4" />
         Director console
       </Link>
 
       {student.isPending || !student.data ? (
         <div className="space-y-4">
-          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-9 w-64" />
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             {Array.from({ length: 6 }, (_, i) => (
               <Skeleton key={i} className="h-24 rounded-xl" />
@@ -88,7 +88,7 @@ export function Student360() {
         paperPending={scores.isPending || student.isPending}
       />
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-5 xl:grid-cols-2">
         {scores.isPending ? (
           <PanelSkeleton lines={7} />
         ) : scores.data?.length ? (
@@ -106,10 +106,10 @@ export function Student360() {
         )}
       </section>
 
-      <section className="space-y-3">
+      <section className="space-y-4">
         <div>
-          <h2 className="text-base font-semibold tracking-tight">Open flags</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <h2 className="text-lg font-semibold tracking-tight">Open flags</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             Each one shows the evidence that raised it. Nothing fires on a single
             bad day.
           </p>

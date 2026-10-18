@@ -11,7 +11,7 @@ import {
   Lock,
   Minus,
   ShieldCheck,
-  Sparkles,
+  PenLine,
   UserRound,
   X,
 } from "lucide-react";
@@ -86,7 +86,7 @@ export function DataTrust() {
             <li key={q.id}>
               <a
                 href={`#${q.id}`}
-                className="inline-flex rounded-full border border-border bg-card px-2.5 py-1 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="inline-flex rounded-sm border border-border bg-card px-2.5 py-1 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {q.ask}
               </a>
@@ -315,7 +315,7 @@ function Question({
       className="grid scroll-mt-20 gap-5 border-t border-border pt-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-10"
     >
       <div className="min-w-0">
-        <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+        <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
           <Icon aria-hidden className="size-3.5" />
           {ask}
         </p>
@@ -358,7 +358,7 @@ const STATUS: Record<Status, { label: string; icon: typeof Check; tone: string }
   },
   real: {
     label: "Real",
-    icon: Sparkles,
+    icon: PenLine,
     tone: "border-status-good/45 bg-status-good/[0.08] text-foreground",
   },
 };
@@ -501,7 +501,7 @@ function ProvenanceExhibit({
             What in this demo is simulated, our own, being added, or real
           </caption>
           <thead>
-            <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
+            <tr className="border-b border-border text-left text-xs text-muted-foreground">
               <th scope="col" className="pb-2 pr-3 font-medium">
                 What
               </th>
@@ -545,7 +545,7 @@ function StatusChip({ status }: { status: Status }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
         tone,
       )}
     >
@@ -649,7 +649,7 @@ function BookCard({
 function AnswerKeyExhibit() {
   const steps = [
     {
-      icon: Sparkles,
+      icon: PenLine,
       title: "The AI solves it alone",
       body: "Each past-paper question, answered without the key in sight.",
     },
@@ -673,7 +673,7 @@ function AnswerKeyExhibit() {
               {/* Decorative: the list itself carries the order. */}
               <span
                 aria-hidden
-                className="tnum flex size-5 items-center justify-center rounded-full border border-foreground/25 text-[10px] font-semibold"
+                className="tnum flex size-5 items-center justify-center rounded-sm border border-foreground/25 text-xs font-semibold"
               >
                 {i + 1}
               </span>
@@ -839,7 +839,9 @@ function MathsExhibit({
         <div className="space-y-4">
           <div>
             <Eyebrow>Written by the AI</Eyebrow>
-            <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-foreground">
+            {/* In the serif — this panel is where the rule that separates the
+                two voices is stated, so it follows it. */}
+            <p className="mt-2 max-w-prose font-serif text-lg leading-snug font-semibold text-foreground">
               &ldquo;{diagnosis.headline}&rdquo;
             </p>
           </div>
@@ -848,7 +850,7 @@ function MathsExhibit({
             <Eyebrow>Counted by the system</Eyebrow>
             {resolved.length ? (
               <>
-                <p className="tnum mt-1.5 flex flex-wrap items-center gap-1.5 text-sm text-foreground">
+                <p className="tnum mt-2 flex flex-wrap items-center gap-1.5 text-sm text-foreground">
                   {resolved.map((row, i) => (
                     <span key={row.question_id} className="inline-flex items-center gap-1.5">
                       {i > 0 ? (
@@ -856,7 +858,7 @@ function MathsExhibit({
                           +
                         </span>
                       ) : null}
-                      <span className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px]">
+                      <span className="rounded-sm bg-muted px-1.5 py-0.5 font-semibold text-xs">
                         {row.label}
                         <span className="text-muted-foreground"> {num(row.marks_at_stake)}</span>
                       </span>
@@ -891,10 +893,9 @@ function MathsExhibit({
 
           <Link
             to="/how-it-works#step-count"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline underline-offset-4"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground"
           >
             See the full count, step by step
-            <ArrowRight aria-hidden className="size-4" />
           </Link>
         </div>
       )}

@@ -10,9 +10,7 @@ import {
   Hand,
   Lock,
   Minus,
-  Quote,
-  Scale,
-  Sparkles,
+  PenLine,
   UserCheck,
   X,
 } from "lucide-react";
@@ -33,6 +31,7 @@ import {
   useQuestionsFor,
   useStudent,
 } from "@/api/queries";
+import { Bubble } from "@/components/brand/Bubble";
 import {
   ConfidenceMeter,
   EvidenceChip,
@@ -200,7 +199,7 @@ export function HowItWorks() {
           n={3}
           id="step-reason"
           who="The AI"
-          icon={<Sparkles aria-hidden className="size-3.5" />}
+          icon={<PenLine aria-hidden className="size-3.5" />}
           title="The AI reads the pattern"
           promise="The line that matters is what he got right — because that is what narrows a weak chapter down to one fixable trigger."
           lede={
@@ -322,7 +321,7 @@ function Intro({ ctx, pending }: { ctx: Ctx; pending: boolean }) {
 const RAIL = [
   { id: "step-record", verb: "Record", who: "The system", icon: ClipboardList },
   { id: "step-count", verb: "Count", who: "Plain arithmetic", icon: Calculator },
-  { id: "step-reason", verb: "Explain", who: "The AI", icon: Sparkles },
+  { id: "step-reason", verb: "Explain", who: "The AI", icon: PenLine },
   { id: "step-check", verb: "Check", who: "A teacher", icon: UserCheck },
 ] as const;
 
@@ -348,14 +347,14 @@ function StepRail() {
                   : "border-border bg-card",
               )}
             >
-              <span className="tnum flex size-7 shrink-0 items-center justify-center rounded-full border border-foreground/25 text-xs font-semibold text-foreground">
+              <span className="tnum flex size-7 shrink-0 items-center justify-center rounded-sm border border-foreground/25 text-xs font-semibold text-foreground">
                 {i + 1}
               </span>
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-foreground">
                   {step.verb}
                 </span>
-                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
                   <step.icon aria-hidden className="size-3" />
                   {step.who}
                 </span>
@@ -395,10 +394,10 @@ function Step({
     >
       <div className="min-w-0 lg:sticky lg:top-20 lg:self-start">
         <div className="flex items-center gap-2.5">
-          <span className="tnum flex size-7 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">
+          <span className="tnum flex size-7 items-center justify-center rounded-sm bg-foreground text-xs font-semibold text-background">
             {n}
           </span>
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
             {icon}
             {who}
           </span>
@@ -484,31 +483,38 @@ function RecordExhibit({
 
 const STATUS_MARK: Record<
   Attempt["status"],
-  { icon: typeof Check; word: string; cell: string; ink: string }
+  { icon: typeof Check; word: string; cell: string; ink: string; mark: string }
 > = {
+  // A tick in a ring: the way a teacher marks a right answer.
   correct: {
     icon: Check,
     word: "right",
     cell: "border-border bg-background",
     ink: "text-status-good",
+    mark: "border-[1.5px] border-foreground text-status-good",
   },
+  // A cross in a filled disc: the one mark on the sheet that is meant to catch
+  // the eye, because a wrong answer is what this page is about.
   wrong: {
     icon: X,
     word: "wrong",
     cell: "border-status-critical/45 bg-status-critical/[0.07]",
     ink: "text-status-critical",
+    mark: "border-[1.5px] border-status-critical bg-status-critical text-card",
   },
   blank: {
     icon: Minus,
     word: "skipped",
     cell: "border-dashed border-border bg-muted/40",
     ink: "text-muted-foreground",
+    mark: "border-[1.5px] border-dashed border-muted-foreground text-muted-foreground",
   },
   not_reached: {
     icon: Clock,
     word: "not reached",
     cell: "border-dashed border-border bg-muted/40",
     ink: "text-muted-foreground",
+    mark: "border-[1.5px] border-dashed border-muted-foreground text-muted-foreground",
   },
 };
 
@@ -538,15 +544,20 @@ function AnswerSheet({ rows, highlight }: { rows: Attempt[]; highlight?: string 
               key={row.id}
               title={`${row.question_id} · ${row.topic_name} · ${mark.word}${row.time_spent != null ? ` · ${row.time_spent}s` : ""}`}
               className={cn(
-                "flex h-10 flex-col items-center justify-center rounded-md border",
+                "flex h-12 flex-col items-center justify-center gap-1 rounded-md border",
                 mark.cell,
                 ringed && "ring-2 ring-foreground ring-offset-1 ring-offset-card",
               )}
             >
-              <span className="tnum font-mono text-[10px] leading-none text-muted-foreground">
+              <span className="tnum text-xs leading-none font-medium text-muted-foreground">
                 {row.question_id}
               </span>
-              <Icon aria-hidden className={cn("mt-1 size-3.5", mark.ink)} />
+              <span
+                aria-hidden
+                className={cn("grid size-[1.125rem] place-items-center rounded-full", mark.mark)}
+              >
+                <Icon className="size-3" strokeWidth={3} />
+              </span>
               <span className="sr-only">
                 {`${row.topic_name}: ${mark.word}`}
                 {ringed ? " — opened below" : ""}
@@ -595,7 +606,7 @@ function AnswerRecord({ question, who }: { question: QuestionDetail; who: string
     <div>
       <Eyebrow>
         One answer, as the system stores it ·{" "}
-        <span className="font-mono normal-case tracking-normal text-foreground">
+        <span className="font-semibold text-foreground">
           {question.label}
         </span>
       </Eyebrow>
@@ -610,31 +621,27 @@ function AnswerRecord({ question, who }: { question: QuestionDetail; who: string
             <li
               key={option.label}
               className={cn(
-                "flex flex-wrap items-baseline gap-x-2.5 gap-y-1 rounded-md border px-2.5 py-1.5 text-sm",
+                "flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-md px-2.5 py-2 text-sm",
                 option.is_correct
-                  ? "border-status-good/45 bg-status-good/[0.06]"
+                  ? "bg-status-good/[0.08]"
                   : picked
-                    ? "border-status-critical/45 bg-status-critical/[0.06]"
-                    : "border-border",
+                    ? "bg-status-critical/[0.08]"
+                    : undefined,
               )}
             >
-              <span
-                aria-hidden
-                className={cn(
-                  "tnum flex size-5 shrink-0 items-center justify-center self-center rounded border font-mono text-[10px] font-semibold",
-                  picked
-                    ? "border-transparent bg-foreground text-background"
-                    : "border-border bg-muted text-muted-foreground",
-                )}
-              >
-                {option.label}
-              </span>
-              <span className="min-w-0 flex-1 text-foreground">
+              <Bubble
+                letter={option.label}
+                filled={picked}
+                ringed={option.is_correct}
+                size="sm"
+                className="self-center"
+              />
+              <span className="min-w-0 flex-1 font-serif text-base text-foreground">
                 <span className="sr-only">Option {option.label}: </span>
                 {option.text}
               </span>
               {option.is_correct ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold tracking-wide text-status-good uppercase">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-status-good">
                   <Check aria-hidden className="size-3.5" />
                   Correct
                 </span>
@@ -642,7 +649,7 @@ function AnswerRecord({ question, who }: { question: QuestionDetail; who: string
               {picked ? (
                 <span
                   className={cn(
-                    "inline-flex items-center gap-1 text-[11px] font-semibold tracking-wide uppercase",
+                    "inline-flex items-center gap-1 text-xs font-semibold",
                     option.is_correct ? "text-foreground" : "text-status-critical",
                   )}
                 >
@@ -653,7 +660,7 @@ function AnswerRecord({ question, who }: { question: QuestionDetail; who: string
               {option.misconception ? (
                 <span className="basis-full pl-7.5 text-xs text-muted-foreground">
                   Labelled in advance:{" "}
-                  <code className="rounded border border-border bg-muted px-1 py-px font-mono text-[10px] text-foreground">
+                  <code className="rounded-sm bg-muted px-1.5 py-0.5 font-semibold text-xs text-foreground">
                     {option.misconception.code}
                   </code>{" "}
                   {option.misconception.name}
@@ -691,7 +698,7 @@ function RecordField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="tnum font-mono text-sm font-medium text-foreground">{value}</dd>
+      <dd className="tnum text-sm font-medium text-foreground">{value}</dd>
     </div>
   );
 }
@@ -875,7 +882,7 @@ function ChapterLosses({ marksLost }: { marksLost: MarksLost }) {
         ))}
       </ul>
       {rest > 0 ? (
-        <p className="mt-1.5 text-[11px] text-muted-foreground">
+        <p className="mt-1.5 text-xs text-muted-foreground">
           and {plural(rest, "more chapter")}
         </p>
       ) : null}
@@ -911,7 +918,7 @@ function Repeats({
           {repeats.map((entry) => (
             <li key={entry.misconception.code} className="text-xs leading-relaxed">
               <p className="text-foreground">
-                <code className="rounded border border-border bg-muted px-1 py-px font-mono text-[10px]">
+                <code className="rounded-sm bg-muted px-1.5 py-0.5 font-semibold text-xs">
                   {entry.misconception.code}
                 </code>{" "}
                 <span className="font-medium">{entry.misconception.name}</span>
@@ -924,7 +931,7 @@ function Repeats({
                 {entry.questions.map((q) => (
                   <span
                     key={q.questionId}
-                    className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+                    className="rounded-sm bg-muted px-1.5 py-0.5 font-semibold text-xs text-foreground"
                   >
                     {q.label}
                     <span className="text-muted-foreground"> chose {q.chose}</span>
@@ -933,7 +940,7 @@ function Repeats({
               </p>
             </li>
           ))}
-          <li className="text-[11px] leading-relaxed text-muted-foreground">
+          <li className="text-xs leading-relaxed text-muted-foreground">
             Read from the label on the option he chose, one question at a time —
             over the answers the diagnosis cites.
             {unchecked > 0
@@ -1002,29 +1009,36 @@ function ReasonExhibit({
         <ExhibitSkeleton lines={6} />
       ) : (
         <div>
-          <p className="max-w-[48ch] text-lg leading-snug font-semibold tracking-tight text-balance text-foreground sm:text-xl">
+          {/* The AI's words are the serif, here as on the console: the same rule
+              is what lets this page teach how to read that one. */}
+          <p className="max-w-[40ch] font-serif text-2xl leading-[1.15] font-semibold tracking-tight text-balance text-foreground">
             {diagnosis.headline || "No diagnosis text was returned for this paper."}
           </p>
 
           {lead ? (
             <>
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <code className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-foreground">
+              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+                <code className="rounded-sm bg-muted px-2 py-0.5 text-xs font-semibold tracking-wide text-foreground">
                   {lead.misconception_code}
                 </code>
                 <ConfidenceMeter level={lead.confidence} />
               </div>
-              <p className="mt-2 max-w-prose text-sm leading-relaxed text-foreground">
+              <p className="mt-3 max-w-prose font-serif text-base leading-relaxed text-foreground">
                 {lead.claim}
               </p>
 
               {lead.counter_evidence ? (
-                <div className="mt-4 border-l-[3px] border-status-good bg-status-good/[0.07] py-3 pr-3.5 pl-3.5">
-                  <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-foreground uppercase">
-                    <Scale aria-hidden className="size-3.5" />
+                <div className="mt-5 border-l-[3px] border-foreground pl-5">
+                  <p className="flex items-center gap-2.5 text-sm font-semibold text-foreground">
+                    <span
+                      aria-hidden
+                      className="inline-grid size-5 place-items-center rounded-full border-[1.5px] border-foreground"
+                    >
+                      <Check className="size-3" strokeWidth={3} />
+                    </span>
                     Why it&rsquo;s one trigger, not a weak chapter
                   </p>
-                  <p className="mt-1.5 max-w-prose text-[0.9375rem] leading-relaxed text-foreground">
+                  <p className="mt-2 max-w-prose font-serif text-lg leading-relaxed text-foreground">
                     {lead.counter_evidence}
                   </p>
                   {confirmed.length ? (
@@ -1035,9 +1049,9 @@ function ReasonExhibit({
                       {confirmed.map((row) => (
                         <span
                           key={row.id}
-                          className="inline-flex items-center gap-1 rounded border border-border bg-background px-1.5 py-0.5"
+                          className="inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 font-semibold"
                         >
-                          <span className="tnum font-mono text-[11px] text-foreground">
+                          <span className="tnum text-xs text-foreground">
                             {row.question_id}
                           </span>
                           {row.status === "correct" ? (
@@ -1182,14 +1196,13 @@ function CheckExhibit({
             >
               <h3
                 id="explainer-belief"
-                className="text-[11px] font-semibold tracking-[0.06em] text-foreground uppercase"
+                className="text-xs font-semibold text-foreground"
               >
                 What choosing ({spotlight.chosen_label ?? "?"}) on {spotlight.label}{" "}
                 reveals — in {ctx.who}&rsquo;s own words
               </h3>
-              <blockquote className="mt-2 flex gap-2.5">
-                <Quote aria-hidden className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                <p className="max-w-[56ch] text-[0.9375rem] leading-relaxed text-foreground">
+              <blockquote className="mt-2">
+                <p className="relative max-w-[56ch] font-serif text-lg leading-relaxed text-foreground before:absolute before:-left-[0.62em] before:content-['“'] after:content-['”']">
                   {belief.description}
                 </p>
               </blockquote>
@@ -1204,10 +1217,9 @@ function CheckExhibit({
 
           <Link
             to={`/students/${ctx.studentId}`}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline underline-offset-4"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground"
           >
             Agree or disagree on {ctx.who}&rsquo;s page
-            <ArrowRight aria-hidden className="size-4" />
           </Link>
         </div>
       )}
@@ -1315,18 +1327,16 @@ function NextLink({ to, title, body }: { to: string; title: string; body: string
   return (
     <Link
       to={to}
-      className="group flex items-start justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3.5 transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="group flex items-start justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-xs transition-colors outline-none hover:border-foreground/40 hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/35"
     >
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-foreground">{title}</span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+        <span className="block text-sm font-semibold text-foreground underline decoration-transparent underline-offset-4 transition-colors group-hover:decoration-foreground/40">
+          {title}
+        </span>
+        <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">
           {body}
         </span>
       </span>
-      <ArrowRight
-        aria-hidden
-        className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-      />
     </Link>
   );
 }

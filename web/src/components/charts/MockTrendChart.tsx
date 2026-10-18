@@ -138,7 +138,7 @@ export function MockTrendChart({ rows, highlight }: Props) {
                   y={y(tick)}
                   textAnchor="end"
                   dominantBaseline="middle"
-                  className="tnum fill-muted-foreground text-[10px]"
+                  className="tnum fill-muted-foreground text-xs"
                 >
                   {tick}
                 </text>
@@ -151,7 +151,7 @@ export function MockTrendChart({ rows, highlight }: Props) {
                 x={x(i)}
                 y={PAD.top + PLOT_H + 16}
                 textAnchor="middle"
-                className="tnum fill-muted-foreground text-[10px]"
+                className="tnum fill-muted-foreground text-xs"
               >
                 {row.paper_name.replace(/^\D+/, "")}
               </text>
@@ -206,7 +206,7 @@ export function MockTrendChart({ rows, highlight }: Props) {
                 x={x(rows.length - 1) + 10}
                 y={y(last[lead])}
                 dominantBaseline="middle"
-                className="tnum fill-foreground text-[11px] font-semibold"
+                className="tnum fill-foreground text-xs font-semibold"
               >
                 {num(last[lead])}
               </text>
@@ -282,7 +282,7 @@ function TrendTooltip({
       }
     >
       <div className="font-medium text-popover-foreground">{row.paper_name}</div>
-      <div className="mb-1.5 text-[11px] text-muted-foreground">
+      <div className="mb-1.5 text-xs text-muted-foreground">
         {shortDate(row.held_on)}
       </div>
       <dl className="space-y-1">

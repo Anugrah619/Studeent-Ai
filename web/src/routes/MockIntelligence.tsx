@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { useMarksLost, useMockScores, useStudent } from "@/api/queries";
 import { MarksLostBar } from "@/components/charts/MarksLostBar";
 import { ErrorState, PanelSkeleton } from "@/components/common/States";
+import { FigureBand } from "@/components/common/StatTile";
 import { causeSlices, marksLostTotals } from "@/lib/causes";
 import { longDate, num, pct } from "@/lib/format";
 import { SUBJECT_LIST } from "@/lib/subjects";
@@ -56,21 +57,21 @@ export function MockIntelligence() {
   const maxMarks = marksLost.data?.max_marks ?? null;
 
   return (
-    <div className="space-y-6 py-6">
+    <div className="space-y-8 py-10">
       <Link
         to={`/students/${id}`}
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
       >
-        <ChevronLeft aria-hidden className="size-3.5" />
+        <ChevronLeft aria-hidden className="size-4" />
         {student.data?.name ?? "Student"} · 360
       </Link>
 
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight">
             {row?.paper_name ?? "Mock"} · mock intelligence
           </h1>
-          <p className="tnum mt-1 text-sm text-muted-foreground">
+          <p className="tnum mt-2 text-sm text-muted-foreground">
             {student.data?.name ?? "—"}
             {row ? ` · held ${longDate(row.held_on)}` : ""}
             {/* The score is quoted only once the paper's own maximum has
@@ -82,7 +83,7 @@ export function MockIntelligence() {
 
         {/* One filter row, above everything it scopes. */}
         <div>
-          <Label htmlFor="paper-select" className="mb-1.5 block text-xs">
+          <Label htmlFor="paper-select" className="mb-1.5 block text-xs text-muted-foreground">
             Paper
           </Label>
           <Select
@@ -109,19 +110,13 @@ export function MockIntelligence() {
       {error ? <ErrorState error={error} onRetry={() => marksLost.refetch()} /> : null}
 
       {row ? (
-        <section
-          aria-label="Subject scores in this paper"
-          className="grid grid-cols-3 gap-3"
-        >
+        <FigureBand aria-label="Subject scores in this paper" className="grid-cols-3">
           {SUBJECT_LIST.map((subject) => (
-            <div
-              key={subject.key}
-              className="rounded-xl border border-border bg-card px-4 py-3"
-            >
+            <div key={subject.key} className="bg-card px-5 py-4">
               <div className="flex items-center gap-2">
                 <span
                   aria-hidden
-                  className="size-2.5 shrink-0 rounded-[2px]"
+                  className="size-3 shrink-0 rounded-[2px]"
                   style={{ background: subject.color }}
                 />
                 <span className="text-xs font-medium text-muted-foreground">
@@ -133,17 +128,17 @@ export function MockIntelligence() {
                   184, not 300, so thirds of it are not 100 either. The share of
                   the paper's own total is a number we can actually stand
                   behind. */}
-              <div className="tnum mt-1.5 text-2xl leading-none font-semibold">
+              <div className="tnum mt-2 text-2xl leading-none font-semibold">
                 {num(row[subject.key])}
                 {row.total > 0 ? (
-                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
                     {pct((row[subject.key] / row.total) * 100)} of the paper
                   </span>
                 ) : null}
               </div>
             </div>
           ))}
-        </section>
+        </FigureBand>
       ) : null}
 
       {marksLost.isPending || !marksLost.data || !totals ? (
@@ -159,12 +154,12 @@ export function MockIntelligence() {
               "61 of your 166 marks" quietly asserts that the other 105 were
               also understood, which is the thing it was just changed to stop
               doing. */}
-          <section className="rounded-xl border border-border bg-card px-6 py-5">
+          <section className="rounded-xl border border-border bg-card px-7 py-6 shadow-xs">
             <p className="text-xs font-medium text-muted-foreground">
               Recoverable without learning anything new
             </p>
             <p className="mt-2 flex flex-wrap items-baseline gap-2">
-              <span className="text-[56px] leading-none font-semibold tracking-tight text-foreground">
+              <span className="text-5xl leading-none font-semibold tracking-tight text-foreground">
                 {num(marksLost.data.recoverable)}
               </span>
               <span className="text-lg text-muted-foreground">
@@ -212,19 +207,19 @@ export function MockIntelligence() {
             scored={marksLost.data.score ?? row?.total}
           />
 
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {causeSlices(marksLost.data).map((slice) => (
               <article
                 key={slice.key}
-                className="rounded-xl border border-border bg-card p-4"
+                className="rounded-xl border border-border bg-card p-5 shadow-xs"
               >
                 <div className="flex items-center gap-2">
                   <span
                     aria-hidden
-                    className="size-2.5 shrink-0 rounded-[2px]"
+                    className="size-3 shrink-0 rounded-[2px]"
                     style={{ background: slice.color }}
                   />
-                  <h3 className="text-xs font-medium text-muted-foreground">
+                  <h3 className="text-sm font-medium text-foreground">
                     {slice.label}
                   </h3>
                 </div>
@@ -234,14 +229,14 @@ export function MockIntelligence() {
                     {pct(slice.sharePct)}
                   </span>
                 </p>
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   {slice.meaning}.
                 </p>
                 {/* Three outcomes, not two. The unattributed bucket is neither
                     a teaching job nor a drilling job — it is a question the
                     engine has not earned the right to answer yet, and saying
                     so is more useful than filing it under either. */}
-                <p className="mt-2 text-[11px] font-medium">
+                <p className="mt-2 text-xs font-medium">
                   {!slice.attributed ? (
                     <span className="text-muted-foreground">
                       No call made yet

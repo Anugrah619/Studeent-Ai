@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
 import type { Flag } from "@/api/types";
 import {
   useBatches,
@@ -77,20 +76,19 @@ export function DirectorConsole() {
   const error = summary.error ?? openFlags.error ?? students.error;
 
   return (
-    <div className="space-y-6 py-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Director console</h1>
-          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+    <div className="space-y-10 py-10">
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight">Director console</h1>
+          <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-muted-foreground">
             Week of {longDate(new Date().toISOString())}. Every row below is a
             student the system can justify interrupting your week for — with the
             evidence that raised it.{" "}
             <Link
               to="/how-it-works"
-              className="inline-flex items-center gap-0.5 font-medium whitespace-nowrap text-foreground underline-offset-4 hover:underline"
+              className="font-medium whitespace-nowrap text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground"
             >
               How it works
-              <ArrowRight aria-hidden className="size-3.5" />
             </Link>
           </p>
         </div>
@@ -98,7 +96,7 @@ export function DirectorConsole() {
         {/* One filter row, above everything it scopes. */}
         <div className="flex items-end gap-2">
           <div>
-            <Label htmlFor="batch-filter" className="mb-1.5 block text-xs">
+            <Label htmlFor="batch-filter" className="mb-1.5 block text-xs text-muted-foreground">
               Batch
             </Label>
             <Select value={batch} onValueChange={setBatch}>
@@ -126,12 +124,12 @@ export function DirectorConsole() {
         scopeWarning={batchId !== undefined}
       />
 
-      <section className="space-y-3">
+      <section className="space-y-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-semibold tracking-tight">
+          <h2 className="text-lg font-semibold tracking-tight">
             Students who need you this week
           </h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {rows.length} open {rows.length === 1 ? "flag" : "flags"}
             {batchId !== undefined ? " in this batch" : " across the institute"}
           </p>
@@ -146,12 +144,12 @@ export function DirectorConsole() {
         )}
       </section>
 
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-semibold tracking-tight">
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">
             Recently closed
           </h2>
-          <p className="max-w-xl text-xs text-muted-foreground">
+          <p className="mt-1 max-w-[62ch] text-sm text-muted-foreground">
             Flags a mentor acted on, and what happened next. This is the number
             to hold us to at the end of a pilot.
           </p>

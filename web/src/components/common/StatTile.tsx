@@ -1,6 +1,37 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+
+/**
+ * A band of figures: one sheet, its cells divided by the rule showing through a
+ * one-pixel gap.
+ *
+ * It replaces a grid of identical bordered tiles. Six boxes of equal weight say
+ * "six things to look at"; one band says "here is the week" and lets a single
+ * figure lead. Painting the container in the rule colour and the cells in the
+ * sheet colour means the dividers follow the layout at every breakpoint — no
+ * per-cell border logic, and no stray rule when a row wraps.
+ *
+ * Callers must give it a cell count that fills every row at each breakpoint
+ * they choose, or the empty remainder shows the rule colour as a grey block.
+ */
+export function FigureBand({
+  children,
+  className,
+  ...rest
+}: ComponentProps<"div">) {
+  return (
+    <div
+      {...rest}
+      className={cn(
+        "grid gap-px overflow-hidden rounded-xl border border-border bg-border shadow-xs",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
 interface StatTileProps {
   label: string;
@@ -15,8 +46,9 @@ interface StatTileProps {
 }
 
 /**
- * Stat tile. Proportional figures on the value — `tabular-nums` makes a number
- * like 121 look loose at display size; it is reserved for columns.
+ * One cell of a `FigureBand`. Proportional figures on the value — `tabular-nums`
+ * makes a number like 121 look loose at display size; it is reserved for
+ * columns.
  */
 export function StatTile({
   label,
@@ -30,10 +62,7 @@ export function StatTile({
 }: StatTileProps) {
   return (
     <div
-      className={cn(
-        "flex min-w-0 flex-col justify-between rounded-xl border border-border bg-card p-4",
-        className,
-      )}
+      className={cn("flex min-w-0 flex-col justify-between bg-card px-5 py-4", className)}
       title={hint}
     >
       <div className="flex items-start justify-between gap-2">
@@ -42,16 +71,16 @@ export function StatTile({
       </div>
 
       {loading ? (
-        <Skeleton className="mt-3 h-8 w-20" />
+        <Skeleton className="mt-3 h-9 w-24" />
       ) : (
         <div className="mt-2 flex items-baseline gap-2">
-          <span className="text-[28px] leading-none font-semibold tracking-tight text-foreground">
+          <span className="text-3xl leading-none font-semibold tracking-tight text-foreground">
             {value}
           </span>
           {delta ? (
             <span
               className={cn(
-                "text-xs font-medium",
+                "text-sm font-medium",
                 delta.tone === "good"
                   ? "text-status-good"
                   : delta.tone === "bad"
@@ -66,7 +95,7 @@ export function StatTile({
       )}
 
       {(caption || delta?.caption) && !loading ? (
-        <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+        <p className="mt-2 text-xs leading-snug text-muted-foreground">
           {caption ?? delta?.caption}
         </p>
       ) : null}
@@ -74,7 +103,10 @@ export function StatTile({
   );
 }
 
-/** Meter: fill carries severity, track is a lighter step of the same ramp. */
+/**
+ * Meter: fill carries severity, track is a lighter step of the same ramp. Square
+ * ended — a bar is a measurement, and round is reserved for answers.
+ */
 export function Meter({
   value,
   max = 1,
@@ -96,11 +128,11 @@ export function Meter({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label={label}
-      className={cn("h-1.5 w-full overflow-hidden rounded-full", className)}
+      className={cn("h-2 w-full overflow-hidden rounded-[2px]", className)}
       style={{ background: `color-mix(in oklab, ${color} 18%, transparent)` }}
     >
       <div
-        className="h-full rounded-full"
+        className="h-full rounded-[2px]"
         style={{ width: `${share * 100}%`, background: color }}
       />
     </div>

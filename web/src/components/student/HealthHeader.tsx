@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
 import type { MockScore, StudentDetail } from "@/api/types";
-import { StatTile } from "@/components/common/StatTile";
+import { FigureBand, StatTile } from "@/components/common/StatTile";
 import { RiskChip } from "@/components/common/SeverityChip";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { Button } from "@/components/ui/button";
@@ -21,37 +20,43 @@ export function HealthHeader({
   const trend = state.mock_trend ?? 0;
 
   return (
-    <header className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <header className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-semibold tracking-tight">{student.name}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">{student.name}</h1>
             <RiskChip score={state.risk_score} size="md" />
             {student.exited_at ? (
-              <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+              <span className="rounded-sm border border-border px-2 py-0.5 text-xs text-muted-foreground">
                 Exited {longDate(student.exited_at)}
               </span>
             ) : null}
           </div>
-          <p className="tnum mt-1 text-sm text-muted-foreground">
-            {student.roll_no} · {student.batch.name} · {student.batch.exam_code}{" "}
-            {student.batch.year}
-            {student.target ? ` · Target ${student.target}` : ""} · Mentor{" "}
-            {student.mentor.name}
-          </p>
+          {/* Pairs, not a run of middle dots: each fact has a name, and the
+              name is quiet enough that the value is what the eye lands on. */}
+          <dl className="tnum mt-3 flex flex-wrap gap-x-8 gap-y-1.5 text-sm">
+            <Fact label="Roll" value={student.roll_no} />
+            <Fact label="Batch" value={student.batch.name} />
+            <Fact
+              label="Exam"
+              value={`${student.batch.exam_code} ${student.batch.year}`}
+            />
+            {student.target ? <Fact label="Target" value={student.target} /> : null}
+            <Fact label="Mentor" value={student.mentor.name} />
+          </dl>
         </div>
 
         {latest ? (
           <Button variant="outline" asChild>
             <Link to={`/students/${student.id}/mock/${latest.paper_id}`}>
               Open {latest.paper_name}
-              <ArrowRight aria-hidden className="size-4" />
             </Link>
           </Button>
         ) : null}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      {/* Six cells fill a row at 6, 3 and 2 columns alike. */}
+      <FigureBand className="grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         {/* No "of 300". `StudentState.mock_avg` averages across papers whose
             maxima differ — the seeded series runs seven papers out of 300 and
             one out of 184 — so there is no single denominator to quote, and
@@ -92,7 +97,7 @@ export function HealthHeader({
         <StatTile
           label="Risk score"
           value={num(state.risk_score, 2)}
-          caption={`${band.label} · 0–1 scale · recomputed nightly`}
+          caption={`${band.label}, on a 0–1 scale, recomputed nightly`}
         />
         <StatTile
           label="Study consistency"
@@ -113,7 +118,16 @@ export function HealthHeader({
               : undefined
           }
         />
-      </div>
+      </FigureBand>
     </header>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="font-medium text-foreground">{value}</dd>
+    </div>
   );
 }

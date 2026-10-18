@@ -482,6 +482,20 @@ test("an evidence chip opens the question, and marks the pick and the answer dif
   // greyscale and every colour-vision deficiency.
   assert.ok(panel.includes("Correct answer") && panel.includes("chose this"));
 
+  // …and the same two facts are drawn as two different shapes, the way an OMR
+  // sheet draws them: the pick is a filled bubble, the right answer a circled
+  // one. Booleans only — see the note below on asserting with DOM nodes.
+  const optionEl = (needle: string) =>
+    Array.from(dialog().querySelectorAll("ol li")).find((li) =>
+      li.textContent?.includes(needle),
+    )!;
+  const pickEl = optionEl("m-nitrotoluene");
+  const answerEl = optionEl("o- and p-nitrotoluene");
+  assert.ok(pickEl.querySelector("[data-filled]") !== null, "his pick is a filled bubble");
+  assert.ok(pickEl.querySelector("[data-ringed]") === null, "and is not circled");
+  assert.ok(answerEl.querySelector("[data-ringed]") !== null, "the answer is circled");
+  assert.ok(answerEl.querySelector("[data-filled]") === null, "and was not picked");
+
   // 3 — the belief, in his own voice. The reason the panel is worth opening.
   assert.ok(
     panel.includes("in Aarav's own words"),

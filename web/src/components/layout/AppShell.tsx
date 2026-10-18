@@ -1,7 +1,8 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Database, GraduationCap, Wifi } from "lucide-react";
+import { Database, Wifi } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { StudentSwitcher } from "./StudentSwitcher";
+import { BrandMark } from "@/components/brand/BrandMark";
 import { USE_MOCKS } from "@/api/env";
 import { useMe } from "@/api/session";
 import { cn } from "@/lib/utils";
@@ -18,20 +19,47 @@ const NAV = [
 
 function navClass({ isActive }: { isActive: boolean }) {
   return cn(
-    "shrink-0 rounded-md px-2.5 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
-    isActive
-      ? "bg-secondary text-secondary-foreground"
-      : "text-muted-foreground hover:text-foreground",
+    "inline-flex shrink-0 items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium whitespace-nowrap transition-colors",
+    isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground",
   );
 }
 
 /**
- * The masthead names the institute the signed-in account actually belongs to.
+ * The page you are on is the filled bubble — the option that was picked — and
+ * the others wait as empty space where a bubble would be, so the row never
+ * shifts as you move. Colour and the bubble say it together; neither is the
+ * only cue.
+ */
+function NavItem({ item }: { item: (typeof NAV)[number] }) {
+  return (
+    <NavLink to={item.to} end={item.end} className={navClass}>
+      {({ isActive }) => (
+        <>
+          <span
+            aria-hidden
+            className={cn(
+              "size-2 rounded-full transition-colors",
+              isActive ? "bg-foreground" : "bg-transparent",
+            )}
+          />
+          {item.label}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+/**
+ * The masthead is the institute's letterhead: the name of the institute the
+ * signed-in account actually belongs to, in the serif a printed result sheet
+ * would use, with the product and the place beneath it.
  *
  * It used to be hardcoded, because there was no endpoint to ask. `/api/me/` is
  * in the contract now and carries `institute`, so the console stops asserting
  * "Aarambh Classes" at whoever is logged in and reads it instead — with the
- * static pair as the pre-login placeholder, not as the answer.
+ * static pair as the pre-login placeholder, not as the answer. (The exam it
+ * used to name beside the city was hardcoded too, and would have been wrong the
+ * day a NEET batch appeared; the shell no longer claims one.)
  */
 export function AppShell() {
   const me = useMe();
@@ -46,57 +74,57 @@ export function AppShell() {
         Skip to content
       </a>
 
-      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-4 px-4 sm:px-6">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-7 items-center justify-center rounded-md bg-foreground text-background">
-              <GraduationCap aria-hidden className="size-4" />
-            </span>
-            <div className="leading-tight">
-              <div className="text-sm font-semibold tracking-tight">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-[1360px] items-center gap-5 px-5 sm:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <BrandMark className="text-foreground" />
+            <div className="min-w-0 leading-tight">
+              <div className="truncate font-serif text-lg font-semibold tracking-tight">
                 {institute?.name ?? "Aarambh Classes"}
               </div>
-              <div className="text-[11px] text-muted-foreground">
-                {institute?.city ?? "Kota"} · JEE 2027 &amp; 2028
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Student AI</span>
+                <span aria-hidden className="h-3 w-px bg-border" />
+                <span>{institute?.city ?? "Kota"}</span>
               </div>
             </div>
           </div>
 
           <nav aria-label="Primary" className="ml-4 hidden items-center gap-1 xl:flex">
             {NAV.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
-                {item.label}
-              </NavLink>
+              <NavItem key={item.to} item={item} />
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <FixtureBadge />
-            <StudentSwitcher />
+            {/* A 184px select does not fit a phone's masthead beside the
+                letterhead; every student is one tap from the triage table. */}
+            <div className="hidden md:block">
+              <StudentSwitcher />
+            </div>
             <ThemeToggle />
           </div>
         </div>
       </header>
 
       {/* Below `xl` four inline links, the fixture badge and the student
-          switcher do not fit one 56px bar — at tablet width the masthead
-          pushed the page sideways. Below `md` the nav used to simply vanish,
-          so on a phone nothing but the console was reachable. A scrolling row
-          under the masthead fixes both, without a menu to open first. */}
+          switcher do not fit one bar — at tablet width the masthead pushed the
+          page sideways. Below `md` the nav used to simply vanish, so on a phone
+          nothing but the console was reachable. A scrolling row under the
+          masthead fixes both, without a menu to open first. */}
       <nav
         aria-label="Primary"
-        className="sticky top-14 z-20 border-b border-border bg-background/85 backdrop-blur xl:hidden"
+        className="sticky top-16 z-20 border-b border-border bg-background/90 backdrop-blur xl:hidden"
       >
-        <div className="mx-auto flex max-w-[1440px] gap-1 overflow-x-auto px-4 py-1.5">
+        <div className="mx-auto flex max-w-[1360px] gap-1 overflow-x-auto px-5 py-1.5 sm:px-8">
           {NAV.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
-              {item.label}
-            </NavLink>
+            <NavItem key={item.to} item={item} />
           ))}
         </div>
       </nav>
 
-      <main id="main" className="mx-auto max-w-[1440px] px-4 pb-16 sm:px-6">
+      <main id="main" className="mx-auto max-w-[1360px] px-5 pb-24 sm:px-8">
         <Outlet />
       </main>
     </div>
@@ -111,16 +139,17 @@ export function AppShell() {
  * answer. But the badge used to say "Demo dataset · 14 of 312 students seeded"
  * *unconditionally* — including against a live Django server serving 46 real
  * students, where it is simply false, and false in the one direction that
- * makes a real answer look staged.
+ * makes a real answer look staged. The detail lives in the tooltip now; the
+ * badge itself is two words, so it fits the bar at every width it is shown.
  */
 function FixtureBadge() {
   if (!USE_MOCKS) {
     return (
       <span
-        className="hidden items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground lg:inline-flex"
+        className="hidden items-center gap-1.5 rounded-sm border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground lg:inline-flex"
         title="Every figure on screen came from the API, including the diagnosis."
       >
-        <Wifi aria-hidden className="size-3" />
+        <Wifi aria-hidden className="size-3.5" />
         Live API
       </span>
     );
@@ -128,11 +157,11 @@ function FixtureBadge() {
 
   return (
     <span
-      className="hidden items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground lg:inline-flex"
+      className="hidden items-center gap-1.5 rounded-sm border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground lg:inline-flex"
       title="Served by Mock Service Worker from schema-derived fixtures. 14 of the institute's 312 students are seeded."
     >
-      <Database aria-hidden className="size-3" />
-      Demo dataset · 14 of 312 students seeded
+      <Database aria-hidden className="size-3.5" />
+      Demo data
     </span>
   );
 }

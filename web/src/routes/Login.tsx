@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { GraduationCap, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import { USE_MOCKS } from "@/api/env";
+import { BrandMark } from "@/components/brand/BrandMark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,28 +33,28 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-background px-4 py-10">
+    <div className="flex min-h-dvh items-center justify-center bg-background px-5 py-12">
       <div className="w-full max-w-sm">
-        <div className="mb-7 flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-md bg-foreground text-background">
-            <GraduationCap aria-hidden className="size-4.5" />
-          </span>
+        <div className="mb-10 flex items-center gap-3.5">
+          <BrandMark className="size-10 text-foreground" />
           <div className="leading-tight">
-            <div className="text-sm font-semibold tracking-tight">Student AI</div>
-            <div className="text-[11px] text-muted-foreground">
+            <div className="font-serif text-2xl font-semibold tracking-tight">
+              Student AI
+            </div>
+            <div className="text-sm text-muted-foreground">
               Mentor &amp; director console
             </div>
           </div>
         </div>
 
-        <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+        <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Your institute is read from your account. You will only ever see your
           own students.
         </p>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
-          <div className="space-y-1.5">
+        <form onSubmit={onSubmit} className="mt-7 space-y-5" noValidate>
+          <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
             <Input
               id="username"
@@ -68,7 +69,7 @@ export function Login() {
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"
@@ -87,14 +88,14 @@ export function Login() {
             {loginError ? (
               <p
                 role="alert"
-                className="rounded-md border border-status-critical/30 bg-status-critical/5 px-3 py-2 text-xs text-foreground"
+                className="rounded-md border border-status-critical/30 bg-status-critical/5 px-3.5 py-2.5 text-sm text-foreground"
               >
                 {loginError.message}
               </p>
             ) : null}
           </div>
 
-          <Button type="submit" className="w-full" disabled={!canSubmit}>
+          <Button type="submit" size="lg" className="w-full" disabled={!canSubmit}>
             {loginPending ? (
               <>
                 <Loader2 aria-hidden className="size-4 animate-spin" />
@@ -120,16 +121,16 @@ export function Login() {
 function DemoHint() {
   if (!USE_MOCKS && !import.meta.env.DEV) return null;
   return (
-    <div className="mt-6 rounded-lg border border-dashed border-border px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
+    <div className="mt-8 rounded-md border border-dashed border-border px-4 py-3.5 text-sm leading-relaxed text-muted-foreground">
       <p className="font-medium text-foreground">Seeded demo accounts</p>
-      <p className="mt-1">
+      <p className="mt-1.5">
         Mentors at Aarambh Classes:{" "}
         <code className="font-mono">aarambh.bhatia</code>,{" "}
         <code className="font-mono">aarambh.nagarajan</code>,{" "}
-        <code className="font-mono">aarambh.kulkarni</code> · password{" "}
+        <code className="font-mono">aarambh.kulkarni</code>. The password is{" "}
         <code className="font-mono">demo12345</code>.
       </p>
-      <p className="mt-1.5">
+      <p className="mt-2">
         <code className="font-mono">pinnacle.rao</code> belongs to the second
         institute — sign in as them to watch tenant isolation empty the console.
       </p>

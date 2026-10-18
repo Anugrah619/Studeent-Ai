@@ -65,7 +65,7 @@ export function InterveneDialog({
         <DialogHeader>
           <div className="flex items-center gap-2">
             <SeverityChip severity={flag.severity} />
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {detectorLabel(flag.type)} · rule {flag.rule_version ?? "—"}
             </span>
           </div>
@@ -104,13 +104,13 @@ export function InterveneDialog({
                   key={quick}
                   type="button"
                   onClick={() => setAction(quick)}
-                  className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="rounded-sm border border-border px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   {quick}
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
+            <p className="mt-2 text-xs text-muted-foreground">
               Logged against {student.data?.mentor.name ?? flag.mentor_name}. This
               closes the flag and starts the recovery clock.
             </p>

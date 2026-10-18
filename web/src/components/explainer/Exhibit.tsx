@@ -28,7 +28,7 @@ export function SourceTag({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
+        "inline-flex shrink-0 items-center gap-1.5 rounded-sm border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground",
         className,
       )}
       title={detail}
@@ -71,7 +71,7 @@ export function Exhibit({
       <figcaption className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-border bg-muted/40 px-4 py-2.5">
         <span
           id={labelledBy}
-          className="min-w-0 text-[11px] font-semibold tracking-[0.06em] text-foreground uppercase"
+          className="min-w-0 text-xs font-semibold text-foreground"
         >
           {title}
         </span>
@@ -117,7 +117,7 @@ export function ExhibitNote({
       <div className="min-w-0">
         <p>{children}</p>
         {detail ? (
-          <p className="mt-1.5 font-mono text-[11px] break-words text-muted-foreground/80">
+          <p className="mt-1.5 font-mono text-xs break-words text-muted-foreground/80">
             {detail}
           </p>
         ) : null}
@@ -126,7 +126,7 @@ export function ExhibitNote({
   );
 }
 
-/** Small uppercase label over a group inside an exhibit. */
+/** Small label over a group inside an exhibit. */
 export function Eyebrow({
   children,
   className,
@@ -140,7 +140,7 @@ export function Eyebrow({
     <p
       id={id}
       className={cn(
-        "text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase",
+        "text-xs font-semibold text-muted-foreground",
         className,
       )}
     >
@@ -164,7 +164,7 @@ export function Figure({
 }) {
   return (
     <div className="min-w-0 rounded-lg border border-border bg-background/60 px-3 py-2.5">
-      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="mt-1">
         <span className="text-2xl leading-none font-semibold tracking-tight text-foreground">
           {value}
@@ -173,7 +173,7 @@ export function Figure({
           <span className="ml-1.5 text-xs text-muted-foreground">{of}</span>
         ) : null}
         {caption ? (
-          <span className="mt-1 block text-[11px] leading-snug text-muted-foreground">
+          <span className="mt-1 block text-xs leading-snug text-muted-foreground">
             {caption}
           </span>
         ) : null}

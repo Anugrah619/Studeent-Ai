@@ -23,31 +23,34 @@ export function StudentFlagsPanel({
   }
 
   return (
-    <ul className="grid gap-3 md:grid-cols-2">
+    <ul className="grid gap-4 md:grid-cols-2">
       {flags.map((flag) => (
         <li
           key={flag.id}
-          className="flex flex-col rounded-xl border border-border bg-card p-4"
+          className="flex flex-col rounded-xl border border-border bg-card p-5 shadow-xs"
         >
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <SeverityChip severity={flag.severity} />
-            <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+            <span className="text-sm text-muted-foreground">
               {detectorLabel(flag.type)}
             </span>
-            <span className="ml-auto text-[11px] text-muted-foreground">
+            <span className="ml-auto text-xs text-muted-foreground">
               {daysAgo(flag.raised_at)}
             </span>
           </div>
 
-          <p className="mt-2 text-sm leading-snug text-foreground">{flag.headline}</p>
+          <p className="mt-3 text-sm leading-snug font-medium text-foreground">
+            {flag.headline}
+          </p>
 
-          <div className="mt-3 flex-1">
+          <div className="mt-4 flex-1">
             <EvidenceList evidence={flag.evidence} />
           </div>
 
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <span className="truncate text-[11px] text-muted-foreground">
-              {flag.topic_name} · {flag.mentor_name}
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <span className="flex min-w-0 flex-wrap gap-x-3 text-xs text-muted-foreground">
+              <span className="truncate">{flag.topic_name}</span>
+              <span className="truncate">{flag.mentor_name}</span>
             </span>
             <Button size="sm" variant="outline" onClick={() => onIntervene(flag)}>
               Log intervention

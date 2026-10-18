@@ -15,6 +15,10 @@ const OUTCOME: Record<Outcome, { label: string; severity: "improving" | "critica
 /**
  * A console that only raises flags is a complaints box. This is the half that
  * renews a contract: what was done, and whether it worked.
+ *
+ * Same ledger as the triage table above it — name, the sentence, the verdict —
+ * on a grid, so the three columns line up from one row to the next instead of
+ * wrapping wherever the text happens to fall.
  */
 export function ClosedLoopPanel({ flags }: { flags: Flag[] }) {
   if (!flags.length) {
@@ -27,30 +31,32 @@ export function ClosedLoopPanel({ flags }: { flags: Flag[] }) {
   }
 
   return (
-    <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+    <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-xs">
       {flags.map((flag) => {
         const outcome = flag.outcome && flag.outcome in OUTCOME
           ? OUTCOME[flag.outcome as Outcome]
           : OUTCOME.unknown;
         return (
-          <li key={flag.id} className="flex flex-wrap items-start gap-x-4 gap-y-2 px-5 py-3">
-            <div className="min-w-[160px] flex-1">
+          <li
+            key={flag.id}
+            className="grid items-start gap-x-8 gap-y-2 px-6 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_15rem]"
+          >
+            <div className="min-w-0">
               <Link
                 to={`/students/${flag.student_id}`}
-                className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                className="text-sm font-semibold text-foreground underline-offset-4 hover:underline"
               >
                 {flag.student_name}
               </Link>
-              <div className="text-[11px] text-muted-foreground">
-                {flag.batch_name} · {detectorLabel(flag.type)}
+              <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                <span>{flag.batch_name}</span>
+                <span>{detectorLabel(flag.type)}</span>
               </div>
             </div>
-            <p className="min-w-[200px] flex-[2] text-xs leading-snug text-muted-foreground">
-              {flag.headline}
-            </p>
-            <div className="flex shrink-0 items-center gap-3">
+            <p className="text-sm leading-snug text-muted-foreground">{flag.headline}</p>
+            <div className="flex shrink-0 items-center gap-4 md:justify-end">
               <SeverityChip severity={outcome.severity} label={outcome.label} />
-              <span className="w-20 text-right text-[11px] text-muted-foreground">
+              <span className="w-16 text-right text-xs text-muted-foreground">
                 {daysAgo(flag.resolved_at)}
               </span>
             </div>

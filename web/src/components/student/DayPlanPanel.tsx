@@ -1,4 +1,4 @@
-import { Check, Smartphone } from "lucide-react";
+import { Check } from "lucide-react";
 import type { PlanBlock } from "@/api/types";
 import { duration, hhmm } from "@/lib/format";
 import { resolveSubject } from "@/lib/subjects";
@@ -12,7 +12,7 @@ const MODE_LABEL: Record<string, string> = {
 
 /**
  * What the student's own app shows today. A plan a student cannot interrogate
- * is a plan he stops following, so every block carries its reason.
+ * is a plan they stop following, so every block carries its reason.
  *
  * `/api/my/plan/` is scoped to the signed-in student, not to a student id — so
  * a mentor signed in against the live API gets an empty list here rather than
@@ -24,14 +24,16 @@ export function DayPlanPanel({ blocks }: { blocks: PlanBlock[] }) {
   const done = blocks.filter((b) => b.completed).length;
 
   return (
-    <section className="rounded-xl border border-border bg-card">
-      <header className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
-        <Smartphone aria-hidden className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold tracking-tight">
+    <section className="rounded-xl border border-border bg-card shadow-xs">
+      <header className="flex flex-wrap items-baseline gap-x-6 gap-y-1 border-b border-border px-6 py-4">
+        <h2 className="text-base font-semibold tracking-tight">
           Today&rsquo;s plan, as the student sees it
         </h2>
-        <span className="tnum ml-auto text-[11px] text-muted-foreground">
-          {done} of {blocks.length} done · {duration(total)} scheduled
+        <span className="tnum ml-auto flex gap-x-4 text-sm text-muted-foreground">
+          <span>
+            {done} of {blocks.length} done
+          </span>
+          <span>{duration(total)} scheduled</span>
         </span>
       </header>
 
@@ -39,19 +41,19 @@ export function DayPlanPanel({ blocks }: { blocks: PlanBlock[] }) {
         {blocks.map((block) => {
           const subject = resolveSubject(block.subject);
           return (
-            <li key={block.id} className="flex gap-3 px-5 py-3">
-              <div className="tnum w-12 shrink-0 pt-0.5 text-xs text-muted-foreground">
+            <li key={block.id} className="flex gap-4 px-6 py-4">
+              <div className="tnum w-14 shrink-0 pt-0.5 text-sm text-muted-foreground">
                 {hhmm(block.start_time)}
               </div>
 
               <span
                 aria-hidden
-                className="mt-1.5 h-[calc(100%-6px)] w-1 shrink-0 rounded-full"
+                className="mt-1.5 h-[calc(100%-6px)] w-1 shrink-0 rounded-[1px]"
                 style={{ background: subject.color }}
               />
 
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span
                     className={cn(
                       "text-sm font-medium",
@@ -62,21 +64,21 @@ export function DayPlanPanel({ blocks }: { blocks: PlanBlock[] }) {
                   >
                     {block.topic_name}
                   </span>
-                  <span className="rounded-full border border-border px-1.5 py-px text-[10px] text-muted-foreground">
+                  <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                     {MODE_LABEL[block.mode] ?? block.mode}
                   </span>
-                  <span className="tnum text-[11px] text-muted-foreground">
+                  <span className="tnum text-xs text-muted-foreground">
                     {duration(block.minutes)}
                   </span>
                   {block.completed ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-status-good">
-                      <Check aria-hidden className="size-3" />
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-status-good">
+                      <Check aria-hidden className="size-3.5" />
                       Done
                     </span>
                   ) : null}
                 </div>
                 {block.reason_text ? (
-                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                  <p className="mt-1 text-sm leading-snug text-muted-foreground">
                     {block.reason_text}
                   </p>
                 ) : null}

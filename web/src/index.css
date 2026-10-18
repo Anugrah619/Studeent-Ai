@@ -1,13 +1,40 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+/* Self-hosted: the demo runs with no internet, so no font may come from a CDN.
+   Archivo carries a width axis (tables set tighter than prose); Source Serif 4
+   carries an optical-size axis (the browser picks the display cut for headlines
+   and the text cut for a paragraph, from the font-size alone). */
+@import "@fontsource-variable/archivo/wdth.css";
+@import "@fontsource-variable/source-serif-4/opsz.css";
 
 @custom-variant dark (&:is(.dark *));
 
+/* ------------------------------------------------------------------ *
+ * The marking desk
+ *
+ * Paper and ink. The chrome carries no hue at all: blue, orange, green, violet,
+ * red and amber are each already spoken for — by subjects, by causes of lost
+ * marks, by status — so a brand colour would only ever be mistaken for one of
+ * them. What identifies the product is type, shape and layout instead.
+ *
+ *   desk    --background   what the sheets sit on
+ *   sheet   --card         a surface that holds content
+ *   ink     --foreground   text, and the fill of anything primary
+ *   margin  --muted-foreground   notes, captions, the quiet half of a label
+ *   rule    --border       ink at low alpha, never a grey of its own
+ *
+ * Two typefaces, one rule. The system speaks in Archivo: labels, figures,
+ * controls. Language about the subject — a question stem, the belief behind a
+ * wrong option, the AI's claim, the remedy — is set in Source Serif 4, the way a
+ * printed paper is. A reader learns it in one screen: a figure was counted by
+ * code; a sentence in the serif was read or written, and opens to its evidence.
+ * ------------------------------------------------------------------ */
+
 @theme inline {
+    --font-sans: 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-serif: 'Source Serif 4 Variable', ui-serif, Georgia, serif;
     --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,6 +66,9 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+
+    /* Tight corners. Round is reserved for the answer bubble, so a circle on
+       screen always means "an option, or a judgement about one". */
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -46,75 +76,135 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+
+    /* Shadows are ink, not black: a sheet lifts off the desk in the desk's own
+       hue. In the dark theme they are nearly invisible on purpose; the rule does
+       the work there. */
+    --shadow-xs: 0 1px 0 var(--ink-shadow);
+    --shadow-sm: 0 1px 1px var(--ink-shadow);
+    --shadow-md: 0 2px 6px -1px var(--ink-shadow), 0 1px 2px var(--ink-shadow);
+    --shadow-lg: 0 18px 40px -14px var(--ink-shadow), 0 2px 8px var(--ink-shadow);
+}
+
+/* The scale. 13px is the floor for anything a person is meant to read: the old
+   10–11px captions were unreadable from the back of a meeting room, and this
+   product's first audience is a director looking at a projector. */
+@theme {
+    --text-xs: 0.8125rem;            /* 13  captions, table headers */
+    --text-xs--line-height: 1.45;
+    --text-sm: 0.9375rem;            /* 15  interface text */
+    --text-sm--line-height: 1.5;
+    --text-base: 1.0625rem;          /* 17  reading text */
+    --text-base--line-height: 1.6;
+    --text-lg: 1.25rem;              /* 20  section titles */
+    --text-lg--line-height: 1.35;
+    --text-xl: 1.5rem;               /* 24 */
+    --text-xl--line-height: 1.25;
+    --text-2xl: 1.875rem;            /* 30  page titles */
+    --text-2xl--line-height: 1.15;
+    --text-3xl: 2.125rem;            /* 34  the diagnosis headline */
+    --text-3xl--line-height: 1.15;
+    --text-4xl: 2.75rem;             /* 44 */
+    --text-4xl--line-height: 1.05;
+    --text-5xl: 3.5rem;              /* 56  the one figure that leads a view */
+    --text-5xl--line-height: 1;
+
+    /* Two moments of motion, both answering something the reader is waiting on.
+       `ink-rule`: the margin rule of a finished diagnosis draws down the page.
+       `bubble-fill`: the options it cites are filled in, one after another.
+       `bubble-read`: while a live reading is under way, the four bubbles of an
+       answer row are filled in turn — marking in progress. */
+    /* `backwards`, not `both`: the end state is the element's own style, so
+       holding the last keyframe would only keep a composited layer alive after
+       the motion is over. */
+    --animate-ink-rule: ink-rule 560ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    --animate-bubble-fill: bubble-fill 320ms ease-out backwards;
+    --animate-bubble-read: bubble-read 2.4s linear infinite;
+
+    @keyframes ink-rule {
+        from { transform: scaleY(0); }
+    }
+    @keyframes bubble-fill {
+        from { background-color: transparent; color: var(--foreground); }
+    }
+    @keyframes bubble-read {
+        0%, 50%, 100% { background-color: transparent; color: var(--foreground); }
+        12%, 38% { background-color: var(--foreground); color: var(--primary-foreground); }
+    }
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    --radius: 0.375rem;
+
+    --background: oklch(0.955 0.006 250);
+    --foreground: oklch(0.235 0.045 265);
+    --card: oklch(0.993 0.002 250);
+    --card-foreground: oklch(0.235 0.045 265);
+    --popover: oklch(0.993 0.002 250);
+    --popover-foreground: oklch(0.235 0.045 265);
+    --primary: oklch(0.235 0.045 265);
+    --primary-foreground: oklch(0.985 0.004 250);
+    --secondary: oklch(0.925 0.01 252);
+    --secondary-foreground: oklch(0.235 0.045 265);
+    --muted: oklch(0.94 0.008 252);
+    --muted-foreground: oklch(0.48 0.035 258);
+    --accent: oklch(0.925 0.01 252);
+    --accent-foreground: oklch(0.235 0.045 265);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --border: oklch(0.235 0.045 265 / 0.14);
+    --input: oklch(0.235 0.045 265 / 0.55);
+    --ring: oklch(0.235 0.045 265);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar: oklch(0.985 0.004 250);
+    --sidebar-foreground: oklch(0.235 0.045 265);
+    --sidebar-primary: oklch(0.235 0.045 265);
+    --sidebar-primary-foreground: oklch(0.985 0.004 250);
+    --sidebar-accent: oklch(0.925 0.01 252);
+    --sidebar-accent-foreground: oklch(0.235 0.045 265);
+    --sidebar-border: oklch(0.235 0.045 265 / 0.14);
+    --sidebar-ring: oklch(0.235 0.045 265);
+
+    --ink-shadow: oklch(0.235 0.045 265 / 0.1);
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
+    --background: oklch(0.175 0.022 262);
+    --foreground: oklch(0.945 0.008 255);
+    --card: oklch(0.215 0.025 262);
+    --card-foreground: oklch(0.945 0.008 255);
+    --popover: oklch(0.24 0.027 262);
+    --popover-foreground: oklch(0.945 0.008 255);
+    --primary: oklch(0.945 0.008 255);
+    --primary-foreground: oklch(0.2 0.03 262);
+    --secondary: oklch(0.275 0.03 262);
+    --secondary-foreground: oklch(0.945 0.008 255);
+    --muted: oklch(0.25 0.028 262);
+    --muted-foreground: oklch(0.73 0.028 258);
+    --accent: oklch(0.29 0.03 262);
+    --accent-foreground: oklch(0.945 0.008 255);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --border: oklch(0.945 0.008 255 / 0.14);
+    --input: oklch(0.945 0.008 255 / 0.5);
+    --ring: oklch(0.945 0.008 255);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --sidebar: oklch(0.215 0.025 262);
+    --sidebar-foreground: oklch(0.945 0.008 255);
+    --sidebar-primary: oklch(0.945 0.008 255);
+    --sidebar-primary-foreground: oklch(0.2 0.03 262);
+    --sidebar-accent: oklch(0.29 0.03 262);
+    --sidebar-accent-foreground: oklch(0.945 0.008 255);
+    --sidebar-border: oklch(0.945 0.008 255 / 0.14);
+    --sidebar-ring: oklch(0.945 0.008 255);
+
+    --ink-shadow: oklch(0 0 0 / 0.5);
 }
 
 /* ------------------------------------------------------------------ *
@@ -159,10 +249,10 @@
     --status-neutral: oklch(0.556 0 0);
 
     /* Hairline, one step off the surface. Never dashed. */
-    --chart-grid: oklch(0.91 0 0);
-    --chart-axis: oklch(0.83 0 0);
+    --chart-grid: oklch(0.235 0.045 265 / 0.1);
+    --chart-axis: oklch(0.235 0.045 265 / 0.28);
     /* The colour the 2px separator gaps and mark rings are painted in. */
-    --chart-surface: oklch(1 0 0);
+    --chart-surface: oklch(0.993 0.002 250);
 }
 
 .dark {
@@ -189,9 +279,9 @@
     --status-critical: #f07a6c;
     --status-neutral: oklch(0.708 0 0);
 
-    --chart-grid: oklch(1 0 0 / 9%);
-    --chart-axis: oklch(1 0 0 / 18%);
-    --chart-surface: oklch(0.205 0 0);
+    --chart-grid: oklch(0.945 0.008 255 / 0.1);
+    --chart-axis: oklch(0.945 0.008 255 / 0.22);
+    --chart-surface: oklch(0.215 0.025 262);
 }
 
 @theme inline {
@@ -211,13 +301,34 @@
     @apply border-border outline-ring/50;
     }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground text-sm;
     }
   html {
     @apply font-sans antialiased;
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+    }
+  ::selection {
+    background: color-mix(in oklab, var(--foreground) 18%, transparent);
     }
   /* Columns of numbers align; standalone display figures stay proportional. */
   .tnum {
     font-variant-numeric: tabular-nums;
+    }
+  /* The serif is for reading. Hyphenating a 40-character measure only breaks
+     it, and a headline must never split a word. */
+  .font-serif {
+    hyphens: manual;
+    }
+}
+
+/* Motion is welcome when it answers something. It is never required to read the
+   page: with the preference set, the margin rule is simply there and the
+   bubbles are simply filled. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-ink-rule,
+  .animate-bubble-fill,
+  .animate-bubble-read {
+    animation: none;
     }
 }

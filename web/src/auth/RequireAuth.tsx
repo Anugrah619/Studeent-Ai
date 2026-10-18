@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { Loader2, PlugZap } from "lucide-react";
+import { PlugZap } from "lucide-react";
 import { API_BASE } from "@/api/env";
 import { useAuth } from "./AuthProvider";
 import { Login } from "@/routes/Login";
+import { Bubble } from "@/components/brand/Bubble";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -26,11 +27,21 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 function BootScreen() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background">
-      <Loader2
-        aria-label="Loading your session"
+      <div
         role="status"
-        className="size-5 animate-spin text-muted-foreground"
-      />
+        aria-label="Loading your session"
+        className="flex gap-2.5"
+      >
+        {["A", "B", "C", "D"].map((letter, i) => (
+          <Bubble
+            key={letter}
+            letter={letter}
+            size="md"
+            className="animate-bubble-read"
+            style={{ animationDelay: `${i * 300}ms` }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -50,10 +61,10 @@ function Unavailable({
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background px-4">
       <div className="w-full max-w-md text-center">
-        <span className="mx-auto mb-4 flex size-10 items-center justify-center rounded-full border border-border text-muted-foreground">
+        <span className="mx-auto mb-4 flex size-11 items-center justify-center rounded-md border border-border bg-card text-muted-foreground">
           <PlugZap aria-hidden className="size-5" />
         </span>
-        <h1 className="text-lg font-semibold tracking-tight">
+        <h1 className="text-xl font-semibold tracking-tight">
           Cannot reach the API
         </h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
