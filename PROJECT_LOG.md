@@ -1002,3 +1002,12 @@ so each one builds on the last:
 Not committed: `.claude/` (the `LICENSE.txt` question for the design skill is
 still open, and the repo is public). Nothing pushed — the other laptop needs a
 push to see any of this.
+
+### 2026-10-18 — pushed to main
+
+Asked to push to the main branch. Fetched first: `origin/main` was still at
+`149ff5e`, so the three commits went up as a plain fast-forward
+(`149ff5e..df81768`), no force. Local `main` moved to the same commit. On the
+other laptop: `git pull` on `main`, then `manage.py migrate` (tenancy 0004,
+ingestion 0005) and `npm install` in `web/`. `.claude/` is still untracked and
+was not pushed.
