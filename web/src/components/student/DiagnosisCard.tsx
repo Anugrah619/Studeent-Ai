@@ -1,20 +1,15 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import {
-  CalendarCheck,
-  CircleCheck,
-  CircleMinus,
-  CircleX,
-  Clock,
+  Check,
   Hourglass,
   LoaderCircle,
+  Minus,
   PlugZap,
-  Scale,
   Shuffle,
-  Sparkles,
   Tags,
   ThumbsDown,
   ThumbsUp,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -35,36 +30,53 @@ import {
 } from "@/api/queries";
 import { STATUS_LABEL } from "@/api/questions";
 import type { Attempt, AttemptStatus } from "@/api/types";
+import { Bubble } from "@/components/brand/Bubble";
 import { AnimatedNumber } from "@/components/kit/AnimatedNumber";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/common/States";
 import { QuestionPanel } from "./QuestionPanel";
 import { labelsNamedIn } from "@/lib/explainer";
-import { EASE_OUT_SOFT, fadeUp, stagger } from "@/lib/motion";
 import { num } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
- * The AI diagnosis — the hero of Student 360.
+ * The AI diagnosis, laid out as a marked page — the hero of Student 360.
  *
  * Every other panel on this screen reports what happened. This one says what
  * the student *misunderstands*, and the whole product claim rests on it being
- * legible to a director in about four seconds. The layout is an argument, in
- * order:
+ * legible to a director in about four seconds. So it is a page with a margin,
+ * the way a teacher's marked script is:
+ *
+ *   the prose, left   what was read or written — the claim, the evidence it
+ *                     rests on, the observation that argues against it, the
+ *                     action. Set in the serif, because it is language.
+ *   the margin, right what was counted — marks at stake, confidence, the time
+ *                     it takes to fix. Set in the grotesque, because it is
+ *                     figures, and each one says who produced it.
+ *
+ * A vertical rule, drawn in once as the page appears, divides the two. That
+ * division is the product's central promise made visible: the AI explains, and
+ * the system counts. A director who has seen this card once can tell, on any
+ * screen after, which of the things in front of them a model wrote.
+ *
+ * Read down the prose column, the layout is an argument, in order:
  *
  *   headline + cost   the claim at page-headline size, and what it costs
  *   main finding      the claim broken out, with the questions behind it
  *   key insight       the counter-evidence: why it is a trigger, not a gap
  *   weaker findings   shown, never hidden, and visibly subordinate
- *   action            what to do this week
- *   verdict           agree / disagree, which trains the system
+ *   action            what to do this week, beside what it takes to fix
+ *   verdict           agree / disagree
  *
- * The counter-evidence gets the second-loudest treatment on the card. "He was
- * correct on the two questions where the group was stated explicitly" is the
- * sentence that proves the finding is a specific trigger and not a topic gap
- * — the most load-bearing line on the screen, and the one a lesser product
- * cannot produce.
+ * The counter-evidence is deliberately given the largest body type on the page
+ * and its own rule rather than a grey footnote. "He was correct on the two
+ * questions where the group was stated explicitly" is the sentence that proves
+ * the finding is a specific trigger and not a topic gap — the most load-bearing
+ * line on the screen, and the one a lesser product cannot produce.
+ *
+ * Brand is chrome here: the header and verdict bands say "this is the AI's
+ * reading", and the question labels in the prose are links. It never carries a
+ * status or a value — those are ink.
  */
 export function DiagnosisCard({
   studentId,
@@ -83,7 +95,7 @@ export function DiagnosisCard({
   const query = useDiagnosis(studentId, paperId);
 
   if (paperPending || (paperId !== undefined && query.isPending)) {
-    return <DiagnosisSkeleton />;
+    return <DiagnosisReading />;
   }
 
   if (paperId === undefined) {
@@ -109,7 +121,7 @@ export function DiagnosisCard({
     );
   }
 
-  if (!query.data) return <DiagnosisSkeleton />;
+  if (!query.data) return <DiagnosisReading />;
 
   // Captioned with the paper the server says it diagnosed, not the one asked
   // for. The two differ in mock mode — the fixtures answer every `?paper=`
@@ -129,10 +141,6 @@ export function DiagnosisCard({
 
 /* ------------------------------------------------------------------ *
  * Chrome
- *
- * A brand-soft wash fading into the card: distinct from every data panel on
- * the page, and calm. The brand here is chrome — it marks "this is the AI's
- * reading" — and never carries a status or a value.
  * ------------------------------------------------------------------ */
 
 function Shell({
@@ -147,28 +155,23 @@ function Shell({
   return (
     <section
       aria-labelledby="diagnosis-eyebrow"
-      className="relative isolate overflow-hidden rounded-2xl bg-card shadow-raised ring-1 ring-brand-line"
+      className="overflow-hidden rounded-xl border border-foreground/25 bg-card shadow-raised"
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[30rem] bg-linear-to-b from-brand-soft via-brand-soft/60 to-transparent"
-      />
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 pt-5 sm:px-8 sm:pt-6">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-brand-line bg-brand-soft px-6 py-3 sm:px-9">
         <h2
           id="diagnosis-eyebrow"
-          className="flex items-center gap-1.5 text-xs font-semibold tracking-[0.08em] text-brand-ink uppercase"
+          className="text-sm font-semibold text-brand-ink"
         >
-          <Sparkles aria-hidden className="size-3.5" />
           AI diagnosis
         </h2>
         {subtitle ? (
-          <span className="text-xs text-muted-foreground">{subtitle}</span>
+          <span className="text-sm text-muted-foreground">{subtitle}</span>
         ) : null}
         {diagnosis ? (
-          <span className="ml-auto flex items-center gap-2">
+          <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
             {diagnosis.from_cache ? (
               <span
-                className="rounded-full bg-card/70 px-2 py-0.5 text-[10px] font-medium text-muted-foreground ring-1 ring-border"
+                className="rounded-sm border border-border bg-card/70 px-1.5 py-0.5 font-medium"
                 title="Served from cache — the same answer the model gave last time, not a fresh call."
               >
                 Cached
@@ -178,7 +181,7 @@ function Shell({
                 of a card does not read as a count of something. */}
             {diagnosis.trace_id ? (
               <span
-                className="font-mono text-[10px] text-muted-foreground"
+                className="tnum"
                 title="Trace id — the exact input sent to the AI and the answer it returned are stored under it."
               >
                 trace #{diagnosis.trace_id}
@@ -192,23 +195,85 @@ function Shell({
   );
 }
 
-function DiagnosisSkeleton() {
+/**
+ * Marking in progress: the four bubbles of an answer row, filled in turn.
+ *
+ * A saved diagnosis opens at once; a new one is a live call to a model and can
+ * take seconds — or minutes, when the model is busy. That wait is the one moment
+ * in the product the reader is looking at nothing, so it says what is happening
+ * in words, and the bubbles move for the same reason a progress bar does: to
+ * show the page has not frozen. With reduced motion set they simply sit still.
+ */
+function DiagnosisReading() {
   return (
     <Shell>
-      <div className="grid gap-6 px-5 pt-5 pb-8 sm:px-8 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-end">
-        <div className="space-y-3">
-          <span className="sr-only">Loading the diagnosis</span>
-          <Skeleton className="h-8 w-[92%]" />
-          <Skeleton className="h-8 w-[78%]" />
-          <Skeleton className="h-8 w-[40%]" />
+      <div role="status" className="px-6 py-10 sm:px-9">
+        <div aria-hidden className="flex gap-3">
+          {["A", "B", "C", "D"].map((letter, i) => (
+            <Bubble
+              key={letter}
+              letter={letter}
+              size="lg"
+              className="animate-bubble-read"
+              style={{ animationDelay: `${i * 300}ms` }}
+            />
+          ))}
         </div>
-        <Skeleton className="h-36 rounded-xl" />
-      </div>
-      <div className="grid gap-6 border-t border-brand-line/50 px-5 py-6 sm:px-8 lg:grid-cols-2">
-        <Skeleton className="h-32 rounded-xl" />
-        <Skeleton className="h-32 rounded-xl" />
+        <p className="mt-5 text-base font-semibold text-foreground">
+          Reading the answer sheet
+        </p>
+        <p className="mt-1 max-w-[56ch] text-sm leading-relaxed text-muted-foreground">
+          A saved diagnosis opens at once. A new one takes a few seconds, and
+          longer when the model is busy.
+        </p>
       </div>
     </Shell>
+  );
+}
+
+/**
+ * One row of the page: prose on the left, margin on the right.
+ *
+ * The margin column is a fixed width and the whole row is capped, so the rule
+ * that runs down the page sits at the same place in every row without any
+ * measuring — see the offset on the rule in `DiagnosisBody`, which is this
+ * geometry written out. Below `lg` there is no margin to speak of: it stacks
+ * under its prose and the rule is not drawn.
+ */
+function Row({
+  children,
+  margin,
+  first = false,
+  compact = false,
+  marginFirst = false,
+}: {
+  children: ReactNode;
+  margin?: ReactNode;
+  first?: boolean;
+  compact?: boolean;
+  /**
+   * When the margin stacks (below `lg`), put it above its prose instead of
+   * under it. A finding's confidence and cost read as the head of the finding;
+   * the time to fix reads as the tail of the action, so that stays below.
+   */
+  marginFirst?: boolean;
+}) {
+  return (
+    <div className={first ? undefined : "border-t border-border"}>
+      <div
+        className={cn(
+          "grid max-w-[72rem] gap-x-14 gap-y-5 px-6 sm:px-9 lg:grid-cols-[minmax(0,1fr)_22rem]",
+          compact ? "py-5" : "py-7",
+        )}
+      >
+        <div className="min-w-0">{children}</div>
+        {margin ? (
+          <aside className={cn("min-w-0", marginFirst && "max-lg:order-first")}>
+            {margin}
+          </aside>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -238,6 +303,7 @@ function DiagnosisBody({
    */
   const atStake = data.total_marks_at_stake;
   const timeToFix = timeToFixLabel(data.time_to_fix);
+  const findings = data.hypotheses.length;
   const name = firstName(studentName);
 
   // The model lists its strongest finding first, and the headline is about
@@ -268,79 +334,74 @@ function DiagnosisBody({
     sheet: sheet.data ?? [],
   };
 
+  // What it takes to fix sits beside the action it prices, not up with what
+  // the finding costs. With no action to sit beside it falls back to the hero.
+  const fixBand = timeToFix ? <TimeToFixBand label={timeToFix} /> : null;
+  const fixInHero = fixBand !== null && !data.recommended_action;
+  const heroMargin =
+    atStake > 0 || fixInHero ? (
+      <>
+        <TotalsMargin
+          atStake={atStake}
+          findings={findings}
+          patternFound={data.pattern_found}
+        />
+        {fixInHero ? <div className={atStake > 0 ? "mt-5" : undefined}>{fixBand}</div> : null}
+      </>
+    ) : undefined;
+
   return (
     <>
-      <motion.div
-        variants={stagger(0.08)}
-        initial="hidden"
-        animate="show"
-        className={cn(
-          "grid gap-x-10 gap-y-6 px-5 pt-3 pb-7 sm:px-8 sm:pb-8",
-          atStake > 0 && "lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-center",
-        )}
-      >
-        <div className="min-w-0">
-          {/* The hero. The page's one big sentence is the model's, verbatim. */}
-          <motion.p
-            variants={fadeUp}
-            className="max-w-[40ch] font-heading text-[26px] leading-[1.18] font-semibold tracking-tight text-balance text-foreground sm:text-[32px] sm:leading-[1.14] lg:text-[36px]"
-          >
-            {data.headline || "No diagnosis text was returned for this paper."}
-          </motion.p>
-          {timeToFix ? (
-            <motion.div variants={fadeUp} className="mt-4">
-              <TimeToFixBand label={timeToFix} />
-            </motion.div>
-          ) : null}
-        </div>
-
-        {atStake > 0 ? (
-          <motion.div variants={fadeUp}>
-            <WhatItCosts
-              atStake={atStake}
-              findings={data.hypotheses.length}
-              patternFound={data.pattern_found}
-            />
-          </motion.div>
-        ) : null}
-      </motion.div>
-
-      {data.pattern_found ? null : (
-        <div className="px-5 pb-7 sm:px-8">
-          <NoPattern name={name} />
-        </div>
-      )}
-
-      {main ? <MainFinding hypothesis={main} ctx={ctx} /> : null}
-
-      {weaker.length ? (
-        <WeakerFindings
-          hypotheses={weaker}
-          patternFound={data.pattern_found}
-          ctx={ctx}
+      <div className="relative">
+        {/* The rule between the prose and the margin. `left` is the row
+            geometry written out: the row is at most 72rem wide, the margin
+            column is 22rem, the gap is 3.5rem and the right padding 2.25rem, so
+            the middle of the gap is 26rem in from the row's right edge. It
+            draws down once, as the card appears. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-[calc(min(100%,72rem)-26rem)] -ml-px hidden w-0.5 origin-top animate-ink-rule bg-foreground lg:block"
         />
-      ) : null}
 
-      {data.recommended_action ? (
-        <div className="border-t border-border px-5 py-6 sm:px-8">
-          <div className="flex gap-3.5">
-            <span className="mt-0.5 hidden size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground ring-1 ring-border sm:flex">
-              <CalendarCheck aria-hidden className="size-4" />
-            </span>
-            <div className="min-w-0">
-              <h3 className="text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-                Do this week
-              </h3>
-              <ProseWithQuestions
-                as="p"
-                text={data.recommended_action}
-                ctx={ctx}
-                className="mt-1.5 max-w-[75ch] text-[15px] leading-relaxed text-foreground"
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
+        <Row first margin={heroMargin}>
+          {/* The hero. The page's one big sentence is the model's, verbatim. */}
+          <p className="max-w-[40ch] font-serif text-2xl leading-[1.15] font-semibold tracking-tight text-balance text-foreground sm:text-3xl">
+            {data.headline || "No diagnosis text was returned for this paper."}
+          </p>
+        </Row>
+
+        {data.pattern_found ? null : (
+          <Row>
+            <NoPattern name={name} />
+          </Row>
+        )}
+
+        {main ? (
+          <MainFinding hypothesis={main} ctx={ctx} showMarks={findings > 1} />
+        ) : null}
+
+        {weaker.length ? (
+          <WeakerFindings
+            hypotheses={weaker}
+            patternFound={data.pattern_found}
+            ctx={ctx}
+          />
+        ) : null}
+
+        {data.recommended_action ? (
+          <Row margin={fixBand}>
+            <h3 className="text-sm font-semibold text-foreground">
+              Do this week
+            </h3>
+            <ProseWithQuestions
+              as="p"
+              text={data.recommended_action}
+              ctx={ctx}
+              className="mt-2 max-w-[60ch] font-serif text-lg leading-relaxed text-foreground"
+            />
+          </Row>
+        ) : null}
+      </div>
 
       <VerdictBar studentId={studentId} paperId={paperId} data={data} />
     </>
@@ -366,7 +427,7 @@ interface FindingContext {
  * arithmetic the server did not do.
  * ------------------------------------------------------------------ */
 
-function WhatItCosts({
+function TotalsMargin({
   atStake,
   findings,
   patternFound,
@@ -375,32 +436,31 @@ function WhatItCosts({
   findings: number;
   patternFound: boolean;
 }) {
+  if (!(atStake > 0)) return null;
+
   return (
-    <div className="rounded-xl bg-card/90 p-4 shadow-card ring-1 ring-border sm:p-5">
-      <p className="text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-        What it costs
-      </p>
-      <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-5xl leading-none font-semibold tracking-tight text-foreground sm:text-6xl">
+    <div>
+      <p className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <span className="text-5xl leading-none font-semibold tracking-tight text-foreground">
           <AnimatedNumber value={atStake} />
         </span>{" "}
-        <span className="text-base font-medium text-foreground">marks at stake</span>
         {/* Named as a total when there is more than one finding, so it does
             not read as a contradiction of the single figure the headline
             quotes for the strongest one. */}
-        {findings > 1 ? (
-          <>
-            {" "}
-            <span className="text-sm text-muted-foreground">
-              across {findings} findings
-            </span>
-          </>
-        ) : null}
+        <span className="text-sm font-medium text-foreground">
+          marks at stake
+          {findings > 1 ? ` across ${findings} findings` : ""}
+        </span>
+      </p>
+      <p className="mt-2.5 max-w-[34ch] text-xs leading-snug text-muted-foreground">
+        Counted from the answer sheet by the system, not estimated by the AI.
       </p>
       {findings > 1 && patternFound ? (
-        <p className="mt-3 border-t border-border pt-3 text-xs leading-snug text-muted-foreground">
+        <p className="mt-2 max-w-[34ch] text-xs leading-snug text-muted-foreground">
           The headline&rsquo;s figure is the main finding alone;{" "}
-          {findings - 1 === 1 ? "the weaker one adds" : `the ${findings - 1} weaker ones add`}{" "}
+          {findings - 1 === 1
+            ? "the weaker one adds"
+            : `the ${findings - 1} weaker ones add`}{" "}
           the rest.
         </p>
       ) : null}
@@ -416,20 +476,22 @@ function WhatItCosts({
  * same evidence, while the action it recommended never changed. So it is four
  * bands now, and the label carries no digits: a director who spots one
  * invented "45 minutes" has no way left to believe the misconception above it.
+ * A band, by being visibly a band, tells the reader how precise the claim is
+ * meant to be instead of implying a precision that was never there.
  */
 function TimeToFixBand({ label }: { label: string }) {
   return (
-    <p
-      className="flex items-start gap-2 text-[15px]"
-      title="A band, not an estimate — the model is not asked for a number of minutes, because when it was, it gave a different one each time for the same evidence."
-    >
-      <Clock aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-      <span>
+    <div>
+      <p className="text-sm font-medium text-foreground">
         <span className="text-muted-foreground">About </span>
-        <span className="font-medium text-foreground">{label.toLowerCase()}</span>
+        {label.toLowerCase()}
         <span className="text-muted-foreground"> to fix</span>
-      </span>
-    </p>
+      </p>
+      <p className="mt-1.5 max-w-[34ch] text-xs leading-snug text-muted-foreground">
+        A band, not an estimate. The AI is not asked for minutes: when it was,
+        the answer changed every time.
+      </p>
+    </div>
   );
 }
 
@@ -437,30 +499,27 @@ function TimeToFixBand({ label }: { label: string }) {
  * pattern_found: false
  *
  * A real answer, not an empty state. A system that will say "there is no
- * pattern here" is the only kind whose patterns are worth anything.
+ * pattern here" is the only kind whose patterns are worth anything, so this
+ * state is designed rather than defaulted.
  * ------------------------------------------------------------------ */
 
 function NoPattern({ name }: { name: string }) {
   return (
-    <div className="rounded-xl bg-card/85 px-4 py-4 ring-1 ring-border sm:px-5">
-      <div className="flex gap-3.5">
-        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground ring-1 ring-border">
-          <Shuffle aria-hidden className="size-4" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-base font-semibold text-foreground">
-            No systematic pattern — the errors look scattered
-          </p>
-          <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted-foreground">
-            The AI found no repeated misconception in these wrong answers, so
-            there is no single belief to re-teach. That is a finding about{" "}
-            {name}, not a gap in the analysis.
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground italic">
-            We would rather say this than invent a misconception to fill the
-            card.
-          </p>
-        </div>
+    <div className="flex gap-4">
+      <Shuffle aria-hidden className="mt-1 size-5 shrink-0 text-muted-foreground" />
+      <div className="min-w-0">
+        <p className="text-base font-semibold text-foreground">
+          No systematic pattern — the errors look scattered
+        </p>
+        <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-muted-foreground">
+          The AI found no repeated misconception in these wrong answers, so
+          there is no single belief to re-teach. That is a finding about {name},
+          not a gap in the analysis.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          We would rather say this than invent a misconception to fill the
+          card.
+        </p>
       </div>
     </div>
   );
@@ -469,42 +528,70 @@ function NoPattern({ name }: { name: string }) {
 /* ------------------------------------------------------------------ *
  * The main finding
  *
- * Claim and counter-evidence side by side: what he gets wrong, and the
- * observation that argues against it being a topic gap. Read left to right
- * it is the whole pitch.
+ * Claim and counter-evidence in one column: what he gets wrong, and the
+ * observation that argues against it being a topic gap. Read down the page it
+ * is the whole pitch. Its confidence and cost sit in the margin beside it.
  * ------------------------------------------------------------------ */
 
 function MainFinding({
   hypothesis,
   ctx,
+  showMarks,
 }: {
   hypothesis: Hypothesis;
   ctx: FindingContext;
+  /** Off when this is the only finding: its marks are the headline total. */
+  showMarks: boolean;
 }) {
   return (
-    <div className="grid gap-x-10 gap-y-6 border-t border-brand-line/60 px-5 py-7 sm:px-8 lg:grid-cols-2">
-      <article className="min-w-0">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h3 className="text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-            Main finding
-          </h3>
-          <MisconceptionCode code={hypothesis.misconception_code} />
-          <ConfidenceMeter level={hypothesis.confidence} />
-        </div>
+    <Row
+      marginFirst
+      margin={<FindingMargin hypothesis={hypothesis} showMarks={showMarks} />}
+    >
+      <p>
+        <MisconceptionCode code={hypothesis.misconception_code} />
+      </p>
 
-        <p className="mt-3 max-w-[60ch] text-base leading-relaxed text-foreground sm:text-[17px]">
-          {hypothesis.claim}
-        </p>
+      <p className="mt-3 max-w-[60ch] font-serif text-base leading-relaxed text-foreground">
+        {hypothesis.claim}
+      </p>
 
-        <EvidenceRow
-          evidence={hypothesis.evidence}
-          ctx={ctx}
-          marks={hypothesis.marks_at_stake}
-        />
-      </article>
+      {/* The bubbles fill in one after another as the page inks in. */}
+      <EvidenceRow evidence={hypothesis.evidence} ctx={ctx} fillFromMs={560} />
 
       {hypothesis.counter_evidence ? (
         <KeyInsight text={hypothesis.counter_evidence} ctx={ctx} />
+      ) : null}
+    </Row>
+  );
+}
+
+function FindingMargin({
+  hypothesis,
+  quiet = false,
+  showMarks = true,
+}: {
+  hypothesis: Hypothesis;
+  /** A weaker finding: the same facts, one size down. */
+  quiet?: boolean;
+  /** The finding's own cost, when it is not already the headline figure. */
+  showMarks?: boolean;
+}) {
+  return (
+    <div className={quiet ? "space-y-2.5" : "space-y-4"}>
+      <ConfidenceMeter level={hypothesis.confidence} />
+      {showMarks && hypothesis.marks_at_stake > 0 ? (
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span
+            className={cn(
+              "tnum leading-none font-semibold tracking-tight text-foreground",
+              quiet ? "text-xl" : "text-3xl",
+            )}
+          >
+            {num(hypothesis.marks_at_stake)}
+          </span>
+          <span className="text-sm text-muted-foreground">marks at stake</span>
+        </p>
       ) : null}
     </div>
   );
@@ -515,37 +602,45 @@ function MainFinding({
  * option this student actually picked, which is the difference between "he
  * got D16 wrong" and "he picked C on D16" — the second is checkable against
  * the paper in his hand.
+ *
+ * A citation the server could not tie to one of this student's wrong answers
+ * comes back with `question_id: null`, and is rendered as plain text rather
+ * than as something that looks openable.
  */
 function EvidenceRow({
   evidence,
   ctx,
-  marks,
   compact = false,
+  fillFromMs,
 }: {
   evidence: Evidence[];
   ctx: FindingContext;
-  marks: number;
   compact?: boolean;
+  /** Set to have the chips' bubbles fill in on mount, one after another. */
+  fillFromMs?: number;
 }) {
   if (!evidence.length) return null;
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-2 gap-y-2", compact ? "mt-3" : "mt-4")}>
-      <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-        Rests on
-      </span>
-      {evidence.map((cited) => (
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-x-2.5 gap-y-2",
+        compact ? "mt-3" : "mt-4",
+      )}
+    >
+      <span className="text-sm text-muted-foreground">Rests on</span>
+      {evidence.map((cited, i) => (
         <EvidenceChip
           key={cited.label}
           cited={cited}
           studentId={ctx.studentId}
           studentName={ctx.studentName}
+          fillDelayMs={fillFromMs === undefined ? undefined : fillFromMs + i * 90}
         />
       ))}
-      <span className="text-xs text-muted-foreground">
+      <span className="text-sm text-muted-foreground">
         {evidence.length === 1
-          ? "· 1 question"
-          : `· ${evidence.length} questions, same error`}
-        {marks > 0 && !compact ? ` · ${num(marks)} marks` : ""}
+          ? "1 question"
+          : `${evidence.length} questions, same error`}
       </span>
     </div>
   );
@@ -555,24 +650,31 @@ function EvidenceRow({
  * One cited question.
  *
  * Resolved citations open the question itself — the stem, the four options
- * and the belief that produced the option chosen. Unresolved ones (the model
- * named a question that is not a wrong answer this student gave on this
- * paper) stay a dashed, inert span with a title saying so: a chip that opens
- * an empty panel is worse than a chip that visibly is not one.
+ * and the belief that produced the option chosen — and show the option this
+ * student picked as a filled bubble, the pencil mark, which is what makes the
+ * claim checkable against the paper in the teacher's hand.
+ *
+ * Unresolved ones (the model named a question that is not a wrong answer this
+ * student gave on this paper) stay a dashed, inert span with a title saying
+ * so. They are deliberately not buttons: a chip that opens an empty panel is
+ * worse than a chip that visibly is not one.
  */
 export function EvidenceChip({
   cited,
   studentId,
   studentName,
+  fillDelayMs,
 }: {
   cited: Evidence;
   studentId: number;
   studentName: string;
+  /** Set to have the bubble fill in on mount, after this many milliseconds. */
+  fillDelayMs?: number;
 }) {
   if (!isResolved(cited)) {
     return (
       <span
-        className="tnum rounded-md border border-dashed border-border px-2 py-1 font-mono text-xs text-muted-foreground"
+        className="tnum inline-flex items-center rounded-sm border border-dashed border-border px-2.5 py-1 text-sm font-medium text-muted-foreground"
         title="The model cited this question, but it is not one of this student's wrong answers on this paper — so nothing is claimed for it."
       >
         {cited.label}
@@ -588,14 +690,28 @@ export function EvidenceChip({
     >
       <button
         type="button"
-        className="tnum group/chip inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-card px-2 py-1 font-mono text-xs text-foreground shadow-card ring-1 ring-border transition-[color,background-color,box-shadow] outline-none hover:bg-brand-soft hover:ring-brand-line focus-visible:ring-3 focus-visible:ring-ring/50"
+        className={cn(
+          "tnum inline-flex cursor-pointer items-center gap-2 rounded-sm border border-foreground/30 bg-card py-1 pl-2.5 text-sm font-semibold text-foreground shadow-xs transition-colors outline-none hover:border-brand-ink hover:bg-brand-soft focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35",
+          cited.chose ? "pr-1.5" : "pr-2.5",
+        )}
         title={`${cited.label}: chose ${cited.chose} · ${cited.marks_at_stake} marks. Open the question.`}
       >
-        <span className="font-semibold">{cited.label}</span>
+        {cited.label}
         {cited.chose ? (
-          <span className="font-sans text-muted-foreground group-hover/chip:text-foreground">
-            chose {cited.chose}
-          </span>
+          <>
+            <span className="sr-only">chose </span>
+            <Bubble
+              letter={cited.chose}
+              filled
+              size="sm"
+              className={fillDelayMs === undefined ? undefined : "animate-bubble-fill"}
+              style={
+                fillDelayMs === undefined
+                  ? undefined
+                  : { animationDelay: `${fillDelayMs}ms` }
+              }
+            />
+          </>
         ) : null}
         <span className="sr-only">
           — open this question, the options and what that choice reveals
@@ -608,95 +724,59 @@ export function EvidenceChip({
 /**
  * The counter-evidence, as the card's key insight.
  *
- * Anything can say "weak at organic chemistry". Only a system that actually
- * reasoned over the questions can say "except on the two where the group was
- * named, where he was right" — and that exception is what makes the finding a
- * trigger rather than a subject gap, and fixable in a sitting rather than a
- * term. So it sits on its own raised panel, in reading-size type, with the one
- * piece of motion on the card that is not an entrance.
+ * Given a rule, its own block and the largest body type on the page, because it
+ * is the line that separates a diagnosis from a topic report. Anything can say
+ * "weak at organic chemistry". Only a system that actually reasoned over the
+ * questions can say "except on the two where the group was named, where he was
+ * right" — and that exception is what makes the finding a trigger rather than
+ * a subject gap, and what makes it fixable in one sitting rather than a term.
+ *
+ * The tick in a ring is the same mark a teacher uses for a correct answer, so
+ * it is drawn only when the counter-evidence actually narrows the finding; when
+ * it does not, the ring holds a dash.
  */
 function KeyInsight({ text, ctx }: { text: string; ctx: FindingContext }) {
   const onSheet = labelsNamedIn(text, ctx.sheet);
+  const narrows = counterEvidenceNarrows(text);
   return (
-    <aside
+    <section
       aria-labelledby="key-insight-heading"
-      className="min-w-0 self-start rounded-xl bg-card p-5 shadow-raised ring-1 ring-border sm:p-6"
+      className="mt-7 border-l-[3px] border-foreground pl-5"
     >
-      <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-        <Scale aria-hidden className="size-3.5" />
-        Key insight
-      </p>
       <h3
         id="key-insight-heading"
-        className="mt-2 font-heading text-lg leading-snug font-semibold tracking-tight text-foreground sm:text-xl"
+        className="flex items-center gap-2.5 text-sm font-semibold text-foreground"
       >
-        {counterEvidenceNarrows(text) ? (
-          <>
-            Why this is <MarkOnce>a trigger, not a topic gap</MarkOnce>
-          </>
-        ) : (
-          "Not narrowed to one trigger yet"
-        )}
+        <span
+          aria-hidden
+          className="inline-grid size-5 place-items-center rounded-full border-[1.5px] border-foreground"
+        >
+          {narrows ? (
+            <Check className="size-3" strokeWidth={3} />
+          ) : (
+            <Minus className="size-3" strokeWidth={3} />
+          )}
+        </span>
+        {narrows
+          ? "Why this is a trigger, not a topic gap"
+          : "Not narrowed to one trigger yet"}
       </h3>
       <ProseWithQuestions
         as="p"
         text={text}
         ctx={ctx}
-        className="mt-3 text-base leading-relaxed text-foreground sm:text-[17px]"
+        className="mt-2.5 max-w-[56ch] font-serif text-lg leading-relaxed text-foreground"
       />
-      {onSheet.length ? (
-        <SheetCheck rows={onSheet} name={ctx.name} />
-      ) : null}
-    </aside>
+      {onSheet.length ? <SheetCheck rows={onSheet} name={ctx.name} /> : null}
+    </section>
   );
 }
 
-/**
- * A marker stroke drawn once under a phrase, the first time it is seen. It is
- * emphasis on our own words, never on a value, so it takes the brand line.
- * Reduced motion gets the finished stroke with no sweep.
- */
-function MarkOnce({ children }: { children: ReactNode }) {
-  const reduce = useReducedMotion();
-  const done = { backgroundSize: "100% 38%" };
-  return (
-    <motion.span
-      className="box-decoration-clone bg-no-repeat"
-      style={{
-        backgroundImage: "linear-gradient(var(--brand-line), var(--brand-line))",
-        backgroundPosition: "0 92%",
-        ...(reduce ? done : null),
-      }}
-      initial={reduce ? false : { backgroundSize: "0% 38%" }}
-      whileInView={done}
-      viewport={{ once: true, amount: 1 }}
-      transition={{ duration: 0.7, delay: 0.45, ease: EASE_OUT_SOFT }}
-    >
-      {children}
-    </motion.span>
-  );
-}
-
-const SHEET_MARK: Record<
-  AttemptStatus,
-  { icon: LucideIcon; tone: string }
-> = {
-  correct: {
-    icon: CircleCheck,
-    tone: "bg-status-good/10 text-status-good ring-status-good/25",
-  },
-  wrong: {
-    icon: CircleX,
-    tone: "bg-status-critical/10 text-status-critical ring-status-critical/25",
-  },
-  blank: {
-    icon: CircleMinus,
-    tone: "bg-muted text-muted-foreground ring-border",
-  },
-  not_reached: {
-    icon: Hourglass,
-    tone: "bg-muted text-muted-foreground ring-border",
-  },
+const SHEET_MARK: Record<AttemptStatus, { icon: LucideIcon; tone: string }> = {
+  correct: { icon: Check, tone: "text-status-good" },
+  wrong: { icon: X, tone: "text-status-critical" },
+  blank: { icon: Minus, tone: "text-muted-foreground" },
+  not_reached: { icon: Hourglass, tone: "text-muted-foreground" },
 };
 
 /**
@@ -704,29 +784,31 @@ const SHEET_MARK: Record<
  *
  * The model said he was right on D22; this row says whether the record agrees,
  * in words and an icon. It shows what was recorded even when that contradicts
- * the model — that is the point of checking.
+ * the model — that is the point of checking. The status word carries the
+ * meaning; the icon's hue only repeats it.
  */
 function SheetCheck({ rows, name }: { rows: Attempt[]; name: string }) {
   return (
     <div className="mt-4 border-t border-border pt-3">
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Checked against {name}&rsquo;s answer sheet
       </p>
-      <ul className="mt-2 flex flex-wrap gap-1.5">
+      <ul className="mt-2 flex flex-wrap gap-2">
         {rows.map((row) => {
           const mark = SHEET_MARK[row.status];
           const Icon = mark.icon;
           return (
             <li
               key={row.question_id}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset",
-                mark.tone,
-              )}
+              className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-1 text-sm"
             >
-              <Icon aria-hidden className="size-3.5" />
-              <span className="tnum font-mono font-semibold">{row.question_id}</span>
-              <span>{STATUS_LABEL[row.status].toLowerCase()}</span>
+              <Icon aria-hidden className={cn("size-4", mark.tone)} />
+              <span className="tnum font-semibold text-foreground">
+                {row.question_id}
+              </span>
+              <span className="text-muted-foreground">
+                {STATUS_LABEL[row.status].toLowerCase()}
+              </span>
             </li>
           );
         })}
@@ -739,8 +821,8 @@ function SheetCheck({ rows, name }: { rows: Attempt[]; name: string }) {
  * Weaker findings
  *
  * Shown, never folded away — a finding hidden behind a click is a finding a
- * director never weighs. But smaller, quieter and boxed apart from the main
- * one, because on two of the hero students they are what makes the total
+ * director never weighs. But smaller, quieter and set on a tint apart from the
+ * main one, because on two of the hero students they are what makes the total
  * larger than the headline's figure, and that must read as "plus some weaker
  * things", not as a second headline.
  * ------------------------------------------------------------------ */
@@ -755,20 +837,22 @@ function WeakerFindings({
   ctx: FindingContext;
 }) {
   return (
-    <div className="border-t border-border bg-muted/30 px-5 py-6 sm:px-8">
-      <h3 className="text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-        {patternFound
-          ? `Also on this paper — ${hypotheses.length} weaker ${hypotheses.length === 1 ? "finding" : "findings"}`
-          : "Weak signals, shown for completeness"}
-      </h3>
-      <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
-        {patternFound
-          ? "Lower confidence or fewer questions than the main finding. Counted in the total above; not what the headline is about."
-          : "None of these is strong enough to call a pattern."}
-      </p>
-      <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <div className="border-t border-border bg-muted/30">
+      <Row first compact>
+        <h3 className="text-sm font-semibold text-foreground">
+          {patternFound
+            ? `Also on this paper: ${hypotheses.length} weaker ${hypotheses.length === 1 ? "finding" : "findings"}`
+            : "Weak signals, shown for completeness"}
+        </h3>
+        <p className="mt-1 max-w-[62ch] text-xs leading-relaxed text-muted-foreground">
+          {patternFound
+            ? "Lower confidence or fewer questions than the main finding. Counted in the total above; not what the headline is about."
+            : "None of these is strong enough to call a pattern."}
+        </p>
+      </Row>
+      <ul>
         {hypotheses.map((h) => (
-          <li key={`${h.misconception_code}-${h.claim}`} className="min-w-0">
+          <li key={`${h.misconception_code}-${h.claim}`}>
             <WeakerFinding hypothesis={h} ctx={ctx} />
           </li>
         ))}
@@ -786,37 +870,24 @@ function WeakerFinding({
 }) {
   const onSheet = labelsNamedIn(hypothesis.counter_evidence, ctx.sheet);
   return (
-    <article className="flex h-full flex-col rounded-xl bg-card p-4 shadow-card ring-1 ring-border">
-      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <MisconceptionCode code={hypothesis.misconception_code} />
-          <ConfidenceMeter level={hypothesis.confidence} />
-        </div>
-        {hypothesis.marks_at_stake > 0 ? (
-          <span className="tnum shrink-0 text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">
-              {num(hypothesis.marks_at_stake)}
-            </span>{" "}
-            marks at stake
-          </span>
-        ) : null}
-      </div>
+    <Row
+      compact
+      marginFirst
+      margin={<FindingMargin hypothesis={hypothesis} quiet />}
+    >
+      <p>
+        <MisconceptionCode code={hypothesis.misconception_code} />
+      </p>
 
-      <p className="mt-2.5 text-sm leading-relaxed text-foreground">
+      <p className="mt-2.5 max-w-[60ch] font-serif text-base leading-relaxed text-foreground">
         {hypothesis.claim}
       </p>
 
-      <EvidenceRow
-        evidence={hypothesis.evidence}
-        ctx={ctx}
-        marks={hypothesis.marks_at_stake}
-        compact
-      />
+      <EvidenceRow evidence={hypothesis.evidence} ctx={ctx} compact />
 
       {hypothesis.counter_evidence ? (
-        <div className="mt-3 border-t border-border pt-3">
-          <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-            <Scale aria-hidden className="size-3" />
+        <div className="mt-3 border-l-2 border-foreground/30 pl-4">
+          <p className="text-sm font-semibold text-muted-foreground">
             {counterEvidenceNarrows(hypothesis.counter_evidence)
               ? "Why a trigger, not a topic gap"
               : "Not narrowed yet"}
@@ -825,16 +896,22 @@ function WeakerFinding({
             as="p"
             text={hypothesis.counter_evidence}
             ctx={ctx}
-            className="mt-1 text-xs leading-relaxed text-muted-foreground"
+            className="mt-1 max-w-[56ch] font-serif text-base leading-relaxed text-muted-foreground"
           />
           {onSheet.length ? (
-            <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
               {onSheet.map((row) => {
-                const Icon = SHEET_MARK[row.status].icon;
+                const mark = SHEET_MARK[row.status];
+                const Icon = mark.icon;
                 return (
-                  <span key={row.question_id} className="inline-flex items-center gap-1">
-                    <Icon aria-hidden className="size-3" />
-                    <span className="font-mono">{row.question_id}</span>{" "}
+                  <span
+                    key={row.question_id}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <Icon aria-hidden className={cn("size-3.5", mark.tone)} />
+                    <span className="tnum font-semibold text-foreground">
+                      {row.question_id}
+                    </span>{" "}
                     {STATUS_LABEL[row.status].toLowerCase()}
                   </span>
                 );
@@ -843,15 +920,16 @@ function WeakerFinding({
           ) : null}
         </div>
       ) : null}
-    </article>
+    </Row>
   );
 }
 
+/** A misconception's code, as it is filed in the catalogue. */
 function MisconceptionCode({ code }: { code: string }) {
   return (
-    <code className="rounded-md bg-card px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground ring-1 ring-border">
+    <span className="inline-block rounded-sm bg-muted px-2 py-0.5 text-xs font-semibold tracking-wide text-foreground">
       {code}
-    </code>
+    </span>
   );
 }
 
@@ -887,7 +965,8 @@ function openableLabels(data: Diagnosis): Map<string, number> {
  * resolved them. Matching runs from the known labels into the text, never the
  * other way, so "-SO3H" is never mistaken for a question. A label the payload
  * did not resolve stays plain text: there is no id to open, and none is made
- * up.
+ * up. The label is an identifier, so it is set in the grotesque even where the
+ * sentence around it is serif; it is a link, so it takes the brand.
  */
 function ProseWithQuestions({
   text,
@@ -918,7 +997,7 @@ function ProseWithQuestions({
           >
             <button
               type="button"
-              className="tnum cursor-pointer rounded-sm font-mono text-[0.92em] font-semibold text-brand-ink underline decoration-brand-line decoration-dotted underline-offset-[3px] outline-none hover:decoration-brand-ink focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="tnum cursor-pointer rounded-sm font-sans text-[0.9em] font-semibold text-brand-ink underline decoration-brand-line decoration-dotted underline-offset-[3px] outline-none hover:decoration-brand-ink focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               {part.label}
               <span className="sr-only"> — open this question</span>
@@ -962,9 +1041,10 @@ function escapeRegExp(value: string): string {
 /* ------------------------------------------------------------------ *
  * Confidence
  *
- * Three steps of one ordinal ramp plus the word, never a status hue: green for
+ * Three bubbles filled in order, plus the word, never a status hue: green for
  * "high confidence" would read as good news, and a confidently-diagnosed
- * misconception is not good news. The word is what carries the meaning.
+ * misconception is not good news. Fill survives greyscale and every
+ * colour-vision deficiency; the word is what actually carries the meaning.
  * ------------------------------------------------------------------ */
 
 const CONFIDENCE_STEPS: Record<Confidence, number> = {
@@ -982,16 +1062,10 @@ const CONFIDENCE_WORD: Record<Confidence, string> = {
 export function ConfidenceMeter({ level }: { level: Confidence }) {
   const filled = CONFIDENCE_STEPS[level];
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-      <span aria-hidden className="flex items-center gap-[2px]">
+    <span className="inline-flex items-center gap-2.5 text-sm font-medium text-foreground">
+      <span aria-hidden className="flex items-center gap-1">
         {[1, 2, 3].map((step) => (
-          <span
-            key={step}
-            className={cn(
-              "h-2.5 w-1 rounded-[1px]",
-              step <= filled ? "bg-foreground/70" : "bg-foreground/15",
-            )}
-          />
+          <Bubble key={step} size="xs" filled={step <= filled} />
         ))}
       </span>
       {CONFIDENCE_WORD[level]}
@@ -1003,8 +1077,9 @@ export function ConfidenceMeter({ level }: { level: Confidence }) {
  * Verdict
  *
  * The human verdict is what turns a generic tool into *their* system — it is
- * the training data. It is also the only write path on this card, so it gets
- * a band of its own and says plainly what the write does.
+ * the label a later review can be checked against. It is also the only write
+ * path on this card, so it gets a band of its own and says plainly what the
+ * write does, and what it does not.
  * ------------------------------------------------------------------ */
 
 function VerdictBar({
@@ -1029,63 +1104,65 @@ function VerdictBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border-t border-brand-line/60 bg-brand-soft/50 px-5 py-5 sm:px-8">
-      <div className="min-w-0 flex-1 basis-80">
-        {recorded ? (
-          <p className="text-base font-semibold text-foreground">
-            {recorded === "agreed"
-              ? "You agreed with this diagnosis."
-              : "You disagreed with this diagnosis."}{" "}
-            <span className="text-sm font-normal text-muted-foreground">
-              Recorded against{" "}
-              {data.trace_id ? `trace #${data.trace_id}` : "this diagnosis"}.
-            </span>
+    <div className="border-t border-brand-line bg-brand-soft/50">
+      <div className="flex max-w-[72rem] flex-wrap items-center justify-between gap-x-8 gap-y-4 px-6 py-5 sm:px-9">
+        <div className="min-w-0 flex-1 basis-80">
+          {recorded ? (
+            <p className="text-sm font-semibold text-foreground">
+              {recorded === "agreed"
+                ? "You agreed with this diagnosis."
+                : "You disagreed with this diagnosis."}{" "}
+              <span className="font-normal text-muted-foreground">
+                Recorded against{" "}
+                {data.trace_id ? `trace #${data.trace_id}` : "this diagnosis"}.
+              </span>
+            </p>
+          ) : (
+            <p className="text-sm font-semibold text-foreground">
+              Does this match what you see in class?
+            </p>
+          )}
+          <p className="mt-1 max-w-[62ch] text-xs leading-relaxed text-muted-foreground">
+            Your answer is saved with this diagnosis as a teacher-checked label.
+            It does not change this diagnosis or any later one.
           </p>
-        ) : (
-          <p className="text-base font-semibold text-foreground">
-            Does this match what you see in class?
-          </p>
-        )}
-        <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted-foreground">
-          Your answer is saved with this diagnosis as a teacher-checked label.
-          It does not change this diagnosis or any later one.
-        </p>
-        {failed ? (
-          <p role="alert" className="mt-1.5 text-xs text-status-critical">
-            Could not record that: {failed}
-          </p>
-        ) : null}
-      </div>
+          {failed ? (
+            <p role="alert" className="mt-1.5 text-xs text-status-critical">
+              Could not record that: {failed}
+            </p>
+          ) : null}
+        </div>
 
-      <div className="flex shrink-0 items-center gap-2">
-        {verdict.isPending ? (
-          <LoaderCircle
-            aria-hidden
-            className="size-4 animate-spin text-muted-foreground"
-          />
-        ) : null}
-        <Button
-          size="lg"
-          className="min-w-28"
-          variant={recorded === "agreed" ? "default" : "outline"}
-          aria-pressed={recorded === "agreed"}
-          disabled={verdict.isPending}
-          onClick={() => send("agreed")}
-        >
-          <ThumbsUp aria-hidden />
-          Agree
-        </Button>
-        <Button
-          size="lg"
-          className="min-w-28"
-          variant={recorded === "disagreed" ? "default" : "outline"}
-          aria-pressed={recorded === "disagreed"}
-          disabled={verdict.isPending}
-          onClick={() => send("disagreed")}
-        >
-          <ThumbsDown aria-hidden />
-          Disagree
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          {verdict.isPending ? (
+            <LoaderCircle
+              aria-hidden
+              className="size-4 animate-spin text-muted-foreground"
+            />
+          ) : null}
+          <Button
+            size="lg"
+            className="min-w-28"
+            variant={recorded === "agreed" ? "default" : "outline"}
+            aria-pressed={recorded === "agreed"}
+            disabled={verdict.isPending}
+            onClick={() => send("agreed")}
+          >
+            <ThumbsUp aria-hidden />
+            Agree
+          </Button>
+          <Button
+            size="lg"
+            className="min-w-28"
+            variant={recorded === "disagreed" ? "default" : "outline"}
+            aria-pressed={recorded === "disagreed"}
+            disabled={verdict.isPending}
+            onClick={() => send("disagreed")}
+          >
+            <ThumbsDown aria-hidden />
+            Disagree
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -1145,7 +1222,7 @@ function DiagnosisError({
     );
   }
 
-  return <ErrorState error={error} onRetry={onRetry} className="m-5 sm:m-8" />;
+  return <ErrorState error={error} onRetry={onRetry} className="m-6 sm:m-9" />;
 }
 
 function CalmState({
@@ -1162,20 +1239,16 @@ function CalmState({
   action?: { label: string; onClick: () => void };
 }) {
   return (
-    <div className="px-5 pt-4 pb-8 sm:px-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:gap-5">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-card text-muted-foreground shadow-card ring-1 ring-border">
-          <Icon aria-hidden className="size-5" />
-        </span>
+    <div className="px-6 py-8 sm:px-9">
+      <div className="flex gap-4">
+        <Icon aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
         <div className="min-w-0">
-          <p className="font-heading text-xl leading-snug font-semibold tracking-tight text-foreground sm:text-2xl">
-            {title}
-          </p>
-          <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-muted-foreground">
+          <p className="text-base font-semibold text-foreground">{title}</p>
+          <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-muted-foreground">
             {body}
           </p>
           {detail ? (
-            <p className="mt-3 max-w-prose font-mono text-[11px] leading-relaxed break-words text-muted-foreground/80">
+            <p className="mt-3 max-w-[60ch] font-mono text-xs leading-relaxed break-words text-muted-foreground/80">
               {detail}
             </p>
           ) : null}

@@ -137,7 +137,7 @@ function StopButton({
   const number = (
     <span
       className={cn(
-        "tnum flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
+        "tnum flex size-5 shrink-0 items-center justify-center rounded-sm text-xs font-semibold",
         active ? "bg-brand text-brand-foreground" : "border border-foreground/25 text-foreground",
       )}
     >
@@ -147,7 +147,7 @@ function StopButton({
   const chip = (
     <span
       className={cn(
-        "ml-auto shrink-0 truncate rounded-full border px-1.5 py-px text-[10px] font-medium",
+        "ml-auto shrink-0 truncate rounded-sm border px-1.5 py-0.5 text-xs font-medium",
         actor.chip,
       )}
     >
@@ -342,7 +342,7 @@ export function Pipeline({
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border bg-muted/40 px-4 py-2">
           <h3
             id={`${panelId}-title`}
-            className="min-w-0 text-[11px] font-semibold tracking-[0.06em] text-foreground uppercase"
+            className="min-w-0 text-sm font-semibold text-foreground"
           >
             <span className="tnum text-muted-foreground">
               Step {active + 1} of {stops.length} ·{" "}

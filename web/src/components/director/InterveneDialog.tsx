@@ -76,12 +76,12 @@ export function InterveneDialog({
           <div className="flex flex-wrap items-center gap-2 pr-8">
             <SeverityChip severity={flag.severity} />
             <span className="text-xs text-muted-foreground">
-              {detectorLabel(flag.type)} · rule {flag.rule_version ?? "—"}
+              {detectorLabel(flag.type)}, rule {flag.rule_version ?? "—"}
             </span>
           </div>
           <DialogTitle className="mt-3 font-heading text-lg leading-snug font-semibold tracking-tight">
             {flag.student_name}
-            <span className="font-normal text-muted-foreground"> · {flag.batch_name}</span>
+            <span className="font-normal text-muted-foreground">, {flag.batch_name}</span>
           </DialogTitle>
           <DialogDescription className="mt-1 text-sm leading-relaxed text-foreground">
             {flag.headline}
@@ -91,7 +91,7 @@ export function InterveneDialog({
         <div className="max-h-[60dvh] space-y-5 overflow-y-auto px-6 py-5">
           <div>
             <h4 className="mb-2.5 text-xs font-medium text-muted-foreground">
-              Evidence · {flag.topic_name} · raised {daysAgo(flag.raised_at)} (
+              Evidence on {flag.topic_name}, raised {daysAgo(flag.raised_at)} (
               {longDate(flag.raised_at)})
             </h4>
             <div className="rounded-lg bg-muted/40 px-3.5 py-3 ring-1 ring-border/70">
@@ -137,7 +137,7 @@ export function InterveneDialog({
                     aria-pressed={action === quick}
                     onClick={() => setAction(quick)}
                     className={cn(
-                      "rounded-full border px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                      "rounded-sm border px-2.5 py-1.5 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                       action === quick
                         ? "border-foreground/25 bg-muted font-medium text-foreground"
                         : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",

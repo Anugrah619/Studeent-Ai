@@ -1,6 +1,37 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { KpiCard } from "@/components/kit/KpiCard";
 import { cn } from "@/lib/utils";
+
+/**
+ * A band of figures: one sheet, its cells divided by the rule showing through a
+ * one-pixel gap.
+ *
+ * It replaces a grid of identical bordered cards. Six boxes of equal weight say
+ * "six things to look at"; one band says "here is the week" and lets a single
+ * figure lead. Painting the container in the rule colour and the cells in the
+ * sheet colour means the dividers follow the layout at every breakpoint — no
+ * per-cell border logic, and no stray rule when a row wraps.
+ *
+ * Callers must give it a cell count that fills every row at each breakpoint
+ * they choose, or the empty remainder shows the rule colour as a grey block.
+ */
+export function FigureBand({
+  children,
+  className,
+  ...rest
+}: ComponentProps<"div">) {
+  return (
+    <div
+      {...rest}
+      className={cn(
+        "grid gap-px overflow-hidden rounded-xl border border-border bg-border shadow-card",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
 interface StatTileProps {
   label: string;
@@ -16,9 +47,9 @@ interface StatTileProps {
 
 /**
  * Stat tile: the original API over the kit's KpiCard, so every existing tile
- * picks up the card look without a call site changing. The value arrives
- * pre-formatted, so it is shown as given rather than animated — a new screen
- * that has the raw number should use KpiCard directly and get the roll-in.
+ * picks up the look without a call site changing. It is one cell of a
+ * `FigureBand`. The value arrives pre-formatted, so it is shown as given rather
+ * than animated — a screen that has the raw number should use KpiCard directly.
  */
 export function StatTile({
   label,
@@ -32,6 +63,7 @@ export function StatTile({
 }: StatTileProps) {
   return (
     <KpiCard
+      variant="cell"
       label={label}
       display={value}
       delta={
@@ -48,7 +80,10 @@ export function StatTile({
   );
 }
 
-/** Meter: fill carries severity, track is a lighter step of the same ramp. */
+/**
+ * Meter: fill carries severity, track is a lighter step of the same ramp. Square
+ * ended — a bar is a measurement, and round is reserved for answers.
+ */
 export function Meter({
   value,
   max = 1,
@@ -70,11 +105,11 @@ export function Meter({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label={label}
-      className={cn("h-1.5 w-full overflow-hidden rounded-full", className)}
+      className={cn("h-2 w-full overflow-hidden rounded-[2px]", className)}
       style={{ background: `color-mix(in oklab, ${color} 18%, transparent)` }}
     >
       <div
-        className="h-full rounded-full"
+        className="h-full rounded-[2px]"
         style={{ width: `${share * 100}%`, background: color }}
       />
     </div>

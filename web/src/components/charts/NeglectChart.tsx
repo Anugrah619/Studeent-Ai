@@ -23,11 +23,11 @@ const COLUMNS = `minmax(0,1fr) ${CENTRE_W}px minmax(0,1fr)`;
 /** Inset either side of a label that sits inside its own bar. */
 const LABEL_INSET = 6;
 /**
- * Rough advance width of one character of `tnum` at 11px. Used only to decide
+ * Rough advance width of one character of `tnum` at 13px. Used only to decide
  * whether a label fits inside a bar, so an estimate is enough — and erring
  * wide just moves a borderline label outside, which is the safe direction.
  */
-const CHAR_W = 6.6;
+const CHAR_W = 7.8;
 /**
  * A bar shorter than this fraction of the axis stops reading as a bar once
  * there is a number inside it — it reads as a chip. The same reason as the
@@ -188,11 +188,11 @@ export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
           className="mb-2.5 grid items-end gap-x-3"
           style={{ gridTemplateColumns: COLUMNS }}
         >
-          <div className="text-right text-[11px] font-medium text-muted-foreground">
+          <div className="text-right text-xs font-medium text-muted-foreground">
             ← Share of study time
           </div>
           <div />
-          <div className="text-[11px] font-medium text-muted-foreground">
+          <div className="text-xs font-medium text-muted-foreground">
             Share of marks lost →
           </div>
         </div>
@@ -242,7 +242,7 @@ export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
                       {row.label}
                     </span>
                   </div>
-                  <div className="tnum text-[10px] text-muted-foreground">
+                  <div className="tnum text-xs text-muted-foreground">
                     {pct(row.accuracy_pct)} accuracy
                   </div>
                 </div>
@@ -267,7 +267,7 @@ export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
         </motion.ul>
 
         <div
-          className="mt-2.5 grid gap-x-3 text-[10px] text-muted-foreground"
+          className="mt-2.5 grid gap-x-3 text-xs text-muted-foreground"
           style={{ gridTemplateColumns: COLUMNS }}
         >
           <div className="tnum text-left">{max}%</div>
@@ -398,7 +398,7 @@ function Half({
       variants={arrive}
       custom={row}
       className={cn(
-        "tnum text-[11px] leading-none font-medium whitespace-nowrap",
+        "tnum text-xs leading-none font-medium whitespace-nowrap",
         // Inside: in flow, above the absolutely-placed fill. Outside: placed
         // on the track at the tip, centred on the bar's own midline.
         inside ? "relative" : "absolute top-1/2 -translate-y-1/2",

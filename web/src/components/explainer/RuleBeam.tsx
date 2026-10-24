@@ -52,7 +52,7 @@ export function RuleBeam({
               <p className="mt-2.5 text-sm leading-tight font-semibold text-foreground sm:text-base">
                 {stop.title}
               </p>
-              <p className="mt-1 max-w-[26ch] text-[11px] leading-snug text-muted-foreground sm:text-[13px]">
+              <p className="mt-1 max-w-[26ch] text-xs leading-snug text-muted-foreground">
                 {stop.line}
               </p>
             </li>
@@ -86,7 +86,7 @@ const BeamNode = forwardRef<HTMLDivElement, { icon: LucideIcon; accent?: boolean
         ref={ref}
         aria-hidden
         className={cn(
-          "relative z-10 flex size-11 items-center justify-center rounded-full bg-card shadow-raised ring-1 sm:size-14",
+          "relative z-10 flex size-11 items-center justify-center rounded-lg bg-card shadow-raised ring-1 sm:size-14",
           accent ? "text-brand-ink ring-brand-line" : "text-foreground ring-border",
         )}
       >

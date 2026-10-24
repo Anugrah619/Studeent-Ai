@@ -195,7 +195,7 @@ export function MockTrendChart({ rows, highlight }: Props) {
                 axisLine={false}
                 tickMargin={10}
                 padding={{ left: 10, right: 10 }}
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 13 }}
                 tickFormatter={(id: number) => {
                   const row = byId.get(id);
                   return row ? tickLabel(row) : "";
@@ -208,8 +208,8 @@ export function MockTrendChart({ rows, highlight }: Props) {
                 tickLine={false}
                 axisLine={false}
                 tickMargin={6}
-                width={30}
-                tick={{ fontSize: 10 }}
+                width={34}
+                tick={{ fontSize: 13 }}
               />
               <ChartTooltip
                 cursor={{ stroke: "var(--chart-axis)", strokeWidth: 1 }}
@@ -270,7 +270,7 @@ export function MockTrendChart({ rows, highlight }: Props) {
                               x={Number(props.x) + 10}
                               y={Number(props.y)}
                               dominantBaseline="middle"
-                              className="fill-foreground text-[11px] font-semibold"
+                              className="tnum fill-foreground text-xs font-semibold"
                             >
                               {num(Number(props.value))}
                             </text>
@@ -329,10 +329,10 @@ function TrendTooltip({ active, row }: { active?: boolean; row?: MockScore }) {
   return (
     <div
       role="status"
-      className="w-44 rounded-lg border border-border bg-popover p-2.5 text-xs shadow-overlay"
+      className="w-48 rounded-lg border border-border bg-popover p-2.5 text-xs shadow-overlay"
     >
       <div className="font-medium text-popover-foreground">{row.paper_name}</div>
-      <div className="mb-1.5 text-[11px] text-muted-foreground">
+      <div className="mb-1.5 text-xs text-muted-foreground">
         {shortDate(row.held_on)}
       </div>
       <dl className="space-y-1">

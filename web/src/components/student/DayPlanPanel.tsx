@@ -49,11 +49,12 @@ export function DayPlanPanel({ blocks }: { blocks: PlanBlock[] }) {
       <header className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
         <Smartphone aria-hidden className="size-4 text-muted-foreground" />
         <p className="text-sm font-medium text-foreground">Sample day plan</p>
-        <span className="rounded-full px-1.5 py-px text-[11px] text-muted-foreground ring-1 ring-border">
+        <span className="rounded-sm px-1.5 py-0.5 text-xs text-muted-foreground ring-1 ring-border">
           Seeded example
         </span>
-        <span className="tnum ml-auto text-xs text-muted-foreground">
-          {done} of {blocks.length} done · {duration(total)} scheduled
+        <span className="tnum ml-auto flex gap-x-4 text-xs text-muted-foreground">
+          <span>{done} of {blocks.length} done</span>
+          <span>{duration(total)} scheduled</span>
         </span>
       </header>
 
@@ -68,7 +69,7 @@ export function DayPlanPanel({ blocks }: { blocks: PlanBlock[] }) {
 
               <span
                 aria-hidden
-                className="mt-1 w-1 shrink-0 self-stretch rounded-full"
+                className="mt-1 w-1 shrink-0 self-stretch rounded-[1px]"
                 style={{ background: subject.color }}
               />
 
@@ -84,7 +85,7 @@ export function DayPlanPanel({ blocks }: { blocks: PlanBlock[] }) {
                   >
                     {block.topic_name}
                   </span>
-                  <span className="rounded-full px-1.5 py-px text-[11px] text-muted-foreground ring-1 ring-border">
+                  <span className="rounded-sm px-1.5 py-0.5 text-xs text-muted-foreground ring-1 ring-border">
                     {MODE_LABEL[block.mode] ?? block.mode}
                   </span>
                   <span className="tnum text-xs text-muted-foreground">

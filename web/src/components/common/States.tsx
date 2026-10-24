@@ -22,7 +22,7 @@ export function EmptyState({
         className,
       )}
     >
-      <span className="mb-3 flex size-10 items-center justify-center rounded-full bg-card text-muted-foreground shadow-card ring-1 ring-border">
+      <span className="mb-3 flex size-10 items-center justify-center rounded-md bg-card text-muted-foreground shadow-card ring-1 ring-border">
         {icon ?? <Inbox aria-hidden className="size-5" />}
       </span>
       <p className="text-sm font-medium text-foreground">{title}</p>
@@ -53,7 +53,7 @@ export function ErrorState({
       )}
     >
       <div className="flex items-start gap-3">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-status-critical/10 text-status-critical ring-1 ring-status-critical/20">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-status-critical/10 text-status-critical ring-1 ring-status-critical/20">
           <CircleAlert aria-hidden className="size-4" />
         </span>
         <div className="min-w-0 pt-0.5">

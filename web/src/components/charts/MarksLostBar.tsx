@@ -299,7 +299,7 @@ export function MarksLostBar({
         >
           <div style={{ flexBasis: `${conceptualWidth}%` }}>
             <div className="h-0.5 rounded-full bg-muted-foreground/50" />
-            <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
               <span className="tnum font-semibold text-foreground">
                 {num(data.conceptual_gap)}
               </span>{" "}
@@ -309,7 +309,7 @@ export function MarksLostBar({
           {totals.recoverablePct === null ? null : (
             <div style={{ flexBasis: `${recoverableWidth}%` }}>
               <div className="h-0.5 rounded-full bg-status-good" />
-              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                 <span className="tnum font-semibold text-status-good">
                   {num(data.recoverable)}
                 </span>{" "}
@@ -324,7 +324,7 @@ export function MarksLostBar({
                 className="h-0.5 rounded-full"
                 style={{ background: "var(--cause-unattributed)" }}
               />
-              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                 <span className="tnum font-semibold text-foreground">
                   {num(totals.unattributed)}
                 </span>{" "}

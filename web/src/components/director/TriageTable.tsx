@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion, type Variants } from "motion/react";
-import { ArrowRight, ChevronDown, MoveDown, MoveRight, MoveUp } from "lucide-react";
+import { ChevronDown, MoveDown, MoveRight, MoveUp } from "lucide-react";
 import type { Flag, StudentList } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -49,17 +49,14 @@ export function groupByStudent(rows: TriageRow[]): StudentGroup[] {
 const FOLD_AT = 12;
 
 /**
- * Each student arrives in turn, once, after the headline has landed — and
- * leaves with a quick fade when the batch filter drops them, so the rows that
- * stay can slide into place (`layout`) rather than jump.
+ * A student the batch filter brings back arrives with a short fade, and one it
+ * drops leaves with a quicker one, so the rows that stay can slide into place
+ * (`layout`) rather than jump. That motion answers the click on the filter.
+ * Nothing staggers in when the page first loads: the list is simply there.
  */
 const groupIn: Variants = {
   hidden: { opacity: 0, y: 8 },
-  show: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { ...transition.base, delay: 0.18 + Math.min(i, FOLD_AT) * 0.04 },
-  }),
+  show: { opacity: 1, y: 0, transition: transition.base },
   exit: { opacity: 0, transition: transition.fast },
 };
 
@@ -80,6 +77,11 @@ const CELL = "align-top whitespace-normal max-lg:block max-lg:p-0 lg:py-4";
  * "Students who need you this week." Driven by open flags rather than by the
  * roster, because a director does not want a list of 312 students — he wants
  * the handful the system can justify interrupting his week for.
+ *
+ * The page's one ledger, so it gets the room: the sentence that raised each
+ * flag in full, and the name of the check that raised it underneath rather
+ * than as a label above — what the system saw is the thing a director reads,
+ * and which rule saw it is the footnote.
  */
 export function TriageTable({
   groups,
@@ -123,7 +125,7 @@ export function TriageTable({
           </TableRow>
         </TableHeader>
 
-        <AnimatePresence initial>
+        <AnimatePresence initial={false}>
           {visible.map((group, index) => (
             <StudentRows
               key={group.studentId}
@@ -152,7 +154,7 @@ function Th({ className, children }: { className?: string; children: ReactNode }
     <TableHead
       scope="col"
       className={cn(
-        "h-10 border-b border-border bg-muted/30 px-3 text-xs font-medium text-muted-foreground",
+        "h-11 border-b border-border bg-muted/30 px-3 text-xs font-medium text-muted-foreground",
         className,
       )}
     >
@@ -199,13 +201,14 @@ function StudentRows({
         <td className={cn(CELL, "max-lg:min-w-0 max-lg:flex-1 lg:pr-3 lg:pl-5 lg:shadow-[inset_3px_0_0_var(--rail)]", firstBorder)}>
           <Link
             to={`/students/${top.student_id}`}
-            className="rounded-sm text-[15px] font-semibold text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="rounded-sm text-sm font-semibold text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             {top.student_name}
           </Link>
-          <div className="tnum mt-0.5 text-xs leading-snug text-muted-foreground">
-            {student?.roll_no ? `${student.roll_no} · ` : ""}
-            {top.batch_name} · {top.mentor_name}
+          <div className="tnum mt-0.5 flex flex-wrap gap-x-3 text-xs leading-snug text-muted-foreground">
+            {student?.roll_no ? <span>{student.roll_no}</span> : null}
+            <span>{top.batch_name}</span>
+            <span>{top.mentor_name}</span>
           </div>
         </td>
 
@@ -242,13 +245,12 @@ function StudentRows({
           {/* "Log intervention" sits last, on the right edge, so it lines up
               with the same button on the student's other flags below. */}
           <div className="flex items-center justify-end gap-1.5">
-            <Button size="sm" variant="ghost" asChild>
+            <Button size="sm" variant="link" asChild>
               <Link
                 to={`/students/${top.student_id}`}
                 aria-label={`Open ${top.student_name}'s 360 view`}
               >
                 Open
-                <ArrowRight aria-hidden className="size-3.5" />
               </Link>
             </Button>
             <InterveneButton flag={top} onIntervene={onIntervene} />
@@ -306,19 +308,19 @@ function railStyle(flag: Flag): CSSProperties {
   return { "--rail": SEVERITY[flag.severity].color } as CSSProperties;
 }
 
+/**
+ * The sentence first, then which check raised it and how long ago, quietly.
+ * It used to be the other way round — the detector's name in capitals above the
+ * sentence, like the eyebrow on every card in a template.
+ */
 function FlagSummary({ flag }: { flag: Flag }) {
   return (
     <>
-      <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-        {detectorLabel(flag.type)}
-        <span className="font-normal tracking-normal normal-case">
-          {" "}
-          · raised {daysAgo(flag.raised_at)}
-        </span>
+      <p className="max-w-[62ch] text-sm leading-snug text-foreground">{flag.headline}</p>
+      <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+        <span>{detectorLabel(flag.type)}</span>
+        <span>raised {daysAgo(flag.raised_at)}</span>
       </div>
-      <p className="mt-1 max-w-[62ch] text-sm leading-snug text-foreground">
-        {flag.headline}
-      </p>
     </>
   );
 }
@@ -360,7 +362,7 @@ function TrendCell({
   return (
     <div className="whitespace-nowrap">
       <span className={cn("tnum inline-flex items-center gap-1 text-sm font-semibold", tone)}>
-        {Icon ? <Icon aria-hidden className="size-3" /> : null}
+        {Icon ? <Icon aria-hidden className="size-3.5" /> : null}
         {signed(value)}
         <span className="sr-only"> marks across the mock series</span>
       </span>

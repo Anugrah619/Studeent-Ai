@@ -1,15 +1,13 @@
 import { useState, type ReactNode } from "react";
 import {
-  CircleCheck,
+  Check,
   CircleHelp,
-  CircleX,
   Hand,
   Lightbulb,
-  Quote,
-  Stethoscope,
   Tag,
   Timer,
   Unlink,
+  X,
 } from "lucide-react";
 import {
   STATUS_LABEL,
@@ -24,6 +22,7 @@ import {
   type QuestionOption,
 } from "@/api/questions";
 import { useQuestion } from "@/api/queries";
+import { Bubble } from "@/components/brand/Bubble";
 import { ErrorState } from "@/components/common/States";
 import { MathText } from "@/components/kit/MathText";
 import {
@@ -48,11 +47,14 @@ import { cn } from "@/lib/utils";
  * ordered as the argument a teacher actually needs, and that order is not the
  * order the API returns:
  *
- *   1  the stem            the artefact under discussion, at reading size
- *   2  the four options    the student's pick and the right answer, marked
- *                          DIFFERENTLY — never by colour alone
- *   3  the belief          what picking *that* option reveals, in the student's
- *                          own voice. The most valuable sentence on the screen
+ *   1  the stem            the artefact under discussion, set in the serif the
+ *                          way a printed paper sets it
+ *   2  the four options    an OMR row: the student's pick is the filled bubble,
+ *                          the right answer is the circled one — marked
+ *                          DIFFERENTLY, never by colour alone
+ *   3  the belief          what picking *that* option reveals, stated as the
+ *                          student holds it. The most valuable sentence on the
+ *                          screen
  *   4  the remedy          the lesson that fixes it
  *   5  the worked method   folded away, because a teacher already knows the
  *                          answer — they are here for why this student chose
@@ -60,9 +62,10 @@ import { cn } from "@/lib/utils";
  *
  * Point 3 is why the endpoint is worth opening at all. "He got D16 wrong" is a
  * mark. "A catalyst speeds the forward reaction up, so it pushes the equilibrium
- * towards the products" is a *belief*, stated as the student holds it, and it is
- * teachable on Monday morning. It gets the largest quoted type on the panel and
- * its own rule, not a tooltip.
+ * towards the products" is a *belief*, and it is teachable on Monday morning. It
+ * gets the largest type on the panel and the same ink rule the diagnosis card
+ * gives its counter-evidence: both are sentences about what this student
+ * understands.
  */
 export function QuestionPanel({
   questionId,
@@ -111,6 +114,13 @@ export function QuestionPanel({
   );
 }
 
+/** The header every state of the panel shares, so it never jumps. */
+const HEADER = "gap-1.5 border-b border-border bg-muted/50 py-4 pr-14 pl-6 sm:pl-8";
+const BODY = "space-y-6 px-6 py-6 sm:px-8 sm:py-7";
+
+/** A misconception's code, as it is filed in the catalogue. */
+const CODE = "rounded-sm bg-muted px-2 py-0.5 text-xs font-semibold tracking-wide text-foreground";
+
 /* ------------------------------------------------------------------ *
  * Body
  * ------------------------------------------------------------------ */
@@ -132,88 +142,71 @@ function QuestionBody({
 
   return (
     <>
-      <DialogHeader className="gap-1.5 border-b border-border bg-muted/40 py-4 pr-12 pl-5 sm:pl-7">
-        <DialogTitle className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-base">
-          <span className="tnum rounded-md bg-card px-2 py-0.5 font-mono text-sm font-semibold shadow-card ring-1 ring-border">
+      <DialogHeader className={HEADER}>
+        <DialogTitle className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="tnum text-lg font-semibold">
             {data.label || `#${data.id}`}
           </span>
-          <span className="text-sm font-medium text-muted-foreground">
-            {[data.subject, data.topic].filter(Boolean).join(" · ") ||
-              "Unmapped question"}
+          <span className="flex flex-wrap items-baseline gap-x-2 text-sm font-normal text-muted-foreground">
+            {data.subject ? <span>{data.subject}</span> : null}
+            {data.topic ? (
+              <span className="font-medium text-foreground">{data.topic}</span>
+            ) : null}
+            {!data.subject && !data.topic ? <span>Unmapped question</span> : null}
           </span>
         </DialogTitle>
         <DialogDescription
           id="question-panel-meta"
-          className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs"
+          className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs"
         >
           {data.paper_name ? <span>{data.paper_name}</span> : null}
           {data.difficulty ? (
-            <>
-              <span aria-hidden className="text-border">
-                ·
-              </span>
-              <span className="capitalize">{data.difficulty}</span>
-            </>
+            <span className="capitalize">{data.difficulty}</span>
           ) : null}
           {attempted && data.status ? (
-            <>
-              <span aria-hidden className="text-border">
-                ·
-              </span>
-              <span className="font-medium text-foreground">
-                {STATUS_LABEL[data.status]}
-              </span>
-            </>
+            <span className="font-medium text-foreground">
+              {STATUS_LABEL[data.status]}
+            </span>
           ) : null}
           {attempted && data.marks !== null ? (
-            <>
-              <span aria-hidden className="text-border">
-                ·
-              </span>
-              {/* Signed and singularised. "-1 marks" is what a negative mark
-                  reads as when nobody looks, and this number is the one a
-                  director can check against the paper in a minute. */}
-              <span
-                className="tnum"
-                title={
-                  data.marks < 0
-                    ? "Negative marking: a wrong answer costs a mark."
-                    : undefined
-                }
-              >
-                {data.marks > 0 ? `+${num(data.marks)}` : num(data.marks)}{" "}
-                {Math.abs(data.marks) === 1 ? "mark" : "marks"}
-              </span>
-            </>
+            /* Signed and singularised. "-1 marks" is what a negative mark
+               reads as when nobody looks, and this number is the one a
+               director can check against the paper in a minute. */
+            <span
+              className="tnum"
+              title={
+                data.marks < 0
+                  ? "Negative marking: a wrong answer costs a mark."
+                  : undefined
+              }
+            >
+              {data.marks > 0 ? `+${num(data.marks)}` : num(data.marks)}{" "}
+              {Math.abs(data.marks) === 1 ? "mark" : "marks"}
+            </span>
           ) : null}
           {attempted && data.time_spent !== null ? (
-            <>
-              <span aria-hidden className="text-border">
-                ·
-              </span>
-              <span className="tnum inline-flex items-center gap-1">
-                <Timer aria-hidden className="size-3" />
-                {data.time_spent}s
-              </span>
-            </>
+            <span className="tnum inline-flex items-center gap-1">
+              <Timer aria-hidden className="size-3.5" />
+              {data.time_spent}s
+            </span>
           ) : null}
         </DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
-        {/* 1 — the stem. The artefact. Biggest reading-size text on the panel.
+      <div className={BODY}>
+        {/* 1 — the stem. The artefact, set the way the paper prints it.
             Typeset, because real stems carry `$\theta$` and `\ce{}`; MathText
             never treats the text around a formula as HTML. */}
         <MathText
           as="p"
-          className="max-w-[60ch] text-base leading-relaxed font-medium text-foreground sm:text-[1.0625rem]"
+          className="max-w-[56ch] font-serif text-[1.375rem] leading-normal text-pretty text-foreground"
         >
           {data.question_text || "This question has no stem on file."}
         </MathText>
 
         {/* 2 — the options. */}
         {data.options.length ? (
-          <ol className="space-y-2" aria-label="Options">
+          <ol className="-mx-3 space-y-1" aria-label="Options">
             {data.options.map((option) => (
               <li key={option.label}>
                 <OptionRow option={option} who={who} asked={asked} />
@@ -271,7 +264,7 @@ function QuestionBody({
         ) : null}
 
         {alsoTagged.length ? (
-          <p className="text-xs leading-relaxed text-muted-foreground">
+          <p className="text-sm leading-relaxed text-muted-foreground">
             {alsoTagged.length === 1
               ? `One other distractor on this question carries a belief of its own (${alsoTagged[0].label} — ${alsoTagged[0].misconception?.name}). `
               : `${alsoTagged.length} other distractors here carry beliefs of their own. `}
@@ -292,12 +285,14 @@ function QuestionBody({
  * One option
  *
  * Two independent facts can be true of a row — "this is the right answer" and
- * "this student picked it" — and each is marked with an icon AND a word, so
- * neither depends on hue: a tick and "Correct answer"; a cross (or a hand, when
- * the pick was right) and "{name} chose this". A reader in greyscale, or with
- * any colour-vision deficiency, still gets both. A wrong pick also carries the
- * tag on that distractor, named in plain language — the belief that produced
- * the choice, right where the choice is.
+ * "this student picked it" — and they are marked by two different means so
+ * neither depends on hue: the correct answer's bubble is circled and the row
+ * says Correct answer; the student's pick is a filled bubble and the row says
+ * their name, with a cross when the pick was wrong and a hand when it was
+ * right. A reader in greyscale, or with any colour-vision deficiency, still
+ * gets both. The faint wash behind the two rows is a third cue, not the first.
+ * A wrong pick also carries the tag on that distractor, named in plain
+ * language — the belief that produced the choice, right where the choice is.
  * ------------------------------------------------------------------ */
 
 function OptionRow({
@@ -318,66 +313,59 @@ function OptionRow({
   return (
     <div
       className={cn(
-        "flex gap-3 rounded-xl px-3.5 py-3 ring-1 ring-inset",
+        "flex gap-4 rounded-md px-3 py-3",
         option.is_correct
-          ? "bg-status-good/[0.07] ring-status-good/45"
+          ? "bg-status-good/8"
           : wrongPick
-            ? "bg-status-critical/[0.06] ring-status-critical/45"
-            : "ring-border",
+            ? "bg-status-critical/8"
+            : undefined,
       )}
     >
-      <span
-        aria-hidden
-        className={cn(
-          "tnum mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-semibold",
-          option.is_correct
-            ? "bg-status-good text-background"
-            : wrongPick
-              ? "bg-status-critical text-background"
-              : "bg-muted text-muted-foreground ring-1 ring-border ring-inset",
-        )}
-      >
-        {option.label}
-      </span>
+      <Bubble
+        letter={option.label}
+        filled={picked}
+        ringed={option.is_correct}
+        className="mt-0.5"
+      />
 
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] leading-relaxed text-foreground">
+        <p className="font-serif text-base leading-relaxed text-foreground">
           <span className="sr-only">Option {option.label}: </span>
           <MathText>{option.text}</MathText>
         </p>
 
         {option.is_correct || picked ? (
-          <p className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold">
             {option.is_correct ? (
-              <Marker tone="good" icon={<CircleCheck aria-hidden className="size-3.5" />}>
+              <span className="inline-flex items-center gap-1.5 text-status-good">
+                <Check aria-hidden className="size-4" />
                 Correct answer
-              </Marker>
+              </span>
             ) : null}
             {picked ? (
-              <Marker
-                tone={wrongPick ? "critical" : "neutral"}
-                icon={
-                  wrongPick ? (
-                    <CircleX aria-hidden className="size-3.5" />
-                  ) : (
-                    <Hand aria-hidden className="size-3.5" />
-                  )
-                }
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5",
+                  wrongPick ? "text-status-critical" : "text-foreground",
+                )}
               >
+                {wrongPick ? (
+                  <X aria-hidden className="size-4" />
+                ) : (
+                  <Hand aria-hidden className="size-4" />
+                )}
                 {who} chose this
                 {wrongPick ? <span className="sr-only"> — a wrong answer</span> : null}
-              </Marker>
+              </span>
             ) : null}
           </p>
         ) : null}
 
         {tag ? (
-          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
             <Tag aria-hidden className="size-3.5 shrink-0" />
             <span>Tagged</span>
-            <code className="rounded-md bg-card px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground ring-1 ring-border">
-              {tag.code}
-            </code>
+            <span className={CODE}>{tag.code}</span>
             {tag.name ? (
               <span className="font-medium text-foreground">{tag.name}</span>
             ) : null}
@@ -388,41 +376,17 @@ function OptionRow({
   );
 }
 
-const MARKER_TONE = {
-  good: "bg-status-good/12 text-status-good ring-status-good/30",
-  critical: "bg-status-critical/10 text-status-critical ring-status-critical/30",
-  neutral: "bg-muted text-foreground ring-border",
-} as const;
-
-function Marker({
-  tone,
-  icon,
-  children,
-}: {
-  tone: keyof typeof MARKER_TONE;
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset",
-        MARKER_TONE[tone],
-      )}
-    >
-      {icon}
-      {children}
-    </span>
-  );
-}
-
 /* ------------------------------------------------------------------ *
  * The belief
  *
- * Given the largest quoted type on the panel, its own rule and no colour that
- * reads as an error. It is not a warning — it is a sentence the student would
- * agree with, which is exactly what makes it teachable. A teacher who reads it
- * knows what to say at the board; a mark out of four never told them that.
+ * Given the largest type on the panel, an ink rule, and no colour that reads as
+ * an error. It is not a warning — it is a sentence the student would agree
+ * with, which is exactly what makes it teachable. A teacher who reads it knows
+ * what to say at the board; a mark out of four never told them that.
+ *
+ * It is the catalogue's description of the misconception, written when the
+ * paper was tagged, and never anything the student wrote — so it carries no
+ * quotation marks and the heading does not call it their words.
  * ------------------------------------------------------------------ */
 
 function Belief({
@@ -439,38 +403,25 @@ function Belief({
   return (
     <section
       aria-labelledby="belief-heading"
-      className="rounded-xl bg-muted/50 px-4 py-4 ring-1 ring-foreground/15 sm:px-5"
+      className="border-l-[3px] border-foreground pl-5"
     >
-      <h3
-        id="belief-heading"
-        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold tracking-[0.08em] text-foreground uppercase"
-      >
-        <Stethoscope aria-hidden className="size-3.5" />
-        {/* The text below is the catalogue's description of the misconception,
-            written when the paper was tagged — never anything the student
-            wrote, so it is not put in their mouth. */}
+      <h3 id="belief-heading" className="text-sm font-semibold text-foreground">
         {optionLabel
           ? `The belief behind choosing (${optionLabel})`
           : "The belief behind this choice"}
       </h3>
 
-      <blockquote className="mt-2.5 flex gap-2.5">
-        <Quote
-          aria-hidden
-          className="mt-1 size-4 shrink-0 text-muted-foreground"
-        />
+      <blockquote className="mt-3">
         <MathText
           as="p"
-          className="max-w-[54ch] text-[0.9375rem] leading-relaxed text-foreground sm:text-base"
+          className="max-w-[50ch] font-serif text-xl leading-relaxed text-foreground"
         >
           {description}
         </MathText>
       </blockquote>
 
-      <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-        <code className="rounded-md bg-card px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground ring-1 ring-border">
-          {code}
-        </code>
+      <p className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+        <span className={CODE}>{code}</span>
         {name ? <span>{name}</span> : null}
       </p>
     </section>
@@ -483,18 +434,14 @@ function Belief({
 
 function Remedy({ text }: { text: string }) {
   return (
-    <section
-      aria-labelledby="remedy-heading"
-      className="rounded-r-xl border-l-[3px] border-status-good bg-status-good/[0.07] py-3 pr-4 pl-3.5"
-    >
-      <h3
-        id="remedy-heading"
-        className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-foreground uppercase"
-      >
-        <Lightbulb aria-hidden className="size-3.5" />
+    <section aria-labelledby="remedy-heading" className="border-t border-border pt-5">
+      <h3 id="remedy-heading" className="text-sm font-semibold text-foreground">
         What fixes it
       </h3>
-      <MathText as="p" className="mt-1.5 max-w-prose text-sm leading-relaxed text-foreground">
+      <MathText
+        as="p"
+        className="mt-2 max-w-[56ch] font-serif text-base leading-relaxed text-foreground"
+      >
         {text}
       </MathText>
     </section>
@@ -518,8 +465,8 @@ function Solution({
   correct: { label: string } | null;
 }) {
   return (
-    <details className="group rounded-xl ring-1 ring-border">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-3.5 py-2.5 text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
+    <details className="group rounded-md border border-border">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-4 py-3 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
         <span
           aria-hidden
           className="transition-transform group-open:rotate-90"
@@ -528,12 +475,12 @@ function Solution({
         </span>
         The worked method
         {correct?.label ? (
-          <span className="font-normal">· answer ({correct.label})</span>
+          <span className="font-normal">answer ({correct.label})</span>
         ) : null}
       </summary>
       <MathText
         as="p"
-        className="max-w-prose px-3.5 pt-0.5 pb-3.5 text-sm leading-relaxed text-muted-foreground"
+        className="max-w-[56ch] px-4 pt-0.5 pb-4 font-serif text-base leading-relaxed text-muted-foreground"
       >
         {text}
       </MathText>
@@ -547,8 +494,8 @@ function Solution({
 
 function Note({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
-    <p className="flex gap-2.5 rounded-lg border border-dashed border-border bg-muted/30 px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
-      <span className="mt-px shrink-0">{icon}</span>
+    <p className="flex gap-3 rounded-md border border-dashed border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+      <span className="mt-0.5 shrink-0">{icon}</span>
       <span className="max-w-prose">{children}</span>
     </p>
   );
@@ -557,7 +504,7 @@ function Note({ icon, children }: { icon: ReactNode; children: ReactNode }) {
 function QuestionSkeleton() {
   return (
     <>
-      <DialogHeader className="gap-1 border-b border-border bg-muted/40 py-3.5 pr-12 pl-5 sm:pl-7">
+      <DialogHeader className={HEADER}>
         <DialogTitle className="text-base">
           <span className="sr-only">Loading the cited question</span>
           {/* A `<span>`, not the `Skeleton` div: these live inside the Radix
@@ -565,27 +512,27 @@ function QuestionSkeleton() {
               the browser's own parser — which unmounts React's node. */}
           <span
             aria-hidden
-            className="inline-block h-4 w-44 animate-pulse rounded-md bg-muted align-middle"
+            className="inline-block h-4 w-44 animate-pulse rounded-sm bg-foreground/[0.07] align-middle"
           />
         </DialogTitle>
         <DialogDescription id="question-panel-meta">
           <span
             aria-hidden
-            className="inline-block h-3 w-56 animate-pulse rounded-md bg-muted align-middle"
+            className="inline-block h-3 w-56 animate-pulse rounded-sm bg-foreground/[0.07] align-middle"
           />
         </DialogDescription>
       </DialogHeader>
-      <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+      <div className={BODY}>
         <div className="space-y-2">
-          <Skeleton className="h-4 w-[92%]" />
-          <Skeleton className="h-4 w-[64%]" />
+          <Skeleton className="h-5 w-[92%]" />
+          <Skeleton className="h-5 w-[64%]" />
         </div>
         <div className="space-y-1.5">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-12 rounded-lg" />
+            <Skeleton key={i} className="h-12 rounded-md" />
           ))}
         </div>
-        <Skeleton className="h-28 rounded-lg" />
+        <Skeleton className="h-28 rounded-md" />
       </div>
     </>
   );
@@ -613,7 +560,7 @@ function QuestionFailure({
   if (isQuestionMissing(error)) {
     return (
       <>
-        <DialogHeader className="gap-1 border-b border-border bg-muted/40 py-3.5 pr-12 pl-5 sm:pl-7">
+        <DialogHeader className={HEADER}>
           <DialogTitle className="text-base">
             This citation has no question behind it
           </DialogTitle>
@@ -621,14 +568,14 @@ function QuestionFailure({
             Question #{questionId} is not in this institute&rsquo;s papers.
           </DialogDescription>
         </DialogHeader>
-        <div className="px-5 py-5 sm:px-7">
+        <div className="px-6 py-6 sm:px-8">
           <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
             The diagnosis cited a question the server could resolve to an id, but
             that id no longer answers — the paper may have been re-imported since
             the diagnosis was cached. Nothing is claimed for it, and the marks
             above do not count it.
           </p>
-          <p className="mt-2.5 font-mono text-[11px] break-words text-muted-foreground/80">
+          <p className="mt-3 font-mono text-xs break-words text-muted-foreground/80">
             {error.message}
           </p>
         </div>
@@ -638,13 +585,13 @@ function QuestionFailure({
 
   return (
     <>
-      <DialogHeader className="gap-1 border-b border-border bg-muted/40 py-3.5 pr-12 pl-5 sm:pl-7">
+      <DialogHeader className={HEADER}>
         <DialogTitle className="text-base">Could not load the question</DialogTitle>
         <DialogDescription id="question-panel-meta" className="text-xs">
           Question #{questionId}
         </DialogDescription>
       </DialogHeader>
-      <div className="px-5 py-5 sm:px-7">
+      <div className="px-6 py-6 sm:px-8">
         <ErrorState error={error} onRetry={onRetry} />
       </div>
     </>

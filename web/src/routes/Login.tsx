@@ -1,12 +1,11 @@
 import { useState, type FormEvent } from "react";
-import { motion } from "motion/react";
-import { GraduationCap, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import { USE_MOCKS } from "@/api/env";
+import { Wordmark } from "@/components/brand/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { fadeUp, scaleIn, stagger } from "@/lib/motion";
 
 /**
  * The three claims the product is built to keep, in the words the explainer
@@ -35,8 +34,11 @@ const PROMISES = [
  * HttpOnly cookie the page cannot read, which is the point of using sessions —
  * an XSS on this origin cannot walk away with the credential.
  *
- * This is the one screen allowed a brand moment: there is no data on it to
- * compete with, and it is the first thing a director sees.
+ * This is the one screen with room to say what the product is: there is no data
+ * on it to compete with, and it is the first thing a director sees. It says it
+ * in the product's own two voices — the claim in the serif, the promises in the
+ * grotesque — and in nothing else: no gradient on a phrase, no wash or grid
+ * behind it, and no entrance.
  */
 export function Login() {
   const { login, loginPending, loginError } = useAuth();
@@ -57,49 +59,27 @@ export function Login() {
 
   return (
     <div className="grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-      {/* The brand panel. Static wash and grid, no motion beyond its entrance. */}
-      <motion.aside
-        variants={stagger(0.08, 0.05)}
-        initial="hidden"
-        animate="show"
-        className="relative isolate hidden overflow-hidden border-r border-border px-12 py-12 lg:flex lg:flex-col xl:px-16"
-      >
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-hero">
-          <div className="absolute inset-0 bg-grid-faint" />
-        </div>
-
-        <motion.div variants={fadeUp}>
-          <Brand />
-        </motion.div>
+      <aside className="hidden border-r border-border bg-muted/50 px-12 py-12 lg:flex lg:flex-col xl:px-16">
+        <Wordmark tagline="Mentor & director console" />
 
         <div className="my-auto max-w-lg py-12">
-          <motion.p
-            variants={fadeUp}
-            className="text-xs font-semibold tracking-[0.08em] text-brand-ink uppercase"
-          >
-            For coaching institutes · JEE &amp; NEET
-          </motion.p>
-          <motion.h2
-            variants={fadeUp}
-            className="mt-4 font-heading text-4xl leading-[1.1] font-semibold tracking-tight text-foreground xl:text-[44px]"
-          >
-            Not just the score.{" "}
-            <span className="text-brand-gradient">What each student misunderstands.</span>
-          </motion.h2>
-          <motion.p
-            variants={fadeUp}
-            className="mt-4 max-w-md text-base leading-relaxed text-muted-foreground"
-          >
+          <p className="text-sm font-medium text-muted-foreground">
+            For coaching institutes, JEE and NEET
+          </p>
+          <h2 className="mt-4 font-serif text-4xl leading-[1.1] font-semibold tracking-tight text-foreground xl:text-[44px]">
+            Not just the score. What each student misunderstands.
+          </h2>
+          <p className="mt-4 max-w-md text-base leading-relaxed text-muted-foreground">
             Student AI works out the mistake behind the marks a student lost on a
             mock, and tells the teacher what to do about it this week.
-          </motion.p>
+          </p>
 
-          <motion.ul variants={stagger(0.07)} className="mt-10 space-y-5">
+          <ul className="mt-10 space-y-5">
             {PROMISES.map((item) => (
-              <motion.li key={item.title} variants={fadeUp} className="flex gap-3.5">
+              <li key={item.title} className="flex gap-3.5">
                 <span
                   aria-hidden
-                  className="mt-1.5 size-2 shrink-0 rounded-full bg-brand ring-4 ring-brand-soft"
+                  className="mt-2 size-2 shrink-0 rounded-[2px] bg-brand"
                 />
                 <div>
                   <p className="text-sm font-semibold text-foreground">{item.title}</p>
@@ -107,32 +87,25 @@ export function Login() {
                     {item.body}
                   </p>
                 </div>
-              </motion.li>
+              </li>
             ))}
-          </motion.ul>
+          </ul>
         </div>
-      </motion.aside>
+      </aside>
 
       {/* The form. On a phone this is the whole screen. */}
       <main className="flex items-center justify-center px-4 py-10 sm:px-8">
-        <motion.div
-          variants={scaleIn}
-          initial="hidden"
-          animate="show"
-          className="w-full max-w-sm"
-        >
-          <div className="mb-8 lg:hidden">
-            <Brand />
-          </div>
+        <div className="w-full max-w-sm">
+          <Wordmark tagline="Mentor & director console" className="mb-9 lg:hidden" />
 
           <h1 className="font-heading text-2xl font-semibold tracking-tight">Sign in</h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             Your institute is read from your account. You will only ever see your
             own institute&rsquo;s students.
           </p>
 
-          <form onSubmit={onSubmit} className="mt-7 space-y-4" noValidate>
-            <div className="space-y-1.5">
+          <form onSubmit={onSubmit} className="mt-7 space-y-5" noValidate>
+            <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
               <Input
                 id="username"
@@ -144,11 +117,10 @@ export function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 aria-invalid={loginError ? true : undefined}
-                className="h-10 bg-card"
               />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -158,7 +130,6 @@ export function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 aria-invalid={loginError ? true : undefined}
-                className="h-10 bg-card"
               />
             </div>
 
@@ -166,19 +137,16 @@ export function Login() {
                 the form having to steal focus back from the password field. */}
             <div aria-live="polite">
               {loginError ? (
-                <motion.p
+                <p
                   role="alert"
-                  variants={fadeUp}
-                  initial="hidden"
-                  animate="show"
-                  className="rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-2 text-xs leading-relaxed text-foreground"
+                  className="rounded-md border border-status-critical/30 bg-status-critical/5 px-3.5 py-2.5 text-sm leading-relaxed text-foreground"
                 >
                   {loginError.message}
-                </motion.p>
+                </p>
               ) : null}
             </div>
 
-            <Button type="submit" size="lg" className="h-10 w-full" disabled={!canSubmit}>
+            <Button type="submit" size="lg" className="w-full" disabled={!canSubmit}>
               {loginPending ? (
                 <>
                   <Loader2 aria-hidden className="size-4 animate-spin" />
@@ -191,26 +159,8 @@ export function Login() {
           </form>
 
           <DemoHint />
-        </motion.div>
+        </div>
       </main>
-    </div>
-  );
-}
-
-function Brand() {
-  return (
-    <div className="flex items-center gap-3">
-      <span
-        aria-hidden
-        className="relative flex size-10 items-center justify-center rounded-[11px] bg-brand text-brand-foreground shadow-[inset_0_1px_0_oklch(1_0_0/0.28),inset_0_-1px_0_oklch(0_0_0/0.12),0_1px_2px_oklch(0.25_0.04_230/0.25)]"
-      >
-        <span className="absolute inset-0 rounded-[11px] bg-linear-to-b from-white/18 to-transparent" />
-        <GraduationCap className="relative size-5" strokeWidth={2.1} />
-      </span>
-      <div className="leading-tight">
-        <div className="text-[15px] font-semibold tracking-tight text-foreground">Student AI</div>
-        <div className="text-xs text-muted-foreground">Mentor &amp; director console</div>
-      </div>
     </div>
   );
 }
@@ -223,16 +173,16 @@ function Brand() {
 function DemoHint() {
   if (!USE_MOCKS && !import.meta.env.DEV) return null;
   return (
-    <div className="mt-8 rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3.5 text-xs leading-relaxed text-muted-foreground">
+    <div className="mt-8 rounded-md border border-dashed border-border px-4 py-3.5 text-sm leading-relaxed text-muted-foreground">
       <p className="font-medium text-foreground">Seeded demo accounts</p>
-      <p className="mt-1">
+      <p className="mt-1.5">
         Mentors at Aarambh Classes:{" "}
         <code className="font-mono">aarambh.bhatia</code>,{" "}
         <code className="font-mono">aarambh.nagarajan</code>,{" "}
-        <code className="font-mono">aarambh.kulkarni</code> · password{" "}
+        <code className="font-mono">aarambh.kulkarni</code>. The password is{" "}
         <code className="font-mono">demo12345</code>.
       </p>
-      <p className="mt-1.5">
+      <p className="mt-2">
         On the live server, <code className="font-mono">pinnacle.rao</code>{" "}
         belongs to a second institute — sign in as them to see only its three
         students and none of Aarambh&rsquo;s. The demo dataset has one institute.

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { GraduationCap } from "lucide-react";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 /**
  * The plain centred page the post-sign-in holding screens share: the first
@@ -11,17 +11,7 @@ export function AuthFrame({ children }: { children: ReactNode }) {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background px-4 py-10 sm:px-8">
       <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-10 items-center justify-center rounded-[11px] bg-brand text-brand-foreground"
-          >
-            <GraduationCap className="size-5" strokeWidth={2.1} />
-          </span>
-          <span className="text-[15px] font-semibold tracking-tight text-foreground">
-            Student AI
-          </span>
-        </div>
+        <Wordmark className="mb-9" />
         {children}
       </div>
     </main>
