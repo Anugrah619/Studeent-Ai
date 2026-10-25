@@ -40,15 +40,25 @@
  *     `GET /api/questions/{id}/` answers on, plus the option this student
  *     picked. A label alone never could be linked — it is unique only within
  *     one paper — which is exactly why the server resolves it now.
+ *
+ * And against the round-two contract:
+ *
+ *   MOCK_SCORES_ORDER                          `mock-scores/` is documented
+ *     `held_on` ascending, a guarantee, so `useMockScores` no longer re-sorts.
+ *   QUESTION_PROVENANCE                        `TestPaper.source` says where a
+ *     paper came from (official past paper, the institute's own, ours, or
+ *     generated). The Papers screen labels every paper by it and "Data & trust"
+ *     counts the official ones from `usePapers()`; `importRecords.ts` keeps only
+ *     what no route reports (syllabus chapter counts, the cross-check's
+ *     agreement figures).
+ *
+ * Still open below, though the contract now carries what would close them —
+ * `counter_evidence_questions`, `tally` and `student_ref` on the diagnosis.
+ * Their compensations live in `lib/explainer.ts`, which the console round did
+ * not own; deleting each entry means deleting its compensation with it.
  */
 
 export const API_GAPS = {
-  /**
-   * `mock-scores/` is ordered by `held_on` in the view, but the contract does
-   * not promise it and the trend chart's whole meaning is the order of its
-   * points. The hook sorts rather than trusts.
-   */
-  MOCK_SCORES_ORDER: "GET mock-scores/ does not guarantee held_on ordering",
   /**
    * `human_verdict` is declared a plain `string`, but the server's third value
    * is the literal `"unreviewed"` and that enum is not in the schema.
@@ -84,20 +94,6 @@ export const API_GAPS = {
    * `lib/explainer.ts: pseudonymFor` rather than reading it.
    */
   STUDENT_REF_NOT_EXPOSED: "Diagnosis does not echo the student_ref the model was sent",
-  /**
-   * Nothing in the contract says where a question or paper came from — an
-   * official past paper (NEET, JEE Main), our own diagnostic paper, or a
-   * generated one. So no route can count them, and "Data & trust" prints the
-   * syllabus, past-paper and answer-key cross-check figures from
-   * `components/explainer/importRecords.ts` instead: counted when the
-   * documents were imported, checked by hand, and tagged "Import records"
-   * wherever they appear so they are never read as live. When `TestPaper` /
-   * `QuestionDetail` carry a `source`, `ProvenanceExhibit` in
-   * `routes/DataTrust.tsx` counts `usePapers()` by it, `importRecords.ts`
-   * shrinks to what the API still cannot say, and this entry is deleted.
-   */
-  QUESTION_PROVENANCE:
-    "TestPaper / QuestionDetail carry no source (official past paper / ours / generated)",
 } as const;
 
 export type ApiGap = keyof typeof API_GAPS;

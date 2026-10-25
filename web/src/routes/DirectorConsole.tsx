@@ -30,6 +30,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SEVERITY } from "@/lib/severity";
 import { longDate, num } from "@/lib/format";
+import { RefreshedLine } from "@/staff/console";
+import { StudentLoginsRoster } from "@/staff/logins";
 
 const ALL = "all";
 const WEEK_MS = 7 * 86_400_000;
@@ -167,6 +169,7 @@ export function DirectorConsole() {
                 </span>
               </span>
             ) : null}
+            {summary.data ? <RefreshedLine at={summary.data.last_refreshed_at} /> : null}
           </>
         }
         actions={
@@ -258,6 +261,13 @@ export function DirectorConsole() {
         ) : (
           <ClosedLoopPanel flags={closed} />
         )}
+      </Section>
+
+      <Section
+        title="Student logins"
+        description="Each student signs in to their own app with their roll number. Issue a login to hand over a temporary password; they choose their own at first sign-in."
+      >
+        <StudentLoginsRoster batch={shownBatch} />
       </Section>
 
       <InterveneDialog

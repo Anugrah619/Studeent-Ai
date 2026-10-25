@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/common/States";
 import { EvidenceList } from "@/components/director/EvidenceList";
 import { daysAgo } from "@/lib/format";
 import { detectorLabel } from "@/lib/severity";
+import { FlagInterventions } from "@/staff/flags";
 
 export function StudentFlagsPanel({
   flags,
@@ -44,6 +45,8 @@ export function StudentFlagsPanel({
           <div className="mt-3 flex-1">
             <EvidenceList evidence={flag.evidence} />
           </div>
+
+          <FlagInterventions flagId={flag.id} className="mt-3 border-t border-border pt-3" />
 
           <div className="mt-4 flex items-center justify-between gap-2">
             <span className="flex min-w-0 flex-wrap gap-x-3 text-xs text-muted-foreground">

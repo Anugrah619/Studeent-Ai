@@ -5,7 +5,6 @@ import type { Flag } from "@/api/types";
 import {
   useFlags,
   useMockScores,
-  usePlan,
   useStudent,
   useSubjectBreakdown,
   useTopicStates,
@@ -19,7 +18,6 @@ import {
 import { DiagnosisCard } from "@/components/student/DiagnosisCard";
 import { TopicMasteryGrid } from "@/components/student/TopicMasteryGrid";
 import { StudentFlagsPanel } from "@/components/student/StudentFlagsPanel";
-import { DayPlanPanel } from "@/components/student/DayPlanPanel";
 import { MockTrendChart } from "@/components/charts/MockTrendChart";
 import { NeglectChart } from "@/components/charts/NeglectChart";
 import { InterveneDialog } from "@/components/director/InterveneDialog";
@@ -27,6 +25,8 @@ import { Section } from "@/components/kit/Section";
 import { ErrorState, PanelSkeleton } from "@/components/common/States";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { firstName } from "@/lib/explainer";
+import { LoginControl } from "@/staff/logins";
+import { StudentActivity, StudentDayPlan } from "@/staff/student360";
 
 /**
  * Student 360, read top to bottom as three answers:
@@ -47,7 +47,6 @@ export function Student360() {
   const scores = useMockScores(id);
   const breakdown = useSubjectBreakdown(id);
   const topics = useTopicStates(id);
-  const plan = usePlan();
   // `?student=` and `?open=` are both declared now, so this asks the server for
   // one student's open flags instead of pulling all 81 in the institute and
   // narrowing in the browser — which, past `PAGE_SIZE 50`, meant following a
@@ -57,7 +56,7 @@ export function Student360() {
 
   /**
    * The diagnosis is per-paper, and the paper a director cares about is the
-   * one just sat. `useMockScores` already sorts by `held_on`, so the last row
+   * one just sat. `mock-scores/` is ordered by `held_on` (a contract guarantee), so the last row
    * is the latest mock — the same paper the "Where the marks went" screen
    * opens on.
    */
@@ -86,7 +85,24 @@ export function Student360() {
         {student.isPending || !student.data ? (
           <StudentHeaderSkeleton />
         ) : (
-          <StudentHeader student={student.data} latest={latestMock} />
+          <>
+            <StudentHeader student={student.data} latest={latestMock} />
+            {/* Whether this student can sign in to their own app, and the one
+                action that moves it on. */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+              <span className="text-muted-foreground">Student app login</span>
+              <LoginControl
+                student={{
+                  id: student.data.id,
+                  name: student.data.name,
+                  roll_no: student.data.roll_no,
+                  login_status: student.data.login_status,
+                  exited_at: student.data.exited_at,
+                  mentor_name: student.data.mentor.name,
+                }}
+              />
+            </div>
+          </>
         )}
 
         <DiagnosisCard
@@ -128,8 +144,19 @@ export function Student360() {
       </Section>
 
       <Section
+        title={`What ${name} does between mocks`}
+        description="Their own answers at onboarding, the study they log, how sure they say they are, the revisions the system has booked, and the chapters they are starting to forget."
+      >
+        {student.isPending || !student.data ? (
+          <PanelSkeleton lines={4} />
+        ) : (
+          <StudentActivity student={student.data} />
+        )}
+      </Section>
+
+      <Section
         title="Behind the numbers"
-        description="The open flags, with the evidence recorded for each; every chapter's mastery; and a sample day plan."
+        description="The open flags, with the evidence recorded for each and what was done about them; every chapter's mastery; and the day's plan."
       >
         {/* Every panel stays mounted (`forceMount`) and is only hidden when
             inactive, so a filter set in one tab survives a visit to another
@@ -172,11 +199,7 @@ export function Student360() {
           </TabsContent>
 
           <TabsContent value="plan" forceMount className="data-[state=inactive]:hidden">
-            {plan.isPending ? (
-              <PanelSkeleton lines={6} />
-            ) : (
-              <DayPlanPanel blocks={plan.data ?? []} />
-            )}
+            <StudentDayPlan studentId={id} name={student.data?.name ?? "this student"} />
           </TabsContent>
         </Tabs>
       </Section>

@@ -341,7 +341,9 @@ export function HowItWorks() {
                   </p>
                   <p>
                     That judgement is saved alongside the AI&rsquo;s reasoning, as a
-                    checked example for training a model of our own later. Today it
+                    checked example for training a model of our own later. It also
+                    decides what the student sees: only a finding a teacher agreed
+                    with reaches the student&rsquo;s own app, reworded for them. It
                     changes nothing else — not this diagnosis, and not the next one.
                   </p>
                 </>
@@ -1037,7 +1039,7 @@ function KeyIdeas({
           <IdeaCard
             icon={UserCheck}
             title="A teacher checks the AI"
-            body="Each finding opens to the wrong answers it cites. A teacher's Agree or Disagree is saved with the reasoning, as a label for training a model of our own later."
+            body="Each finding opens to the wrong answers it cites. A teacher's Agree or Disagree is saved with the reasoning, and only an agreed finding is ever shown to the student."
             to="#step-check"
             cta="See the teacher's view"
           />

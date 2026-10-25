@@ -174,21 +174,28 @@ test("a wrong temporary password is refused and says which one", async () => {
   await act(async () => root.unmount());
 });
 
-test("a student who chooses a password lands on the holding page, not the console", async () => {
+test("a student who chooses a password lands in the student app, not the console", async () => {
   signInAs(STUDENT_ON_TEMPORARY);
   const root = await renderApp();
   await waitFor(() => text().includes("Choose your own password"));
 
   await fillAndSubmit("demo12345", "a-much-better-one");
-  await waitFor(() => text().includes("You’re all set"));
+  // A new student has not onboarded, so the student app opens on that. The
+  // facts arrive on their own request, a moment after the heading.
+  await waitFor(
+    () =>
+      text().includes("Let's fit your plan to your day.") &&
+      text().includes("Your institute set these"),
+  );
 
   const body = text();
-  assert.ok(body.includes("Aarav"), "uses their first name");
-  assert.ok(body.includes("Aarambh Classes"), "names their institute");
+  assert.ok(body.includes("Your institute set these"), "the institute's facts, to confirm");
+  assert.ok(body.includes("How many minutes a day can you study?"));
   assert.ok(!body.includes("Director console"));
   assert.ok(!body.includes("Choose your own password"), "the gate is open");
   // Still no console traffic: a student's console routes are all 403.
   assert.ok(!requested.some((p) => p.startsWith("/api/students") || p.startsWith("/api/dashboard")));
+  assert.ok(requested.includes("/api/my/profile/"), "the student app asked who they are");
   await act(async () => root.unmount());
 });
 
@@ -203,10 +210,10 @@ test("a mentor who chooses a password goes straight into the console", async () 
   await act(async () => root.unmount());
 });
 
-test("a student past the first sign-in still gets the holding page, not a screen of 403s", async () => {
+test("a student past the first sign-in gets the student app, not a screen of 403s", async () => {
   signInAs({ ...STUDENT_ON_TEMPORARY, must_change_password: false });
   const root = await renderApp();
-  await waitFor(() => text().includes("You’re all set"));
+  await waitFor(() => text().includes("Let's fit your plan to your day."));
   assert.ok(!text().includes("Director console"));
   assert.ok(!requested.some((p) => p.startsWith("/api/students")));
   await act(async () => root.unmount());

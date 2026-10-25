@@ -18,12 +18,16 @@ import { flags, interventions } from "./fixtures/flags";
 import { INSTITUTE, batches, mentors, papers } from "./fixtures/institute";
 import { planBlocks } from "./fixtures/plan";
 import { KNOWN_STUDENTS, hasQuestion, questionFor } from "./fixtures/questions";
+import { looksLikeRollNumber } from "./fixtures/student/personas";
+import { studentLogin } from "./fixtures/student/world";
+import { studentHandlers } from "./studentHandlers";
 import {
   mockScoresFor,
   seeds,
   studentDetail,
   studentListRow,
 } from "./fixtures/students";
+import { staffHandlers } from "./staffHandlers";
 
 /**
  * The mock server exists to run the *same client code* the live API runs, so
@@ -164,6 +168,15 @@ function guard<T>(
 }
 
 export const handlers = [
+  // The student app's `/api/my/…` routes. First, so a student's request is
+  // answered from their own world; a staff session falls through to the
+  // console's handlers below on the routes those already serve.
+  ...studentHandlers(() => session.me),
+
+  // The console's staff tools (logins, papers, uploads, tagging, review).
+  // They override the base roster routes so login status can change.
+  ...staffHandlers,
+
   /* ---------------------------------------------------------------- auth */
 
   http.get("/api/auth/csrf/", () => {
@@ -200,6 +213,19 @@ export const handlers = [
         { detail: "Incorrect username or password." },
         { status: 400 },
       );
+    }
+    // A roll number signs in as that student, on the temporary password the
+    // first time in a session (A-1041 is JEE, N-5012 is NEET).
+    if (looksLikeRollNumber(body.username)) {
+      const student = studentLogin(body.username);
+      if (!student) {
+        return HttpResponse.json(
+          { detail: "Incorrect username or password." },
+          { status: 400 },
+        );
+      }
+      session.me = student;
+      return HttpResponse.json(session.me);
     }
     session.me = { ...DEMO_ME, username: body.username };
     return HttpResponse.json(session.me);

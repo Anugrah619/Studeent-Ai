@@ -30,6 +30,9 @@ const NAV: NavItemDef[] = [
   // Lit for every student, not only the one the link opens: on /students/7
   // the reader is still in Student 360, and an unlit nav says otherwise.
   { to: "/students/1", label: "Student 360", active: (p) => p.startsWith("/students/") },
+  // Staff tools: a paper's blueprint, results and tags; the answer-key queue.
+  { to: "/papers", label: "Papers", active: (p) => p.startsWith("/papers") },
+  { to: "/review", label: "Review", active: (p) => p.startsWith("/review") },
   // The explanation layer: how a diagnosis is made, and why to trust it. In
   // the main navigation rather than a footer, because in a pitch they are the
   // pages a director is shown second, right after the console.
@@ -103,7 +106,7 @@ export function AppShell() {
             </div>
           </Link>
 
-          <nav aria-label="Primary" className="ml-6 hidden items-center gap-1 xl:flex">
+          <nav aria-label="Primary" className="ml-6 hidden items-center gap-1 2xl:flex">
             <NavItems group="desktop" pathname={location.pathname} />
           </nav>
 
@@ -119,14 +122,14 @@ export function AppShell() {
         </div>
       </header>
 
-      {/* Below `xl` four inline links, the fixture badge and the student
+      {/* Below `2xl` six inline links, the fixture badge and the student
           switcher do not fit one bar — at tablet width the masthead pushed
           the page sideways. Below `md` the nav used to simply vanish, so on a
           phone nothing but the console was reachable. A scrolling row under
           the masthead fixes both, without a menu to open first. */}
       <nav
         aria-label="Primary"
-        className="sticky top-16 z-20 border-b border-border bg-background/85 backdrop-blur-xl xl:hidden"
+        className="sticky top-16 z-20 border-b border-border bg-background/85 backdrop-blur-xl 2xl:hidden"
       >
         <div className="mx-auto flex max-w-[1440px] gap-1 overflow-x-auto px-4 py-1.5 sm:px-6">
           <NavItems group="compact" pathname={location.pathname} />

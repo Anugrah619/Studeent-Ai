@@ -26,6 +26,9 @@ export function dashboardSummary(): DashboardSummary {
     // it is rather than leaving the reader to infer it from the filter chip.
     batch_id: null,
     batch_name: null,
+    // When the nightly job last finished for this institute. Mock mode
+    // pretends it ran at 02:00 today, as the live scheduler would.
+    last_refreshed_at: new Date(new Date().setHours(2, 0, 0, 0)).toISOString(),
     // Institute roster. Only 14 students are seeded in this fixture set.
     total_students: 312,
     active_students: 298,

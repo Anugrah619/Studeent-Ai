@@ -42,8 +42,21 @@ const TIME_FILL = "color-mix(in oklab, var(--foreground) 32%, transparent)";
  * tint of the foreground over the card, so it lands mid-scale either way.
  */
 const TIME_INK = "var(--foreground)";
-const SUBJECT_KEY_FILL =
-  "linear-gradient(90deg, var(--subject-physics) 0 33.33%, var(--subject-chemistry) 33.33% 66.66%, var(--subject-maths) 66.66% 100%)";
+
+/**
+ * The legend's key for "share of marks lost, by subject": one hard-stop band
+ * per subject the chart actually shows, in its order — three for JEE, four for
+ * NEET — so the key never names a subject the rows below do not have.
+ */
+function subjectKeyFill(colors: string[]): string {
+  const unique = [...new Set(colors)];
+  if (unique.length <= 1) return unique[0] ?? "var(--status-neutral)";
+  const step = 100 / unique.length;
+  const stops = unique.map(
+    (color, i) => `${color} ${(i * step).toFixed(2)}% ${((i + 1) * step).toFixed(2)}%`,
+  );
+  return `linear-gradient(90deg, ${stops.join(", ")})`;
+}
 
 /**
  * Bars grow once, outward from the centre, the first time the chart scrolls
@@ -132,7 +145,7 @@ export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
           items={[
             { color: TIME_FILL, label: "Share of study time", shape: "block" },
             {
-              color: SUBJECT_KEY_FILL,
+              color: subjectKeyFill(data.map((row) => row.color)),
               label: "Share of marks lost, by subject",
               shape: "block",
               wide: true,
@@ -179,7 +192,7 @@ export function NeglectChart({ rows }: { rows: SubjectBreakdown[] }) {
             most clearly under-spent.
           </>
         ) : (
-          "Effort and loss are broadly in proportion across all three subjects."
+          `Effort and loss are broadly in proportion across ${data.length === 1 ? "the one subject" : `all ${data.length} subjects`}.`
         )
       }
     >

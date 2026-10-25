@@ -1,4 +1,4 @@
-import { Check, Smartphone } from "lucide-react";
+import { CalendarDays, Check } from "lucide-react";
 import type { PlanBlock } from "@/api/types";
 import { EmptyState } from "@/components/common/States";
 import { duration, hhmm } from "@/lib/format";
@@ -12,28 +12,35 @@ const MODE_LABEL: Record<string, string> = {
 };
 
 /**
- * A day plan, every block with its reason — a plan a student cannot
- * interrogate is a plan he stops following.
+ * One student's plan for one day, every block with its reason — a plan a
+ * student cannot interrogate is a plan he stops following.
  *
- * Labelled a seeded example, because that is all it is today: nothing
- * generates plans (`seed_demo.py` writes them, with canned reasons) and there
- * is no student app to serve them to (TECHNICAL_DOC.md: "Student-facing app ·
- * planner" are not built). In mock mode `/api/my/plan/` also returns the one
- * fixture plan whichever student is open, so it must never be captioned as
- * this student's own.
+ * Fed by `GET /api/students/{id}/plan/?date=` (see `StudentDayPlan` in
+ * `staff/student360.tsx`). It used to be fed by `/api/my/plan/`, which answers
+ * for whoever is signed in — so a mentor always saw an empty panel, and the
+ * panel had to explain that away. The plan is the student's real one now: the
+ * nightly refresh makes it, or the student makes it from their own app.
  *
- * `/api/my/plan/` is scoped to the signed-in student, not to a student id — so
- * a mentor signed in against the live API gets an empty list here rather than
- * this student's plan. That is the endpoint working as specified, not the panel
- * failing, and the empty state says so rather than implying no plan exists.
+ * The reasons are written to the student ("you know this"), and are shown as
+ * they were written: this is what the student reads on their phone.
  */
-export function DayPlanPanel({ blocks }: { blocks: PlanBlock[] }) {
+export function DayPlanPanel({
+  blocks,
+  who,
+  day,
+}: {
+  blocks: PlanBlock[];
+  /** First name, for the empty state. */
+  who: string;
+  /** "today", or "on 26 Oct 2026". */
+  day: string;
+}) {
   if (!blocks.length) {
     return (
       <EmptyState
-        icon={<Smartphone aria-hidden className="size-5" />}
-        title="No plan to show from this sign-in"
-        body="The plan route answers for whoever is signed in, and a mentor's sign-in has no plan of its own — so this is not a sign that the student has none. Plans are seeded examples today; nothing generates them yet."
+        icon={<CalendarDays aria-hidden className="size-5" />}
+        title={`No plan for ${who} ${day}`}
+        body={`The nightly refresh makes a plan for each active student, and ${who} can make one from their own app. Nothing has been planned for this day yet.`}
       />
     );
   }
@@ -43,17 +50,18 @@ export function DayPlanPanel({ blocks }: { blocks: PlanBlock[] }) {
 
   return (
     <section
-      aria-label="Sample day plan, a seeded example"
+      aria-label={`${who}'s plan ${day}`}
       className="overflow-hidden rounded-xl bg-card shadow-card ring-1 ring-border"
     >
       <header className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
-        <Smartphone aria-hidden className="size-4 text-muted-foreground" />
-        <p className="text-sm font-medium text-foreground">Sample day plan</p>
-        <span className="rounded-sm px-1.5 py-0.5 text-xs text-muted-foreground ring-1 ring-border">
-          Seeded example
-        </span>
+        <CalendarDays aria-hidden className="size-4 text-muted-foreground" />
+        <p className="text-sm font-medium text-foreground">
+          {who}&rsquo;s plan {day}
+        </p>
         <span className="tnum ml-auto flex gap-x-4 text-xs text-muted-foreground">
-          <span>{done} of {blocks.length} done</span>
+          <span>
+            {done} of {blocks.length} done
+          </span>
           <span>{duration(total)} scheduled</span>
         </span>
       </header>
@@ -85,6 +93,7 @@ export function DayPlanPanel({ blocks }: { blocks: PlanBlock[] }) {
                   >
                     {block.topic_name}
                   </span>
+                  <span className="text-xs text-muted-foreground">{subject.label}</span>
                   <span className="rounded-sm px-1.5 py-0.5 text-xs text-muted-foreground ring-1 ring-border">
                     {MODE_LABEL[block.mode] ?? block.mode}
                   </span>

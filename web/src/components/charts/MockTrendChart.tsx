@@ -13,12 +13,19 @@ import type { MockScore } from "@/api/types";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { useMeasure } from "@/hooks/use-measure";
 import { num, shortDate, signed } from "@/lib/format";
-import { SUBJECT_LIST, type SubjectKey } from "@/lib/subjects";
+import {
+  NEUTRAL_DASH,
+  dashedSwatch,
+  resolveSubject,
+  resolveSubjects,
+  subjectsInWords,
+  subjectsOf,
+  type SubjectToken,
+} from "@/lib/subjects";
 import { Figure, FigureTable, Legend } from "./Figure";
 
 /** The floor. In a two-up row the plot grows to fill whatever its neighbour sets. */
 const PLOT_H = 248;
-const TICKS = [0, 25, 50, 75, 100];
 /**
  * One draw, left to right, on mount. Longer than a UI transition on purpose: a
  * line that arrives in 200 ms reads as a flicker, and the eye should travel the
@@ -26,36 +33,65 @@ const TICKS = [0, 25, 50, 75, 100];
  */
 const DRAW_MS = 650;
 
-/**
- * Subject identity comes from the same tokens as every other subject mark, so
- * the lines can never drift from the legend, the neglect chart or a swatch.
- * Never the brand: it is chrome-only and must not read as a series.
- */
-const CONFIG = Object.fromEntries(
-  SUBJECT_LIST.map((subject) => [
-    subject.key,
-    { label: subject.label, color: subject.color },
-  ]),
-) satisfies ChartConfig;
+/** One subject as a series: its token, and the key its marks sit under. */
+interface Series extends SubjectToken {
+  dataKey: string;
+}
+
+/** A chart row: the paper itself, plus one `s0…sN` value per subject. */
+interface Point {
+  row: MockScore;
+  paper_id: number;
+  [dataKey: string]: number | MockScore;
+}
 
 interface Props {
   rows: MockScore[];
-  /** The series the chart is arguing about — the only one direct-labelled. */
-  highlight?: SubjectKey;
+  /** The subject the chart is arguing about — the only one direct-labelled. */
+  highlight?: string;
 }
 
 /** "AIT Mock 08" → "08": the axis carries the mock number, the tooltip the name. */
 const tickLabel = (row: MockScore) => row.paper_name.replace(/^\D+/, "") || row.paper_name;
 
+/** The marks a row holds for one subject, or null when it has none for it. */
+function marksFor(row: MockScore | undefined, key: string): number | null {
+  if (!row) return null;
+  const hit = subjectsOf(row).find((entry) => resolveSubject(entry.subject).key === key);
+  return hit ? hit.marks : null;
+}
+
 const spoken = (row: MockScore) =>
-  `${row.paper_name}: Physics ${row.physics}, Chemistry ${row.chemistry}, Maths ${row.maths}, total ${row.total}`;
+  `${row.paper_name}: ${subjectsOf(row)
+    .map((entry) => `${entry.subject} ${entry.marks}`)
+    .join(", ")}, total ${row.total}`;
 
 /**
- * Three subject series on ONE axis (each subject is out of 100, so no second
- * scale is ever tempting). Identity is carried by the legend plus the tooltip;
- * only the series the story is about gets a direct end-label, because Physics
- * and Maths converge at the right edge and stacked labels would detach from
- * their lines.
+ * The y scale. Each JEE subject is out of 100, so a series that fits 0–100
+ * keeps exactly that axis (five hairlines, 25 apart). A NEET subject is out of
+ * 180, and negative marking can take a subject below zero, so the axis grows
+ * to whatever the marks need, in round steps, and never cuts a point off.
+ */
+export function trendTicks(values: number[]): number[] {
+  const finite = values.filter((v) => Number.isFinite(v));
+  const lo = Math.min(0, ...finite);
+  const hi = Math.max(100, ...finite);
+  if (lo >= 0 && hi <= 100) return [0, 25, 50, 75, 100];
+  const step = [25, 50, 100, 200, 250, 500].find((s) => (hi - lo) / s <= 5) ?? 1000;
+  const start = Math.floor(lo / step) * step;
+  const end = Math.ceil(hi / step) * step;
+  const ticks: number[] = [];
+  for (let t = start; t <= end; t += step) ticks.push(t);
+  return ticks;
+}
+
+/**
+ * Every subject of the exam on ONE axis — the subjects of one exam share a
+ * maximum, so no second scale is ever tempting. Identity is carried by the
+ * legend plus the tooltip; only the series the story is about gets a direct
+ * end-label, because lines converge at the right edge and stacked labels would
+ * detach from their lines. A subject past the three validated hues is drawn in
+ * the neutral grey and dashed, so it is never told apart by colour alone.
  *
  * Drawn with Recharts (shadcn's chart wrapper) for the crosshair tooltip, the
  * keyboard layer — focus the plot and the arrow keys step mock by mock — and a
@@ -70,20 +106,40 @@ export function MockTrendChart({ rows, highlight }: Props) {
   // animation would play to an empty viewport; drawn on arrival, it is seen.
   const [seen, setSeen] = useState(false);
 
-  const lead = useMemo<SubjectKey>(() => {
-    if (highlight) return highlight;
-    if (rows.length < 2) return "chemistry";
-    let worst: SubjectKey = "physics";
-    let worstDelta = Infinity;
-    for (const subject of SUBJECT_LIST) {
-      const delta = rows[rows.length - 1][subject.key] - rows[0][subject.key];
-      if (delta < worstDelta) {
-        worstDelta = delta;
-        worst = subject.key;
-      }
-    }
-    return worst;
-  }, [rows, highlight]);
+  /** Subjects in the server's order: the first paper's, then any appended. */
+  const series = useMemo<Series[]>(
+    () =>
+      resolveSubjects(rows.flatMap((row) => subjectsOf(row).map((s) => s.subject))).map(
+        (token, i) => ({ ...token, dataKey: `s${i}` }),
+      ),
+    [rows],
+  );
+
+  const data = useMemo<Point[]>(
+    () =>
+      rows.map((row) => {
+        const point: Point = { row, paper_id: row.paper_id };
+        for (const s of series) {
+          const marks = marksFor(row, s.key);
+          if (marks !== null) point[s.dataKey] = marks;
+        }
+        return point;
+      }),
+    [rows, series],
+  );
+
+  const ticks = useMemo(
+    () => trendTicks(rows.flatMap((row) => subjectsOf(row).map((entry) => entry.marks))),
+    [rows],
+  );
+
+  const config = useMemo(
+    () =>
+      Object.fromEntries(
+        series.map((s) => [s.dataKey, { label: s.label, color: s.color }]),
+      ) satisfies ChartConfig,
+    [series],
+  );
 
   const byId = useMemo(
     () => new Map(rows.map((row) => [row.paper_id, row])),
@@ -94,21 +150,40 @@ export function MockTrendChart({ rows, highlight }: Props) {
   const first = rows[0];
   const lastIndex = rows.length - 1;
 
-  const legendItems = SUBJECT_LIST.map((subject) => ({
-    color: subject.color,
-    label: subject.label,
-    shape: "line" as const,
-    value: last
-      ? `${num(last[subject.key])} (${signed(last[subject.key] - first[subject.key])})`
-      : undefined,
-  }));
+  const lead = useMemo<string | undefined>(() => {
+    if (highlight) return resolveSubject(highlight).key;
+    if (rows.length < 2) return series[0]?.key;
+    let worst: string | undefined;
+    let worstDelta = Infinity;
+    for (const s of series) {
+      const delta = (marksFor(last, s.key) ?? 0) - (marksFor(first, s.key) ?? 0);
+      if (delta < worstDelta) {
+        worstDelta = delta;
+        worst = s.key;
+      }
+    }
+    return worst;
+  }, [rows.length, series, highlight, first, last]);
+
+  const subjectWords = subjectsInWords(series.map((s) => s.label));
+
+  const legendItems = series.map((s) => {
+    const end = marksFor(last, s.key);
+    const start = marksFor(first, s.key);
+    return {
+      color: s.neutral ? dashedSwatch(s.color) : s.color,
+      label: s.label,
+      shape: "line" as const,
+      value: end !== null && start !== null ? `${num(end)} (${signed(end - start)})` : undefined,
+    };
+  });
 
   return (
     <Figure
       title="Mock score trend"
       subtitle={
         <>
-          Physics, Chemistry and Maths across {rows.length} mocks. Total{" "}
+          {subjectWords} across {rows.length} mocks. Total{" "}
           {first && last ? (
             <>
               moved {num(first.total)} → {num(last.total)} (
@@ -127,7 +202,7 @@ export function MockTrendChart({ rows, highlight }: Props) {
             <>
               <th scope="col" className="py-2 pr-4 font-medium">Mock</th>
               <th scope="col" className="py-2 pr-4 font-medium">Date</th>
-              {SUBJECT_LIST.map((s) => (
+              {series.map((s) => (
                 <th key={s.key} scope="col" className="py-2 pr-4 text-right font-medium">
                   {s.label}
                 </th>
@@ -144,9 +219,9 @@ export function MockTrendChart({ rows, highlight }: Props) {
               <td className="py-1.5 pr-4 text-muted-foreground">
                 {shortDate(row.held_on)}
               </td>
-              {SUBJECT_LIST.map((s) => (
+              {series.map((s) => (
                 <td key={s.key} className="py-1.5 pr-4 text-right">
-                  {num(row[s.key])}
+                  {num(marksFor(row, s.key))}
                 </td>
               ))}
               <td className="py-1.5 text-right font-medium">{num(row.total)}</td>
@@ -167,17 +242,17 @@ export function MockTrendChart({ rows, highlight }: Props) {
       >
         {width > 0 && seen ? (
           <ChartContainer
-            config={CONFIG}
+            config={config}
             initialDimension={{ width, height: PLOT_H }}
             // shadcn's container hides the surface's outline outright, which
             // would leave a keyboard user on the plot with no sign of focus.
             className="absolute inset-0 aspect-auto [font-variant-numeric:tabular-nums] [&_.recharts-surface:focus-visible]:rounded-sm [&_.recharts-surface:focus-visible]:outline-2 [&_.recharts-surface:focus-visible]:outline-solid [&_.recharts-surface:focus-visible]:outline-offset-2 [&_.recharts-surface:focus-visible]:outline-ring"
           >
             <LineChart
-              data={rows}
+              data={data}
               margin={{ top: 12, right: 34, bottom: 0, left: 0 }}
               role="group"
-              aria-label={`Mock score trend across ${rows.length} mocks for Physics, Chemistry and Maths. Focus the chart and use the arrow keys to step through the mocks; the table view lists every value.`}
+              aria-label={`Mock score trend across ${rows.length} mocks for ${subjectWords}. Focus the chart and use the arrow keys to step through the mocks; the table view lists every value.`}
             >
               {/* Hairline grid, solid, one step off the surface. Horizontal
                   only: the mocks are discrete events, not a time grid. */}
@@ -202,8 +277,8 @@ export function MockTrendChart({ rows, highlight }: Props) {
                 }}
               />
               <YAxis
-                domain={[0, 100]}
-                ticks={TICKS}
+                domain={[ticks[0], ticks[ticks.length - 1]]}
+                ticks={ticks}
                 interval={0}
                 tickLine={false}
                 axisLine={false}
@@ -219,19 +294,21 @@ export function MockTrendChart({ rows, highlight }: Props) {
                 content={({ active, payload }) => (
                   <TrendTooltip
                     active={active}
-                    row={payload?.[0]?.payload as MockScore | undefined}
+                    row={(payload?.[0]?.payload as Point | undefined)?.row}
+                    series={series}
                   />
                 )}
               />
 
-              {SUBJECT_LIST.map((subject) => (
+              {series.map((subject) => (
                 <Line
                   key={subject.key}
-                  dataKey={subject.key}
+                  dataKey={subject.dataKey}
                   name={subject.label}
                   type="linear"
-                  stroke={`var(--color-${subject.key})`}
+                  stroke={`var(--color-${subject.dataKey})`}
                   strokeWidth={2}
+                  strokeDasharray={subject.neutral ? NEUTRAL_DASH : undefined}
                   strokeLinejoin="round"
                   strokeLinecap="round"
                   isAnimationActive={!reduce}
@@ -324,7 +401,15 @@ function MockTargets({ rows }: { rows: MockScore[] }) {
   );
 }
 
-function TrendTooltip({ active, row }: { active?: boolean; row?: MockScore }) {
+function TrendTooltip({
+  active,
+  row,
+  series,
+}: {
+  active?: boolean;
+  row?: MockScore;
+  series: Series[];
+}) {
   if (!active || !row) return null;
   return (
     <div
@@ -336,16 +421,18 @@ function TrendTooltip({ active, row }: { active?: boolean; row?: MockScore }) {
         {shortDate(row.held_on)}
       </div>
       <dl className="space-y-1">
-        {SUBJECT_LIST.map((subject) => (
+        {series.map((subject) => (
           <div key={subject.key} className="flex items-center gap-2">
             <span
               aria-hidden
               className="h-0.5 w-3 shrink-0 rounded-full"
-              style={{ background: subject.color }}
+              style={{
+                background: subject.neutral ? dashedSwatch(subject.color) : subject.color,
+              }}
             />
             <dt className="flex-1 text-muted-foreground">{subject.label}</dt>
             <dd className="tnum font-medium text-popover-foreground">
-              {num(row[subject.key])}
+              {num(marksFor(row, subject.key))}
             </dd>
           </div>
         ))}

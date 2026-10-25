@@ -34,6 +34,16 @@ const HowItWorks = lazy(() =>
 const DataTrust = lazy(() =>
   import("@/routes/DataTrust").then((m) => ({ default: m.DataTrust })),
 );
+// Staff tools: papers and their uploads, and the answer-key review queue.
+const PapersPage = lazy(() =>
+  import("@/staff/papers/PapersPage").then((m) => ({ default: m.PapersPage })),
+);
+const PaperPage = lazy(() =>
+  import("@/staff/papers/PaperPage").then((m) => ({ default: m.PaperPage })),
+);
+const ReviewPage = lazy(() =>
+  import("@/staff/review/ReviewPage").then((m) => ({ default: m.ReviewPage })),
+);
 
 /**
  * Exported for tests only. It is created once per module, so a suite that
@@ -80,6 +90,9 @@ export default function App() {
                     />
                     <Route path="how-it-works" element={<HowItWorks />} />
                     <Route path="trust" element={<DataTrust />} />
+                    <Route path="papers" element={<PapersPage />} />
+                    <Route path="papers/:paperId" element={<PaperPage />} />
+                    <Route path="review" element={<ReviewPage />} />
                     <Route path="*" element={<NotFound />} />
                   </Route>
                 </Routes>

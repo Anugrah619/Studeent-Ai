@@ -55,7 +55,9 @@ function buttons(scope: ParentNode = document): HTMLButtonElement[] {
 
 test("director console renders the KPI strip and the triage table", async () => {
   const root = await renderAt("/");
-  await waitFor(() => text().includes("Aarav Mehta"));
+  // On the triage table itself: the roster of logins below it names every
+  // student too, and can arrive first.
+  await waitFor(() => document.querySelector("tbody tr[data-flag-id]") !== null);
 
   const body = text();
   assert.ok(body.includes("Director console"), "page heading");
@@ -720,7 +722,8 @@ test("neglect-chart value labels stay attached to short bars", async () => {
 
 test("logging an intervention records it and leaves the flag open", async () => {
   const root = await renderAt("/");
-  await waitFor(() => text().includes("Kunal Deshpande"));
+  // The triage rows, not a name: the logins roster names Kunal as well.
+  await waitFor(() => document.querySelector("tbody tr[data-flag-id]") !== null);
 
   // One row per open flag: the table groups by student, and a student's
   // other flags are rows of their own under the first, folded but in the DOM.

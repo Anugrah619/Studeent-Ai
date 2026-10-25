@@ -13,7 +13,7 @@ import { Section } from "@/components/kit/Section";
 import { causeSlices, marksLostTotals, type MarksLostTotals } from "@/lib/causes";
 import { firstName } from "@/lib/explainer";
 import { longDate, num, pct } from "@/lib/format";
-import { SUBJECT_LIST } from "@/lib/subjects";
+import { resolveSubject, subjectsOf } from "@/lib/subjects";
 import {
   Select,
   SelectContent,
@@ -283,38 +283,44 @@ export function MockIntelligence() {
               title="By subject"
               description="What each subject contributed to this paper's total."
             >
+              {/* One cell per subject of the exam, in the order the server
+                  sends them — three for JEE, four for NEET. Two columns at four,
+                  so the band's rule never shows a grey hole. */}
               <FigureBand
                 role="list"
                 aria-label="Subject scores in this paper"
-                className="sm:grid-cols-3"
+                className={subjectsOf(row).length % 3 === 0 ? "sm:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4"}
               >
-                {SUBJECT_LIST.map((subject) => (
-                  <div key={subject.key} role="listitem" className="bg-card px-5 py-4">
-                    <div className="flex items-center gap-2">
-                      <span
-                        aria-hidden
-                        className="size-3 shrink-0 rounded-xs"
-                        style={{ background: subject.color }}
-                      />
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {subject.label}
-                      </span>
-                    </div>
-                    {/* No "/ 100". `MockScore` ships three subject scores and a
-                        total, and no per-subject maximum — and a paper out of
-                        184 does not split into thirds of 100 either. The share
-                        of the paper's own total is a number we can stand
-                        behind. */}
-                    <p className="tnum mt-2 text-2xl leading-none font-semibold">
-                      {num(row[subject.key])}
-                      {row.total > 0 ? (
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          {pct((row[subject.key] / row.total) * 100)} of the paper
+                {subjectsOf(row).map((entry) => {
+                  const subject = resolveSubject(entry.subject);
+                  return (
+                    <div key={entry.subject} role="listitem" className="bg-card px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <span
+                          aria-hidden
+                          className="size-3 shrink-0 rounded-xs"
+                          style={{ background: subject.color }}
+                        />
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {subject.label}
                         </span>
-                      ) : null}
-                    </p>
-                  </div>
-                ))}
+                      </div>
+                      {/* No "/ 100". `MockScore` ships each subject's marks and
+                          a total, and no per-subject maximum — and a paper out
+                          of 184 does not split into thirds of 100 either. The
+                          share of the paper's own total is a number we can
+                          stand behind. */}
+                      <p className="tnum mt-2 text-2xl leading-none font-semibold">
+                        {num(entry.marks)}
+                        {row.total > 0 ? (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            {pct((entry.marks / row.total) * 100)} of the paper
+                          </span>
+                        ) : null}
+                      </p>
+                    </div>
+                  );
+                })}
               </FigureBand>
             </Section>
           ) : null}

@@ -328,6 +328,13 @@ export function mockScoresFor(studentId: number): MockScore[] {
       chemistry,
       maths,
       total: physics + chemistry + maths,
+      // The per-subject list the server now sends for every exam (NEET has
+      // four subjects, not three); the three named fields stay for JEE.
+      subjects: [
+        { subject: "Physics", marks: physics },
+        { subject: "Chemistry", marks: chemistry },
+        { subject: "Maths", marks: maths },
+      ],
     } satisfies MockScore;
   });
   seriesCache.set(studentId, rows);
@@ -402,6 +409,11 @@ export function studentDetail(id: number): StudentDetail | undefined {
     mentor,
     state: stateFor(seed),
     login_status: "none",
+    // No fixture student has onboarded: these are set by the student
+    // themselves at first sign-in, and no fixture student has signed in.
+    daily_minutes: null,
+    target_rank: null,
+    onboarded_at: null,
   };
 }
 

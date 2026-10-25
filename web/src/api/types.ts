@@ -79,6 +79,67 @@ export type Confidence = S["ConfidenceEnum"];
 export type Verdict = S["VerdictEnum"];
 export type TimeToFix = S["TimeToFixEnum"];
 
+/* ------------------------------------------------------------------ *
+ * The student app — `/api/my/…`
+ * ------------------------------------------------------------------ */
+
+export type MyProfile = S["MyProfile"];
+export type MyProgress = S["MyProgress"];
+export type Onboarding = S["Onboarding"];
+export type OnboardingUpdateRequest = S["OnboardingUpdateRequest"];
+export type MyTopic = S["MyTopic"];
+export type MyAttempt = S["MyAttempt"];
+export type MyQuestion = S["MyQuestion"];
+export type MyQuestionOption = S["MyQuestionOption"];
+export type MyRevision = S["MyRevision"];
+export type MockScoreSubject = S["MockScoreSubject"];
+export type StudyLogCreate = S["StudyLogCreate"];
+export type StudyLogCreateRequest = S["StudyLogCreateRequest"];
+export type ConfidenceRating = S["ConfidenceRating"];
+export type ConfidenceRatingRequest = S["ConfidenceRatingRequest"];
+export type PlanGeneration = S["PlanGeneration"];
+export type PlanGenerateRequest = S["PlanGenerateRequestRequest"];
+export type PlanExplain = S["PlanExplain"];
+export type Guidance = S["Guidance"];
+export type NextAction = S["NextAction"];
+export type NextActionKind = S["GuidanceActionKindEnum"];
+export type Finding = S["Finding"];
+export type FindingQuestion = S["FindingQuestion"];
+export type AskRequest = S["AskRequest"];
+export type AskAnswer = S["AskAnswer"];
+
+/* ------------------------------------------------------------------ *
+ * Staff tools — logins, papers and uploads, tagging, answer-key review,
+ * and the student's own activity as a mentor reads it. Hooks: `api/staff.ts`.
+ * ------------------------------------------------------------------ */
+
+export type LoginStatus = S["LoginStatusEnum"];
+export type StudentCredential = S["StudentCredential"];
+export type PaperSource = S["PaperSourceEnum"];
+export type TestPaperCreateRequest = S["TestPaperCreateRequest"];
+export type BlueprintReport = S["BlueprintReport"];
+export type ResultsReport = S["ResultsReport"];
+export type IngestRowError = S["IngestRowError"];
+export type IngestBatch = S["IngestBatch"];
+export type ColumnMappingProfile = S["ColumnMappingProfile"];
+export type ColumnMappingField = ColumnMappingProfile["mapping"][string];
+export type PaperQuestions = S["PaperQuestions"];
+export type PaperQuestionsSummary = S["PaperQuestionsSummary"];
+export type TaggableQuestion = S["TaggableQuestion"];
+export type TaggableOption = S["TaggableOption"];
+export type MisconceptionRef = S["MisconceptionRef"];
+export type DraftMisconception = S["DraftMisconception"];
+export type QuestionContentUpdate = S["PatchedQuestionContentUpdateRequest"];
+export type OptionContentUpdate = S["OptionContentUpdateRequest"];
+export type Verification = S["VerificationEnum"];
+export type KeyDisagreement = S["KeyDisagreement"];
+export type KeyReview = S["KeyReview"];
+export type KeyReviewDecision = S["KeyReviewDecisionEnum"];
+export type KeyReviewStatus = S["KeyReviewStatusEnum"];
+export type DisagreementReviewRequest = S["DisagreementReviewRequest"];
+export type StudyLog = S["StudyLogCreate"];
+export type Revision = S["MyRevision"];
+
 /**
  * The DRF `PageNumberPagination` envelope.
  *

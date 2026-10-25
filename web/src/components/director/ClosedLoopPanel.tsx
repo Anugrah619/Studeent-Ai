@@ -4,6 +4,7 @@ import { SeverityChip } from "@/components/common/SeverityChip";
 import { EmptyState } from "@/components/common/States";
 import { daysAgo } from "@/lib/format";
 import { detectorLabel } from "@/lib/severity";
+import { FlagInterventions } from "@/staff/flags";
 
 const OUTCOME: Record<Outcome, { label: string; severity: "improving" | "critical" | "watch" }> =
   {
@@ -59,7 +60,10 @@ export function ClosedLoopPanel({ flags }: { flags: Flag[] }) {
                 <span>{detectorLabel(flag.type)}</span>
               </div>
             </div>
-            <p className="text-sm leading-snug text-muted-foreground">{flag.headline}</p>
+            <div className="min-w-0">
+              <p className="text-sm leading-snug text-muted-foreground">{flag.headline}</p>
+              <FlagInterventions flagId={flag.id} variant="line" className="mt-1" />
+            </div>
             <div className="flex items-center gap-3 sm:justify-end">
               <SeverityChip severity={outcome.severity} label={outcome.label} />
               <span className="text-xs whitespace-nowrap text-muted-foreground sm:w-20 sm:text-right">

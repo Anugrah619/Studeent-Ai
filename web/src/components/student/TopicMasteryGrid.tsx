@@ -5,7 +5,7 @@ import { Meter } from "@/components/common/StatTile";
 import { EmptyState } from "@/components/common/States";
 import { Button } from "@/components/ui/button";
 import { daysAgo, num, pct } from "@/lib/format";
-import { SUBJECT_LIST, resolveSubject, type SubjectKey } from "@/lib/subjects";
+import { compareSubjects, resolveSubject, resolveSubjects } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
 
 /**
@@ -52,29 +52,39 @@ export function TopicMasteryGrid({ states }: { states: TopicState[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [expanded, setExpanded] = useState(false);
 
+  /**
+   * One column per subject of this student's syllabus — whatever the exam has
+   * (three for JEE, four for NEET) — in the order the exam prints them. The
+   * columns come from every chapter, not the filtered ones, so a filter empties
+   * a column rather than removing it and reshuffling the grid.
+   */
+  const subjects = useMemo(
+    () =>
+      resolveSubjects(
+        [...new Set(states.map((s) => s.topic.subject))].sort(compareSubjects),
+      ),
+    [states],
+  );
+
   const grouped = useMemo(() => {
     const now = Date.now();
-    const buckets: Record<SubjectKey, TopicState[]> = {
-      physics: [],
-      chemistry: [],
-      maths: [],
-    };
+    const buckets = new Map<string, TopicState[]>(subjects.map((s) => [s.key, []]));
 
     for (const state of states) {
       if (!matches(state, filter, now)) continue;
-      const key = resolveSubject(state.topic.subject).key;
-      buckets[key].push(state);
+      buckets.get(resolveSubject(state.topic.subject).key)?.push(state);
     }
 
     // Weakest first: this grid is scanned for what is broken, not admired.
-    for (const key of Object.keys(buckets) as SubjectKey[]) {
-      buckets[key].sort((a, b) => (a.mastery ?? 1) - (b.mastery ?? 1));
+    for (const rows of buckets.values()) {
+      rows.sort((a, b) => (a.mastery ?? 1) - (b.mastery ?? 1));
     }
     return buckets;
-  }, [states, filter]);
+  }, [states, filter, subjects]);
 
-  const total = SUBJECT_LIST.reduce((acc, s) => acc + grouped[s.key].length, 0);
-  const folds = SUBJECT_LIST.some((s) => grouped[s.key].length > FOLDED_ROWS);
+  const rowsOf = (key: string) => grouped.get(key) ?? [];
+  const total = subjects.reduce((acc, s) => acc + rowsOf(s.key).length, 0);
+  const folds = subjects.some((s) => rowsOf(s.key).length > FOLDED_ROWS);
 
   return (
     <div className="space-y-4">
@@ -114,9 +124,20 @@ export function TopicMasteryGrid({ states }: { states: TopicState[] }) {
         />
       ) : (
         <>
-          <div className="grid gap-3 lg:grid-cols-3">
-            {SUBJECT_LIST.map((subject) => {
-              const rows = grouped[subject.key];
+          <div
+            className={cn(
+              "grid gap-3",
+              subjects.length >= 4
+                ? "md:grid-cols-2 2xl:grid-cols-4"
+                : subjects.length === 3
+                  ? "lg:grid-cols-3"
+                  : subjects.length === 2
+                    ? "md:grid-cols-2"
+                    : undefined,
+            )}
+          >
+            {subjects.map((subject) => {
+              const rows = rowsOf(subject.key);
               const shown = expanded ? rows : rows.slice(0, FOLDED_ROWS);
               const weak = rows.filter((r) => (r.mastery ?? 1) < MASTERY_FLOOR).length;
               return (

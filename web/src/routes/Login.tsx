@@ -106,7 +106,7 @@ export function Login() {
 
           <form onSubmit={onSubmit} className="mt-7 space-y-5" noValidate>
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Username or roll number</Label>
               <Input
                 id="username"
                 name="username"
@@ -182,6 +182,13 @@ function DemoHint() {
         <code className="font-mono">aarambh.kulkarni</code>. The password is{" "}
         <code className="font-mono">demo12345</code>.
       </p>
+      {USE_MOCKS ? (
+        <p className="mt-2">
+          Students sign in with a roll number and the same password:{" "}
+          <code className="font-mono">A-1041</code> (JEE Main) or{" "}
+          <code className="font-mono">N-5012</code> (NEET).
+        </p>
+      ) : null}
       <p className="mt-2">
         On the live server, <code className="font-mono">pinnacle.rao</code>{" "}
         belongs to a second institute — sign in as them to see only its three

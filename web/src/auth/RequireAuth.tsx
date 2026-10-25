@@ -1,12 +1,16 @@
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { PlugZap } from "lucide-react";
 import { API_BASE } from "@/api/env";
 import { useAuth } from "./AuthProvider";
 import { Login } from "@/routes/Login";
 import { ChangePassword } from "@/routes/ChangePassword";
-import { StudentWelcome } from "@/routes/StudentWelcome";
 import { Bubble } from "@/components/brand/Bubble";
 import { Button } from "@/components/ui/button";
+
+/** Its own chunk: a mentor never downloads the student app, nor a student the console. */
+const StudentApp = lazy(() =>
+  import("@/student/StudentApp").then((m) => ({ default: m.StudentApp })),
+);
 
 /**
  * The gate. Four states in, four different screens out — see `AuthStatus` for
@@ -16,9 +20,10 @@ import { Button } from "@/components/ui/button";
  *   and nothing else. The server enforces this independently — every other
  *   route answers 403 `password_change_required` — so this is the friendly
  *   half of a rule that does not depend on it.
- * - **A student** gets a holding page rather than the console. Every console
- *   route is closed to student accounts, so mounting it would be a screen of
- *   403s; the student app itself is not built yet.
+ * - **A student** gets the student app (`student/StudentApp.tsx`), with its
+ *   own routes, instead of the console. Every console route is closed to
+ *   student accounts, so the console is never mounted for one — not even at a
+ *   console address, which the student app answers as a page it does not have.
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { status, me, error, retry } = useAuth();
@@ -27,7 +32,13 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (status === "unavailable") return <Unavailable error={error} onRetry={retry} />;
   if (status === "anonymous") return <Login />;
   if (me?.must_change_password) return <ChangePassword />;
-  if (me?.role === "student") return <StudentWelcome />;
+  if (me?.role === "student") {
+    return (
+      <Suspense fallback={<BootScreen />}>
+        <StudentApp />
+      </Suspense>
+    );
+  }
   return <>{children}</>;
 }
 

@@ -17,7 +17,8 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import type { DashboardSummary, StudentDetail, TestPaper } from "@/api/types";
+import type { DashboardSummary, IngestBatch, StudentDetail, TestPaper } from "@/api/types";
+import { useDisagreements, useIngestBatches } from "@/api/staff";
 import type { Diagnosis } from "@/api/diagnosis";
 import {
   useDashboardSummary,
@@ -74,13 +75,15 @@ import { cn } from "@/lib/utils";
  * here.
  *
  * Every figure says where it came from. Live ones are read as the page loads
- * (and labelled "Live data" or "Demo fixtures" by the exhibit they sit in).
- * The syllabus, past-paper and cross-check figures cannot be read live yet —
- * API_GAPS.QUESTION_PROVENANCE — so they come from `importRecords.ts`, were
- * counted when the documents were imported, and wear an "Import records" tag
- * wherever they appear. The one review that has not happened (a person looking
- * at the AI's disagreements with the official key) is said in words, next to
- * the figures, never left for the reader to infer.
+ * (and labelled "Live data" or "Demo fixtures" by the exhibit they sit in):
+ * which papers are official (`TestPaper.source`), whether the institute's own
+ * results are in (`/api/ingest/batches/`), and how far a person has got with
+ * the AI's disagreements with the official key (`/api/review/disagreements/`).
+ * The syllabus chapter counts and the cross-check's agreement figures are not
+ * reported by any route, so they come from `importRecords.ts`, were counted
+ * when the documents were imported, and wear an "Import records" tag wherever
+ * they appear. A review that has not happened is said in words, next to the
+ * figures, never left for the reader to infer.
  */
 export function DataTrust() {
   const summary = useDashboardSummary();
@@ -88,6 +91,15 @@ export function DataTrust() {
   const paperId = summary.data?.latest_paper_id ?? undefined;
   const student = useStudent(EXAMPLE_STUDENT_ID);
   const diagnosis = useDiagnosis(EXAMPLE_STUDENT_ID, paperId);
+  const uploads = useIngestBatches();
+  // The answer-key review, read live: what is still waiting and what a person
+  // has decided. Both lists, because "none reviewed yet" is the claim to check.
+  const waiting = useDisagreements("unreviewed");
+  const reviewed = useDisagreements("reviewed");
+  const review =
+    waiting.data && reviewed.data
+      ? { waiting: waiting.data.length, reviewed: reviewed.data.length }
+      : undefined;
 
   const paper = papers.data?.find((p) => p.id === paperId);
 
@@ -135,7 +147,7 @@ export function DataTrust() {
           eyebrow="At a glance"
           title="Four safeguards, and where each one stands today"
         >
-          <TrustCards pseudonym={pseudonymFor(EXAMPLE_STUDENT_ID)} />
+          <TrustCards pseudonym={pseudonymFor(EXAMPLE_STUDENT_ID)} review={review} />
         </Section>
 
         <Section
@@ -159,8 +171,10 @@ export function DataTrust() {
                   </strong>{" "}
                   They are generated with mistake patterns built in on purpose,
                   so the demo can show what the analysis finds when a pattern is
-                  there. Loading an institute&rsquo;s own results is designed but
-                  not built yet.
+                  there. An institute&rsquo;s own results can be loaded now, from
+                  Excel or CSV: add the paper, upload its blueprint, then the
+                  class&rsquo;s results, and each file is checked before anything
+                  is saved.
                 </p>
                 <p>
                   The diagnostic paper is our own. The AI&rsquo;s diagnoses are
@@ -177,14 +191,16 @@ export function DataTrust() {
             more={
               <p>
                 We label it this way because a demo should say what it runs on.
-                Once your own students&rsquo; answers can be loaded, this table
-                is how you will tell the difference.
+                Once your own students&rsquo; answers are loaded, this table is
+                how you will tell the difference.
               </p>
             }
           >
             <ProvenanceExhibit
               summary={summary.data}
               paper={paper}
+              papers={papers.data}
+              uploads={uploads.data}
               diagnosis={diagnosis.data}
               exampleName={student.data ? firstName(student.data.name) : null}
               pending={summary.isPending || papers.isPending}
@@ -234,19 +250,24 @@ export function DataTrust() {
                 </p>
                 <p>
                   <strong className="font-semibold text-foreground">
-                    That last step has not happened yet for the papers loaded so
-                    far.
+                    {review && review.reviewed > 0
+                      ? `A person has decided ${num(review.reviewed)} of the ${num(review.reviewed + review.waiting)} so far.`
+                      : "That last step has not happened yet for the papers loaded so far."}
                   </strong>{" "}
                   A first pass by an AI assistant sided with NTA&rsquo;s key in
                   every one of the disagreements, and traced{" "}
                   {num(CROSS_CHECK_TRANSCRIPTION_ERRORS)} of them to copying
-                  errors in our own transcription — but a person has not yet
-                  reviewed them.
+                  errors in our own transcription — not a human review. The
+                  review itself is done on the console&rsquo;s{" "}
+                  <Link to="/review" className="font-medium text-brand-ink underline underline-offset-4">
+                    Review
+                  </Link>{" "}
+                  page, one question at a time.
                 </p>
               </>
             }
           >
-            <AnswerKeyExhibit />
+            <AnswerKeyExhibit review={review} />
           </Question>
 
           <Question
@@ -345,8 +366,21 @@ export function DataTrust() {
  * including the one that is not finished. A trust card that only ever says
  * "done" is a slide.
  */
-function TrustCards({ pseudonym }: { pseudonym: string }) {
+function TrustCards({
+  pseudonym,
+  review,
+}: {
+  pseudonym: string;
+  review?: { waiting: number; reviewed: number };
+}) {
   const [jee, neet] = PAST_PAPERS;
+  const reviewed = review?.reviewed ?? 0;
+  const reviewLine =
+    review && reviewed > 0
+      ? review.waiting === 0
+        ? `A person has reviewed all ${num(reviewed)} disagreements.`
+        : `A person has reviewed ${num(reviewed)} of the ${num(reviewed + review.waiting)} disagreements.`
+      : `A person has not yet reviewed the ${num(CROSS_CHECK_DISAGREEMENTS)} disagreements.`;
   return (
     <Reveal stagger={0.06} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <RevealItem>
@@ -373,8 +407,8 @@ function TrustCards({ pseudonym }: { pseudonym: string }) {
         <IdeaCard
           icon={FileCheck2}
           title="Past-paper answers checked against NTA's key"
-          status="Review pending"
-          body={`Gemini solved every question on its own; ${num(jee.agreedPct)}% (${jee.exam}) and ${num(neet.agreedPct, 1)}% (${neet.exam}) matched the official key. A person has not yet reviewed the ${num(CROSS_CHECK_DISAGREEMENTS)} disagreements.`}
+          status={review && reviewed > 0 && review.waiting === 0 ? "Reviewed" : "Review pending"}
+          body={`Gemini solved every question on its own; ${num(jee.agreedPct)}% (${jee.exam}) and ${num(neet.agreedPct, 1)}% (${neet.exam}) matched the official key. ${reviewLine}`}
           to="#answer-key"
           cta="See the cross-check"
         />
@@ -384,7 +418,7 @@ function TrustCards({ pseudonym }: { pseudonym: string }) {
           icon={FlaskConical}
           title="Simulated students, labelled as such"
           status="Simulated"
-          body="Every student on screen is simulated; the AI's diagnoses of them are real. Loading an institute's own results is designed, not built yet."
+          body="Every student on screen is simulated; the AI's diagnoses of them are real. An institute's own results load from Excel or CSV, checked before anything is saved."
           to="#real"
           cta="See what's real"
         />
@@ -453,8 +487,12 @@ function LoadedFigures() {
               — not yet on these real papers.
             </p>
             <p>
-              The students on screen are simulated. Loading an institute&rsquo;s
-              own results is designed but not built yet.
+              The students on screen are simulated. An institute&rsquo;s own
+              results can be loaded on the{" "}
+              <Link to="/papers" className="font-medium text-brand-ink underline underline-offset-4">
+                Papers
+              </Link>{" "}
+              page, each file checked before it is saved.
             </p>
           </AccordionContent>
         </AccordionItem>
@@ -605,15 +643,18 @@ interface ProvenanceRow {
 /**
  * The provenance table.
  *
- * Rows are data so a row can take a live count the day the contract can supply
- * one. API_GAPS.QUESTION_PROVENANCE: nothing in the schema says where a paper
- * or question came from, so the syllabus and past-paper rows print the import
- * records (plain weight, not bold — bold is reserved for what was read live).
- * When `TestPaper` carries a `source`, count `usePapers()` by it here instead.
+ * Rows are data so a row can take a live count when the contract supplies one.
+ * `TestPaper.source` does now, so the official past papers in the bank are
+ * counted from `/api/papers/`, and whether any of the institute's own results
+ * are in is read from the upload history. The syllabus chapter counts and the
+ * per-paper question counts still print the import records (plain weight, not
+ * bold — bold is reserved for what was read live).
  */
 function ProvenanceExhibit({
   summary,
   paper,
+  papers,
+  uploads,
   diagnosis,
   exampleName,
   pending,
@@ -621,11 +662,16 @@ function ProvenanceExhibit({
 }: {
   summary: DashboardSummary | undefined;
   paper: TestPaper | undefined;
+  papers: TestPaper[] | undefined;
+  uploads: IngestBatch[] | undefined;
   diagnosis: Diagnosis | undefined;
   exampleName: string | null;
   pending: boolean;
   error: Error | null;
 }) {
+  const official = papers?.filter((p) => p.source === "official_pyq").length;
+  const imported = (uploads ?? []).filter((b) => b.status !== "failed");
+  const importedStudents = imported.reduce((acc, b) => acc + (b.rows_ok ?? 0), 0);
   const rows: ProvenanceRow[] = [
     {
       key: "students",
@@ -700,8 +746,15 @@ function ProvenanceExhibit({
           ))}{" "}
           JEE from NTA&rsquo;s published paper; NEET from a publisher&rsquo;s
           copy, as NTA does not publish NEET papers. Every answer cross-checked
-          against NTA&rsquo;s official key. The AI diagnosis does not run on
-          them yet.
+          against NTA&rsquo;s official key.
+          {official ? (
+            <>
+              {" "}
+              <Live>{plural(official, "official past paper")}</Live> in the
+              question bank.
+            </>
+          ) : null}{" "}
+          The AI diagnosis does not run on them yet.
         </>
       ),
     },
@@ -724,17 +777,35 @@ function ProvenanceExhibit({
         </>
       ),
     },
-    {
-      key: "your-students",
-      what: "Your students' answers",
-      status: "not_yet",
-      detail: (
-        <>
-          Loading your institute&rsquo;s own results is designed but not built
-          yet. Until it is, every student on screen is simulated.
-        </>
-      ),
-    },
+    imported.length
+      ? {
+          key: "your-students",
+          what: "Your students' answers",
+          status: "real",
+          detail: (
+            <>
+              <Live>{plural(imported.length, "results file")}</Live> imported,{" "}
+              <Live>{plural(importedStudents, "student")}</Live> brought in. Each
+              file was checked before anything was saved.
+            </>
+          ),
+        }
+      : {
+          key: "your-students",
+          what: "Your students' answers",
+          status: "not_yet",
+          detail: (
+            <>
+              None loaded yet, so every student on screen is simulated. Loading
+              them is ready: add your paper on the{" "}
+              <Link to="/papers" className="font-medium text-brand-ink underline underline-offset-4">
+                Papers
+              </Link>{" "}
+              page, then upload its blueprint and the class&rsquo;s results from
+              Excel or CSV. Each file is checked before anything is saved.
+            </>
+          ),
+        },
   ];
 
   return (
@@ -743,6 +814,7 @@ function ProvenanceExhibit({
       endpoints={[
         "/api/dashboard/summary/",
         "/api/papers/",
+        "/api/ingest/batches/",
         "/api/students/{id}/diagnosis/?paper=",
       ]}
       footer={
@@ -919,7 +991,14 @@ function BookCard({
  * The disagreements are not tinted as a warning either: they are not known to
  * be anyone's error until a person has looked, and the page says exactly that.
  */
-function AnswerKeyExhibit() {
+function AnswerKeyExhibit({
+  review,
+}: {
+  /** Read live from the review queue; undefined while it loads or if it cannot. */
+  review?: { waiting: number; reviewed: number };
+}) {
+  const anyReviewed = (review?.reviewed ?? 0) > 0;
+  const allReviewed = review !== undefined && anyReviewed && review.waiting === 0;
   const steps = [
     {
       icon: PenLine,
@@ -939,15 +1018,19 @@ function AnswerKeyExhibit() {
       icon: UserRound,
       title: "Disagreements are marked for a person",
       body: "Every question goes into the bank with NTA's answer; the ones that differ are marked for a reviewer.",
-      state: "Not yet reviewed",
-      done: false,
+      state: allReviewed
+        ? "Reviewed"
+        : anyReviewed
+          ? `${num(review!.reviewed)} reviewed, ${num(review!.waiting)} waiting`
+          : "Not yet reviewed",
+      done: allReviewed,
     },
   ];
 
   return (
     <Exhibit
       title="The cross-check, on the papers loaded so far"
-      endpoints={[]}
+      endpoints={["/api/review/disagreements/"]}
       tag={<RecordsTag />}
       footer={
         <span className="flex items-start gap-2">
@@ -958,8 +1041,21 @@ function AnswerKeyExhibit() {
             </span>{" "}
             A first pass by an AI assistant sided with NTA&rsquo;s key in every
             case and found {num(CROSS_CHECK_TRANSCRIPTION_ERRORS)} copying errors
-            of ours — but a person has not yet reviewed them. Until one has, we
-            say so here.
+            of ours.{" "}
+            {anyReviewed ? (
+              <>
+                A person has since decided{" "}
+                <span className="tnum font-medium text-foreground">
+                  {num(review!.reviewed)}
+                </span>
+                {review!.waiting ? `; ${num(review!.waiting)} are still waiting.` : "."}
+              </>
+            ) : (
+              <>
+                But a person has not yet reviewed them. Until one has, we say so
+                here.
+              </>
+            )}
           </span>
         </span>
       }

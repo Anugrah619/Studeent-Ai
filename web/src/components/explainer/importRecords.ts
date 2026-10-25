@@ -2,13 +2,13 @@
  * What has been imported from official documents — the one set of figures on
  * the explainer pages that is NOT read from the API.
  *
- * API_GAPS.QUESTION_PROVENANCE: nothing in the contract says where a paper or
- * question came from, so no route can count these. They were counted when the
- * documents were imported (and checked by hand afterwards), and are written
- * here so that a trust page does not keep saying "being added" about work that
- * is done. Every place that shows one labels it "From our import records", so
- * it is never mistaken for a live figure. When `TestPaper` carries a `source`,
- * the past-paper rows should be counted from `usePapers()` and this file shrink.
+ * `TestPaper.source` says where a paper came from now, and "Data & trust"
+ * counts the official past papers in the bank from `usePapers()`. What no route
+ * reports is in here: a syllabus's chapter count, how often the AI matched the
+ * official key at import, and how many of those mismatches were our own copying
+ * errors. They were counted when the documents were imported (and checked by
+ * hand afterwards). Every place that shows one labels it "From our import
+ * records", so it is never mistaken for a live figure.
  *
  * Change these only alongside a real import. A trust page with one invented
  * figure on it is worse than no trust page.
@@ -82,4 +82,4 @@ export const CROSS_CHECK_TRANSCRIPTION_ERRORS = 2;
 export const DIAGNOSTIC_PAPER = { questions: 46, misconceptions: 15 } as const;
 
 export const IMPORT_RECORDS_NOTE =
-  "Counted when the documents were imported. The system does not yet report where each question came from, so these figures are written into this page rather than read live.";
+  "Counted when the documents were imported. The system says where each paper came from, but not how many chapters a syllabus has or how often the AI matched the key, so these figures are written into this page rather than read live.";

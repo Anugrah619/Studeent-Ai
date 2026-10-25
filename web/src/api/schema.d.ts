@@ -552,6 +552,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/misconceptions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The misconception taxonomy, for the tagging screen's picker.
+         *
+         *     Global, not tenant-scoped: every institute shares one curated vocabulary,
+         *     which is what makes a diagnosis comparable across them. Console only —
+         *     the taxonomy is a description of wrong beliefs, and is not shown to
+         *     students. Ordered by subject, then code.
+         */
+        get: operations["misconceptions_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/my/attempts/": {
         parameters: {
             query?: never;
@@ -613,6 +637,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/my/guidance/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description My next actions and my mentor-approved findings.
+         *
+         *     `next_actions` are rules over my own data — no model — at most five,
+         *     ranked by kind (see `NextAction.kind`). `findings` are diagnoses my
+         *     mentor marked **agreed**, one per paper, reworded for me; a diagnosis
+         *     nobody has reviewed, or that my mentor disagreed with, never appears.
+         *
+         *     Never a 503, and never a wait on the model: a finding shows the
+         *     rewording the nightly job made, or — until it has — a fixed template
+         *     (`reworded: false`).
+         */
+        get: operations["my_guidance_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/guidance/ask/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Answer a question about my preparation — not a doubt about a chapter.
+         *
+         *     "What should I focus on this week?" and "why is X in my plan?" are
+         *     answered from my own plan, weakest chapters, due revisions and recent
+         *     mocks. A request to solve a question or explain a concept is politely
+         *     declined with a pointer to my teacher; health and wellbeing get a kind
+         *     pointer to my mentor or a trusted adult and no advice.
+         *
+         *     My name, roll number, mentor, institute, and any phone number or email
+         *     are removed from the question before it leaves the server.
+         */
+        post: operations["my_guidance_ask_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/my/marks-lost/": {
         parameters: {
             query?: never;
@@ -649,6 +729,52 @@ export interface paths {
          */
         get: operations["my_mock_scores_list"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/my/onboarding/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description My onboarding: the exam I am preparing for, and what I can give it.
+         *
+         *     `GET` shows what the institute set — exam, exam date, batch, target —
+         *     alongside my own answers, and `needs_onboarding` while I have not
+         *     saved them yet. The exam and batch are read-only: they come from my
+         *     batch, and changing them is the institute's decision.
+         *
+         *     `PUT {daily_minutes, target_rank}` saves my answers. `daily_minutes`
+         *     (45–720) is required; `target_rank` (1 or more) is optional and a PUT
+         *     replaces it, so leaving it out clears it. The first save sets
+         *     `onboarded_at`; later saves change the answers but never move it.
+         *     `daily_minutes` becomes the budget my day plan is built to (see
+         *     `POST /api/my/plan/generate/`).
+         */
+        get: operations["my_onboarding_retrieve"];
+        /**
+         * @description My onboarding: the exam I am preparing for, and what I can give it.
+         *
+         *     `GET` shows what the institute set — exam, exam date, batch, target —
+         *     alongside my own answers, and `needs_onboarding` while I have not
+         *     saved them yet. The exam and batch are read-only: they come from my
+         *     batch, and changing them is the institute's decision.
+         *
+         *     `PUT {daily_minutes, target_rank}` saves my answers. `daily_minutes`
+         *     (45–720) is required; `target_rank` (1 or more) is optional and a PUT
+         *     replaces it, so leaving it out clears it. The first save sets
+         *     `onboarded_at`; later saves change the answers but never move it.
+         *     `daily_minutes` becomes the budget my day plan is built to (see
+         *     `POST /api/my/plan/generate/`).
+         */
+        put: operations["my_onboarding_update"];
         post?: never;
         delete?: never;
         options?: never;
@@ -717,6 +843,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/my/plan/explain/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Why my plan for a day is what it is, from its blocks' own reasons.
+         *
+         *     **Always a 200** for a valid request. When the model is unavailable,
+         *     or the `plan_explain` budget is spent, `summary` is a fixed summary
+         *     built from the same reasons and `available` is false. A day with no
+         *     plan says so, with `available: false`. Cached on the plan's content:
+         *     ticking a block or asking again costs nothing.
+         */
+        post: operations["my_plan_explain_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/my/plan/generate/": {
         parameters: {
             query?: never;
@@ -727,14 +878,21 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * @description Make my plan for a day — three explicit rules, each block saying which.
+         * @description Make my plan for a day — explicit rules, each block saying which.
          *
-         *     **Rules, not a model.** Overdue revisions first, then my weakest
-         *     *taught* chapters, then one chapter taught but never attempted; sized
-         *     to what I actually log on a typical day. Every block's `reason_text`
-         *     names the rule that chose it, so the plan can be argued with. See
+         *     **Rules, not a model.** Due revisions first, then chapters I am
+         *     forecast to be forgetting (at most two revise blocks in all), then my
+         *     weakest *taught* chapters — a neglected subject's first — then one
+         *     chapter taught but never attempted. Sized to the minutes a day I gave
+         *     at onboarding, else to what I actually log, else a default. Every
+         *     block's `reason_text` names the rule that chose it, so the plan can be
+         *     argued with; `reason_code` is one of `revision_r1`–`revision_r3`,
+         *     `low_retention`, `weak_topic`, `subject_balance` or `syllabus`. See
          *     `apps/derived/services/planner.py` for the rules and for why blocks
          *     carry no start time.
+         *
+         *     Some days are deliberately lighter or shorter; `note` then says so in
+         *     a sentence safe to show as it is. It is null on an ordinary day.
          *
          *     Idempotent: if a plan already exists it is returned as it stands
          *     (200). `replace: true` rebuilds it, keeping anything I have ticked.
@@ -760,7 +918,8 @@ export interface paths {
          *
          *     `progress` is the student-safe slice of `StudentState` — no
          *     `risk_score`. See `MyProgressSerializer` for what is withheld and
-         *     why.
+         *     why. `needs_onboarding` is true until `PUT /api/my/onboarding/` has
+         *     been saved once.
          */
         get: operations["my_profile_retrieve"];
         put?: never;
@@ -840,9 +999,11 @@ export interface paths {
          *     done_at IS NULL` is what makes that true under two simultaneous
          *     requests, which a read-then-write would not be.
          *
-         *     Also refreshes my derived state (`revision_debt`, `last_revised`,
-         *     `retention`) so the screen reflects it straight away; see
-         *     `refresh_derived_state` for why that cannot fail the request.
+         *     Also schedules the next cycle at once (R2 a week after R1 is done, R3
+         *     a month after R2, never past the exam) and refreshes my derived state
+         *     (`revision_debt`, `last_revised`, `retention`) so the screen reflects
+         *     it straight away; see `refresh_derived_state` for why neither can
+         *     fail the request.
          */
         post: operations["my_revisions_complete_create"];
         delete?: never;
@@ -868,6 +1029,9 @@ export interface paths {
          *     The `topic` must be a chapter of the student's own syllabus
          *     (`GET /api/my/topics/`), `minutes` is 1–720, and `ts` may be in the past
          *     but not the future. A mentor posting here is a 403; it used to be a 500.
+         *
+         *     The first time a chapter is met, logging it schedules its first revision
+         *     (R1, the next day) straight away — see `schedule_next_revision`.
          */
         get: operations["my_study_logs_list"];
         put?: never;
@@ -881,6 +1045,9 @@ export interface paths {
          *     The `topic` must be a chapter of the student's own syllabus
          *     (`GET /api/my/topics/`), `minutes` is 1–720, and `ts` may be in the past
          *     but not the future. A mentor posting here is a 403; it used to be a 500.
+         *
+         *     The first time a chapter is met, logging it schedules its first revision
+         *     (R1, the next day) straight away — see `schedule_next_revision`.
          */
         post: operations["my_study_logs_create"];
         delete?: never;
@@ -896,7 +1063,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Where my study time goes against where my marks go. Three rows, fixed order. */
+        /** @description Where my study time goes against where my marks go: one row per subject of my syllabus, in its order. */
         get: operations["my_subject_breakdown_list"];
         put?: never;
         post?: never;
@@ -917,7 +1084,8 @@ export interface paths {
          * @description My per-chapter mastery, weakest first.
          *
          *     `mastery` is null below the evidence floor — null is "not enough
-         *     attempts to say", never zero.
+         *     attempts to say", never zero. `?forgetting=true` lists the chapters
+         *     I am forecast to be forgetting, fastest first.
          */
         get: operations["my_topic_states_list"];
         put?: never;
@@ -1041,6 +1209,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/papers/{id}/questions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description A paper's questions for the tagging screen, whole, with progress counts.
+         *
+         *     `summary.wrong_options_tagged` against `summary.wrong_options` is how
+         *     far the paper is from being diagnosable. Only what students actually
+         *     chose matters to a diagnosis, so a paper does not have to be finished
+         *     to be useful — but an untagged option a student picked is a wrong
+         *     answer the diagnosis cannot explain.
+         */
+        get: operations["papers_questions_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/papers/{id}/questions/{question_pk}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * @description Set a question's text and solution, and tag or describe its options.
+         *
+         *     Partial: only what is sent changes, and within `options` only the
+         *     labels named. Every problem is reported at once and nothing is written
+         *     unless there are none. Allowed on questions students have already
+         *     answered — a tag changes no one's marks, only what the next diagnosis
+         *     can say. Returns the question as `GET …/questions/` shows it.
+         */
+        patch: operations["papers_questions_partial_update"];
+        trace?: never;
+    };
     "/api/questions/{id}/": {
         parameters: {
             query?: never;
@@ -1059,6 +1277,54 @@ export interface paths {
         get: operations["questions_retrieve"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/review/disagreements/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The answer-key review queue, oldest paper first, in paper order.
+         *
+         *     Every question the cross-check ever disagreed on — reviewed or not —
+         *     so a decision stays visible after it is made. `?status=unreviewed` is
+         *     the queue itself.
+         */
+        get: operations["review_disagreements_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/review/disagreements/{question_pk}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description `key_stands`, `key_wrong` or `unclear`, with an optional note.
+         *
+         *     Records who decided and when, moves the question's `verification` out
+         *     of `disagreed` (to `key_stands`, `key_wrong` or `key_unclear`), and
+         *     keeps every earlier decision in its history. A later decision
+         *     replaces this one — an `unclear` can become `key_stands` once an
+         *     expert has looked. Returns the updated row.
+         */
+        post: operations["review_disagreements_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1395,10 +1661,11 @@ export interface paths {
         /**
          * @description Study-time share vs marks-lost share. The neglect chart.
          *
-         *     Always exactly three rows, in the fixed order Physics, Chemistry,
-         *     Maths — a subject with no data comes back as zeroes rather than
-         *     being omitted, so the chart's three bars never renumber
-         *     themselves between students.
+         *     One row per subject of the student's syllabus, in syllabus order —
+         *     Physics, Chemistry, Maths for JEE; Physics, Chemistry, Botany,
+         *     Zoology for NEET. A subject with no data comes back as zeroes
+         *     rather than being omitted, so the chart's bars never renumber
+         *     themselves between students of one batch.
          *
          *     `marks_lost_share_pct` is now a share of **marks**, computed by
          *     `features.marks_lost_by_topic`. It previously counted lost
@@ -1430,7 +1697,8 @@ export interface paths {
          *
          *     Ordered by `mastery` ascending; Postgres sorts NULLs last on an
          *     ascending sort, so chapters with too little evidence to score sit
-         *     at the end rather than masquerading as the weakest ones.
+         *     at the end rather than masquerading as the weakest ones. With
+         *     `?forgetting=true`, ordered by `retention` ascending instead.
          */
         get: operations["students_topic_states_list"];
         put?: never;
@@ -1445,6 +1713,24 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description * `mcq` - Multiple choice
+         *     * `numerical` - Numerical value
+         * @enum {string}
+         */
+        AnswerTypeEnum: "mcq" | "numerical";
+        AskAnswer: {
+            /** @description At most about 120 words, safe to show verbatim. */
+            answer: string;
+            /** @description Always true on a 200. When no answer can be given the response is a 503. */
+            available: boolean;
+            /** @description True if this exact question over the same data was answered before. */
+            from_cache: boolean;
+        };
+        AskRequest: {
+            /** @description A preparation question, at most 500 characters — 'what should I focus on this week?', 'why is Thermodynamics in my plan?'. Names, roll numbers, the mentor's and institute's names, phone numbers and emails are removed before it is sent anywhere. */
+            question: string;
+        };
         Attempt: {
             readonly id: number;
             question_id: string;
@@ -1487,7 +1773,7 @@ export interface components {
         BlueprintUploadRequest: {
             /**
              * Format: binary
-             * @description CSV: question_id, chapter, correct_option (or answer for a numeric question).
+             * @description CSV or Excel `.xlsx` (first sheet): question_id, chapter, correct_option (or answer for a numeric question). Legacy `.xls` is refused with how to re-save it.
              */
             file: string;
             /**
@@ -1618,6 +1904,11 @@ export interface components {
              * @description Share of closed flags whose outcome was 'recovered'.
              */
             recovery_rate_pct: number | null;
+            /**
+             * Format: date-time
+             * @description When the nightly refresh (features, revisions, flags, plans) last finished successfully for this institute — how fresh the numbers on this strip are. Institute-wide even under `?batch=`. Null when it has never run, which means everything here comes from manual or on-event updates only.
+             */
+            last_refreshed_at: string | null;
         };
         /** @description The one-key error/ack envelope DRF already uses everywhere. */
         Detail: {
@@ -1773,6 +2064,95 @@ export interface components {
          * @enum {string}
          */
         DifficultyEnum: "easy" | "medium" | "hard";
+        DisagreementOption: {
+            label: string;
+            text: string;
+            /** @description Correct according to the official key. */
+            is_correct: boolean;
+        };
+        DisagreementReviewRequest: {
+            /**
+             * @description `key_stands`: the official key is right (the key becomes trusted). `key_wrong`: the key as stored is wrong — usually a misread question (the key becomes untrusted and its options cannot be tagged). `unclear`: needs a subject expert (still untrusted, no longer unreviewed).
+             *
+             *     * `key_stands` - The official key stands
+             *     * `key_wrong` - The key as stored is wrong
+             *     * `unclear` - Unclear — needs a subject expert
+             */
+            decision: components["schemas"]["KeyReviewDecisionEnum"];
+            /**
+             * @description Why. Kept with the decision and in its history.
+             * @default
+             */
+            note: string;
+        };
+        /** @description A proposed misconception for one option. **Not a tag** — diagnosis ignores it. */
+        DraftMisconception: {
+            /** @description The code proposed — an existing taxonomy code, or a new one the model invented. Blank for a proposal made in the console, which names a belief rather than a code. */
+            code: string;
+            name: string;
+            /** @description The wrong belief, in the student's voice. */
+            description: string;
+            /** @description True when the proposal is not (yet) in the taxonomy. */
+            is_new: boolean;
+            proposed_by: components["schemas"]["ProposedByEnum"];
+            /**
+             * @description `draft` until a person tags the option; then `accepted` if they used this draft's code, `superseded` if they chose another.
+             *
+             *     * `draft` - Proposed, not yet acted on
+             *     * `accepted` - A person tagged the option with this code
+             *     * `superseded` - A person tagged the option with a different code
+             */
+            status: components["schemas"]["DraftMisconceptionStatusEnum"];
+        };
+        DraftMisconceptionProposalRequest: {
+            /** @description A short name for the belief. */
+            name: string;
+            /** @description The wrong belief, stated as the student would hold it. */
+            description: string;
+        };
+        /**
+         * @description * `draft` - Proposed, not yet acted on
+         *     * `accepted` - A person tagged the option with this code
+         *     * `superseded` - A person tagged the option with a different code
+         * @enum {string}
+         */
+        DraftMisconceptionStatusEnum: "draft" | "accepted" | "superseded";
+        /**
+         * @description A diagnosis the student's mentor agreed with, in the student's words.
+         *
+         *     **Only `agreed` diagnoses appear.** Unreviewed and disagreed ones never
+         *     reach the student app. No misconception code, risk score or flag is
+         *     included; the wording is the model's rewording of the approved finding
+         *     (`reworded: true`) or a fixed template built from it when the model is
+         *     unavailable (`reworded: false`).
+         */
+        Finding: {
+            /** @description The paper this finding is about — the `paper_id` of `GET /api/my/mock-scores/`. Null when the diagnosis spanned every paper the student had sat, or its paper no longer exists. */
+            paper_id: number | null;
+            /** @description Null when the finding spans several papers. */
+            paper_name: string | null;
+            /** @description Plain words, encouraging, at most about 12 words. */
+            title: string;
+            /** @description Two or three sentences, addressed to 'you'. */
+            explanation: string;
+            /** @description One concrete next step the student can take. */
+            what_to_do: string;
+            /** @description The questions the finding rests on, in the order cited. */
+            questions: components["schemas"]["FindingQuestion"][];
+            /**
+             * Format: date-time
+             * @description When the mentor agreed. Null only for an agreement recorded before the time was kept.
+             */
+            approved_at: string | null;
+            /** @description True if the wording is the model's rewording for students; false if it is the fixed template, used while the model is unavailable. */
+            reworded: boolean;
+        };
+        FindingQuestion: {
+            /** @description Opens with `GET /api/my/questions/{id}/`. Only questions this student answered are ever listed, so the link always opens. */
+            question_pk: number;
+            /** @description The question as the paper prints it, e.g. `"Q16"`. */
+            label: string;
+        };
         /**
          * @description One detector output, evidenced and routable.
          *
@@ -1852,6 +2232,23 @@ export interface components {
             /** @description Optional. If given, also logged as an Intervention. */
             note?: string;
         };
+        Guidance: {
+            /** @description At most five, most useful first. Empty is a real answer. */
+            next_actions: components["schemas"]["NextAction"][];
+            /** @description One per paper, newest approval first. Empty until a mentor agrees. */
+            findings: components["schemas"]["Finding"][];
+        };
+        /**
+         * @description * `start_plan` - Today's plan is ready and not started
+         *     * `make_plan` - No plan for today yet
+         *     * `revisions_due` - Revisions due or overdue
+         *     * `mock_recoverable` - Marks on the latest mock that needed no new learning
+         *     * `weak_chapter` - The weakest measured chapter
+         *     * `log_study` - No study logged recently
+         *     * `rate_confidence` - Weak chapters with no confidence rating
+         * @enum {string}
+         */
+        GuidanceActionKindEnum: "start_plan" | "make_plan" | "revisions_due" | "mock_recoverable" | "weak_chapter" | "log_study" | "rate_confidence";
         /**
          * @description * `agreed` - agreed
          *     * `disagreed` - disagreed
@@ -1906,6 +2303,71 @@ export interface components {
             mentor: number;
             action: string;
         };
+        /** @description One question where the factory's blind answer and the official key differ. */
+        KeyDisagreement: {
+            /** @description `QuestionTopicMap.id` — the `question_pk` the review POST takes. */
+            id: number;
+            paper_id: number;
+            paper_name: string;
+            label: string;
+            subject: string | null;
+            answer_type: components["schemas"]["AnswerTypeEnum"];
+            question_text: string;
+            options: components["schemas"]["DisagreementOption"][];
+            /** @description NTA's key, mapped to this paper's labels: `2`, `1,2`, `225`. */
+            official_answer: string;
+            /** @description What the model got solving blind. Never the answer. */
+            model_answer: string;
+            has_diagram: boolean;
+            /**
+             * @description Trust in this question's answer key. `agreed`: the factory's blind solve matched the official key. `disagreed`: it did not, and nobody has reviewed it. `key_stands` / `key_wrong` / `key_unclear`: a person's decision on a disagreement. `unverifiable`: could not be checked. Blank: never cross-checked — an institute's own or a demo paper, whose key is its author's. Trusted keys: blank, `agreed`, `key_stands`.
+             *
+             *     * `` - Not cross-checked
+             *     * `agreed` - Model agreed with the official key
+             *     * `disagreed` - Model disagreed — needs a person
+             *     * `unverifiable` - Could not be checked (e.g. unreadable figure)
+             *     * `key_stands` - Model disagreed; a person confirmed the key
+             *     * `key_wrong` - Model disagreed; a person found the key wrong
+             *     * `key_unclear` - Model disagreed; a person could not settle it
+             */
+            verification: components["schemas"]["VerificationEnum"] | components["schemas"]["BlankEnum"];
+            /** @description `verification_detail` in one paragraph: the model's answer and confidence, its note, transcription issues, and the factory agent's first look — labelled as not a human review. */
+            detail_summary: string;
+            /** @description The model's blind working, truncated to 1,500 characters. */
+            model_working: string;
+            review: components["schemas"]["KeyReview"];
+        };
+        KeyReview: {
+            /**
+             * @description `unreviewed`, or the latest decision.
+             *
+             *     * `unreviewed` - Not reviewed yet
+             *     * `key_stands` - The official key stands
+             *     * `key_wrong` - The key as stored is wrong
+             *     * `unclear` - Unclear — needs a subject expert
+             */
+            status: components["schemas"]["KeyReviewStatusEnum"];
+            note: string;
+            /** @description Who made the latest decision (their username). Null if nobody. */
+            reviewed_by: string | null;
+            /** Format: date-time */
+            reviewed_at: string | null;
+        };
+        /**
+         * @description * `key_stands` - The official key stands
+         *     * `key_wrong` - The key as stored is wrong
+         *     * `unclear` - Unclear — needs a subject expert
+         * @enum {string}
+         */
+        KeyReviewDecisionEnum: "key_stands" | "key_wrong" | "unclear";
+        /**
+         * @description * `unreviewed` - Not reviewed yet
+         *     * `key_stands` - The official key stands
+         *     * `key_wrong` - The key as stored is wrong
+         *     * `unclear` - Unclear — needs a subject expert
+         * @enum {string}
+         */
+        KeyReviewStatusEnum: "unreviewed" | "key_stands" | "key_wrong" | "unclear";
         /**
          * @description * `subject` - Subject
          *     * `unit` - Unit
@@ -2070,19 +2532,56 @@ export interface components {
             /** @description What actually fixes it. Shown to the mentor. */
             remedy?: string;
         };
+        MisconceptionRef: {
+            code: string;
+            name: string;
+        };
+        /**
+         * @description One paper's marks, split by subject.
+         *
+         *     `subjects` is **additive** and is the field to read: one entry per
+         *     subject of the student's syllabus, in syllabus order, present on every
+         *     row (0 when the paper had none of that subject). `physics`, `chemistry`
+         *     and `maths` are kept unchanged for clients written before it, and are 0
+         *     for an exam without that subject — a NEET row has `maths: 0` and its
+         *     Biology only in `subjects`.
+         */
         MockScore: {
             paper_id: number;
             paper_name: string;
             /** Format: date */
             held_on: string;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Legacy. The Physics entry of `subjects`, or 0.
+             */
             physics: number;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Legacy. The Chemistry entry of `subjects`, or 0.
+             */
             chemistry: number;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Legacy. The Maths (or Mathematics) entry of `subjects`, or 0 — always 0 for NEET.
+             */
             maths: number;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description The sum of `subjects[].marks` — every subject, not only the legacy three.
+             */
             total: number;
+            /** @description Additive. One entry per subject of the student's syllabus, in syllabus order, on every row; a subject the student has marks in that their current syllabus lacks is appended after. */
+            subjects: components["schemas"]["MockScoreSubject"][];
+        };
+        MockScoreSubject: {
+            /** @description The subject's name as the syllabus tree spells it. */
+            subject: string;
+            /**
+             * Format: double
+             * @description Marks scored in this subject on this paper, after negative marking.
+             */
+            marks: number;
         };
         /**
          * @description * `learn` - Learn
@@ -2120,6 +2619,8 @@ export interface components {
             readonly batch: components["schemas"]["Batch"];
             readonly mentor_name: string;
             readonly progress: components["schemas"]["MyProgress"] | null;
+            /** @description True until the student has saved `/api/my/onboarding/` once. The student app shows onboarding first while this is true. */
+            readonly needs_onboarding: boolean;
         };
         /**
          * @description The slice of `StudentState` a student is shown about themselves.
@@ -2241,8 +2742,88 @@ export interface components {
             /** @description Where to re-read this chapter in the NCERT textbooks: a list of `{class, subject, book, chapter, title, pdf, sections?}`. Null when the chapter has no NCERT counterpart or has not been linked yet. `sections` appears only when just part of the NCERT chapter applies. */
             readonly ncert_ref: unknown;
         };
+        /**
+         * @description One thing to do next, worked out by rules from the student's own data.
+         *
+         *     No model is involved, and nothing here is a label about the student:
+         *     every `title` and `detail` is an action and the fact behind it.
+         */
+        NextAction: {
+            /**
+             * @description Which rule produced this. The list is ranked by kind, in the order the enum lists them: `start_plan`/`make_plan`, `revisions_due`, `mock_recoverable`, `weak_chapter`, `log_study`, `rate_confidence`. At most one of each.
+             *
+             *     * `start_plan` - Today's plan is ready and not started
+             *     * `make_plan` - No plan for today yet
+             *     * `revisions_due` - Revisions due or overdue
+             *     * `mock_recoverable` - Marks on the latest mock that needed no new learning
+             *     * `weak_chapter` - The weakest measured chapter
+             *     * `log_study` - No study logged recently
+             *     * `rate_confidence` - Weak chapters with no confidence rating
+             */
+            kind: components["schemas"]["GuidanceActionKindEnum"];
+            /** @description One line, safe to show verbatim. */
+            title: string;
+            /** @description One or two sentences: the fact behind the action. */
+            detail: string;
+            /** @description Where tapping this should go. A screen name, or `{"mock": paper_id}`. */
+            target: ("plan" | "revisions" | "topics" | "study-log" | "confidence") | {
+                /** @description A `paper_id` this student sat — what `GET /api/my/marks-lost/?paper=` takes. */
+                mock: number;
+            };
+        };
         /** @enum {unknown} */
         NullEnum: null;
+        /**
+         * @description What onboarding shows and stores — read model for `/api/my/onboarding/`.
+         *
+         *     The exam, its date and the batch are the institute's decisions, read off
+         *     the student's batch and shown for confirmation only: a student cannot
+         *     move themselves to another exam or batch here. What the student owns is
+         *     how long they can study a day and the rank they are aiming for.
+         */
+        Onboarding: {
+            /** @description The batch's exam, e.g. `JEE_MAIN`. Read-only. */
+            readonly exam_code: string;
+            /** @description Display name of the exam. Read-only. */
+            readonly exam_name: string;
+            /**
+             * Format: date
+             * @description The day the batch sits the exam. Null when the institute has not set it. Read-only.
+             */
+            readonly exam_date: string | null;
+            /** @description The batch the institute placed the student in. Read-only. */
+            readonly batch_name: string;
+            /** @description The free-text target the institute recorded ("AIR < 5000"), or an empty string. Read-only here; `target_rank` is the student's own number. */
+            readonly target: string;
+            /** @description The rank the student is aiming for (1 or more). Null until they say. */
+            readonly target_rank: number | null;
+            /** @description Minutes a day the student says they can study, 45–720. Null until onboarding. The day planner uses it before the median of what they log, clamped to its 90–360 minute budget. */
+            readonly daily_minutes: number | null;
+            /**
+             * Format: date-time
+             * @description When onboarding was first saved. Set once; later edits do not move it.
+             */
+            readonly onboarded_at: string | null;
+            /** @description True until onboarding has been saved once (`onboarded_at` is null). */
+            readonly needs_onboarding: boolean;
+        };
+        /** @description The body of `PUT /api/my/onboarding/`. A PUT replaces both fields. */
+        OnboardingUpdateRequest: {
+            /** @description Required. Minutes a day you can study, 45–720. */
+            daily_minutes: number;
+            /** @description The rank you are aiming for, 1 or more. Optional: omitting it or sending null clears it, because a PUT replaces the whole answer. */
+            target_rank?: number | null;
+        };
+        OptionContentUpdateRequest: {
+            /** @description Which option: `A`, or `1` on an official paper. */
+            label: string;
+            /** @description The option's text. Omit to leave it unchanged. */
+            text?: string;
+            /** @description Tag this wrong option with a taxonomy code (`GET /api/misconceptions/`). Null or blank removes the tag; omit to leave it unchanged. Refused on the correct option, for a code not in the taxonomy, and for a code of another subject. */
+            misconception_code?: string | null;
+            /** @description Propose a belief the taxonomy lacks. Stored as a draft that counts for nothing until a person adds it to the taxonomy and tags the option with it. Null clears the option's draft; omit to leave it. */
+            draft_misconception?: components["schemas"]["DraftMisconceptionProposalRequest"] | null;
+        };
         PaginatedAttemptList: {
             /** @example 123 */
             count: number;
@@ -2348,6 +2929,21 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["Intervention"][];
         };
+        PaginatedKeyDisagreementList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["KeyDisagreement"][];
+        };
         PaginatedMentorList: {
             /** @example 123 */
             count: number;
@@ -2362,6 +2958,21 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["Mentor"][];
+        };
+        PaginatedMisconceptionList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["Misconception"][];
         };
         PaginatedMockScoreList: {
             /** @example 123 */
@@ -2514,6 +3125,33 @@ export interface components {
             results: components["schemas"]["TopicState"][];
         };
         /**
+         * @description A paper's questions, whole, with how far through tagging it is.
+         *
+         *     Not paginated, on purpose: it is bounded by one paper (a paper has at most
+         *     300 questions; NEET's is 180), and a tagging screen that showed one page
+         *     beside counts for the whole paper would misreport its own progress.
+         */
+        PaperQuestions: {
+            paper_id: number;
+            paper_name: string;
+            paper_source: components["schemas"]["PaperSourceEnum"];
+            /** Format: date */
+            held_on: string;
+            summary: components["schemas"]["PaperQuestionsSummary"];
+            questions: components["schemas"]["TaggableQuestion"][];
+        };
+        PaperQuestionsSummary: {
+            questions: number;
+            /** @description Questions whose stem has been written. */
+            with_text: number;
+            /** @description Wrong options across the paper — every one a diagnosis could use. */
+            wrong_options: number;
+            /** @description Wrong options carrying a confirmed misconception. A paper is diagnosable once the options its students actually chose are tagged. */
+            wrong_options_tagged: number;
+            /** @description Untagged wrong options with a pending proposal to act on. */
+            wrong_options_with_draft: number;
+        };
+        /**
          * @description * `official_pyq` - Official past paper
          *     * `demo` - Demo (written by us)
          *     * `generated` - Generated
@@ -2528,6 +3166,13 @@ export interface components {
             /** @description At least 8 characters; not a common password, not all digits, not like my name, and not my roll number. */
             new_password: string;
         };
+        /** @description Every field optional; only what is sent changes. All or nothing. */
+        PatchedQuestionContentUpdateRequest: {
+            question_text?: string;
+            solution?: string;
+            /** @description Only the options named here change; the rest are left as they are. */
+            options?: components["schemas"]["OptionContentUpdateRequest"][];
+        };
         PlanBlock: {
             readonly id: number;
             /** Format: date */
@@ -2541,6 +3186,23 @@ export interface components {
             readonly reason_code: string;
             reason_text?: string;
             completed?: boolean;
+        };
+        PlanExplain: {
+            /** Format: date */
+            date: string;
+            /** @description Two or three sentences, built from the blocks' own reasons. */
+            summary: string;
+            /** @description True if `summary` was written by the model. False means it is the fixed summary — because the model is unavailable, the budget is spent, or there is no plan for the day. Never an error. */
+            available: boolean;
+            /** @description True if this exact plan was explained before and the answer replayed. */
+            from_cache: boolean;
+        };
+        PlanExplainDayRequest: {
+            /**
+             * Format: date
+             * @description The day whose plan to explain, `YYYY-MM-DD`. Defaults to today.
+             */
+            date?: string;
         };
         PlanGenerateRequestRequest: {
             /**
@@ -2560,7 +3222,15 @@ export interface components {
             /** @description True if this call made blocks. False if the plan already existed, or if nothing qualifies yet — `blocks` then says which: empty means there was nothing to plan, not that the call failed. */
             generated: boolean;
             blocks: components["schemas"]["PlanBlock"][];
+            /** @description One gentle sentence when today's plan is deliberately lighter or shorter than usual — written for the student, safe to show as it is, and never naming why. Null on an ordinary day (and on an empty one). Always present. */
+            note: string | null;
         };
+        /**
+         * @description * `model` - The question factory's tagger
+         *     * `console` - A person, in the console
+         * @enum {string}
+         */
+        ProposedByEnum: "model" | "console";
         /**
          * @description One question, in full — what a director sees on clicking an evidence chip.
          *
@@ -2673,7 +3343,7 @@ export interface components {
         ResultsUploadRequest: {
             /**
              * Format: binary
-             * @description CSV. Either one row per student with a column per question (`roll_no, Q1, Q2, …`), or one row per answer (`roll_no, question_id, answer`).
+             * @description CSV or Excel `.xlsx` (first sheet). Either one row per student with a column per question (`roll_no, Q1, Q2, …`), or one row per answer (`roll_no, question_id, answer`). Legacy `.xls` is refused with how to re-save it.
              */
             file: string;
             /** @description The `TestPaper.id` the file is the results of. */
@@ -2761,6 +3431,15 @@ export interface components {
             readonly mentor: components["schemas"]["Mentor"];
             readonly state: components["schemas"]["StudentState"];
             readonly login_status: components["schemas"]["LoginStatusEnum"];
+            /** @description Minutes a day the student says they can study (45–720). Null until they onboard. The day planner uses it first. */
+            readonly daily_minutes: number | null;
+            /** @description The rank the student says they are aiming for. Null until they say. */
+            readonly target_rank: number | null;
+            /**
+             * Format: date-time
+             * @description When the student first completed onboarding. Null: not yet.
+             */
+            readonly onboarded_at: string | null;
         };
         /**
          * @description Row in the director's triage table.
@@ -2893,8 +3572,19 @@ export interface components {
             /** Format: date-time */
             ts: string;
         };
-        /** @description Time share vs marks-lost share — the neglect chart. */
+        /**
+         * @description Time share vs marks-lost share — the neglect chart.
+         *
+         *     **One row per subject of the student's syllabus, in syllabus order** —
+         *     not a fixed three. JEE comes back as Physics, Chemistry, Maths exactly as
+         *     before; NEET as Physics, Chemistry, Botany, Zoology. A subject with no
+         *     data is a row of zeroes (and a null `accuracy_pct`), never omitted, so
+         *     the bars do not renumber between students of one batch. A subject the
+         *     student has history in that their current syllabus lacks is appended
+         *     after, alphabetically. Render the rows in the order given.
+         */
         SubjectBreakdown: {
+            /** @description The subject's name as the syllabus tree spells it. */
             subject: string;
             /** Format: double */
             time_share_pct: number;
@@ -2902,6 +3592,52 @@ export interface components {
             marks_lost_share_pct: number;
             /** Format: double */
             accuracy_pct: number | null;
+        };
+        TaggableOption: {
+            label: string;
+            /** @description Blank on a blueprint paper until someone types it. */
+            text: string;
+            is_correct: boolean;
+            /** @description The confirmed tag — what diagnosis reads. Always null on a correct option; null on a wrong option nobody has described yet. */
+            misconception: components["schemas"]["MisconceptionRef"] | null;
+            /** @description A proposal awaiting a person, or its resolved record. Null if none. */
+            draft_misconception: components["schemas"]["DraftMisconception"] | null;
+        };
+        /** @description One question as the tagging screen edits it. */
+        TaggableQuestion: {
+            /** @description `QuestionTopicMap.id` — the `question_pk` the PATCH route takes. */
+            id: number;
+            /** @description As the paper prints it: `Q14`, `D16`. */
+            label: string;
+            /** @description Chapter name. Null if unmapped. */
+            topic: string | null;
+            topic_id: number | null;
+            /** @description The question's subject — its chapter's root in the syllabus tree. Pass it to `GET /api/misconceptions/?subject=` to offer only the misconceptions a tag may use. Null when nothing places the question. */
+            subject: string | null;
+            answer_type: components["schemas"]["AnswerTypeEnum"];
+            /** @description Label of the correct option; comma-joined when the official key accepts more than one (`1,2`). Null for a numerical-value question. */
+            correct_option: string | null;
+            /** @description The key as stored — the number, for a numerical question. */
+            official_answer: string;
+            question_text: string;
+            solution: string;
+            difficulty: components["schemas"]["DifficultyEnum"] | components["schemas"]["BlankEnum"];
+            /**
+             * @description Trust in this question's answer key. `agreed`: the factory's blind solve matched the official key. `disagreed`: it did not, and nobody has reviewed it. `key_stands` / `key_wrong` / `key_unclear`: a person's decision on a disagreement. `unverifiable`: could not be checked. Blank: never cross-checked — an institute's own or a demo paper, whose key is its author's. Trusted keys: blank, `agreed`, `key_stands`.
+             *
+             *     * `` - Not cross-checked
+             *     * `agreed` - Model agreed with the official key
+             *     * `disagreed` - Model disagreed — needs a person
+             *     * `unverifiable` - Could not be checked (e.g. unreadable figure)
+             *     * `key_stands` - Model disagreed; a person confirmed the key
+             *     * `key_wrong` - Model disagreed; a person found the key wrong
+             *     * `key_unclear` - Model disagreed; a person could not settle it
+             */
+            verification: components["schemas"]["VerificationEnum"] | components["schemas"]["BlankEnum"];
+            /** @description Students have answers recorded here. Informational: tags and text may still be edited, because they change no one's marks. */
+            has_answers: boolean;
+            /** @description In label order. Empty for a numerical-value question. */
+            options: components["schemas"]["TaggableOption"][];
         };
         TestPaper: {
             readonly id: number;
@@ -2968,7 +3704,7 @@ export interface components {
             readonly mastery: number | null;
             /**
              * Format: double
-             * @description Forecast recall probability, 0–1, decayed since `last_revised`.
+             * @description Forecast probability, 0–1, that the student would recall this chapter today — an exponential forgetting curve, `exp(-t / S)`. `t` is days since the later of `last_seen` (newest attempt) and `last_revised` (newest completed revision). `S`, the stability in days, is `10 × 2.5^(completed revision cycles, at most 3) × (0.5 + mastery)`, with a null mastery counted as 0.5: so a chapter met once at middling mastery falls to 50% in about a week, and each completed revision cycle makes it fade 2.5× slower. **Null when the chapter was never seen** (no attempt and no completed revision; a study log alone does not count). Computed as of the last recompute — nightly, and after the student's own events — so it is a forecast for that moment, not a live clock. Below 0.5 is what `?forgetting=true` returns and what the planner treats as worth a revise block. The constants are stated priors, not fitted values.
              */
             readonly retention: number | null;
             attempts_n?: number;
@@ -2994,6 +3730,17 @@ export interface components {
          * @enum {string}
          */
         VerdictEnum: "agreed" | "disagreed";
+        /**
+         * @description * `` - Not cross-checked
+         *     * `agreed` - Model agreed with the official key
+         *     * `disagreed` - Model disagreed — needs a person
+         *     * `unverifiable` - Could not be checked (e.g. unreadable figure)
+         *     * `key_stands` - Model disagreed; a person confirmed the key
+         *     * `key_wrong` - Model disagreed; a person found the key wrong
+         *     * `key_unclear` - Model disagreed; a person could not settle it
+         * @enum {string}
+         */
+        VerificationEnum: "agreed" | "disagreed" | "unverifiable" | "key_stands" | "key_wrong" | "key_unclear";
     };
     responses: never;
     parameters: never;
@@ -3614,6 +4361,32 @@ export interface operations {
             };
         };
     };
+    misconceptions_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description Only misconceptions of this subject — pass `TaggableQuestion.subject`. Spellings of one subject match each other: `Botany` and `Zoology` find `Biology` entries, `Mathematics` finds `Maths`. Blank or omitted: the whole taxonomy. */
+                subject?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedMisconceptionList"];
+                };
+            };
+        };
+    };
     my_attempts_list: {
         parameters: {
             query?: {
@@ -3691,6 +4464,93 @@ export interface operations {
             };
         };
     };
+    my_guidance_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Guidance"];
+                };
+            };
+            /** @description Not a student account. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    my_guidance_ask_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AskRequest"];
+                "multipart/form-data": components["schemas"]["AskRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskAnswer"];
+                };
+            };
+            /** @description `question` missing, blank, or over 500 characters. DRF's field-error shape: `{"question": ["..."]}`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a student account. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description Today's questions are used up (`guidance_ask`, about 20 a day). Repeating a question already answered is not counted. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description The guide cannot answer now. `detail` is a sentence for the student, safe to show verbatim. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
     my_marks_lost_retrieve: {
         parameters: {
             query: {
@@ -3751,6 +4611,83 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaginatedMockScoreList"];
+                };
+            };
+        };
+    };
+    my_onboarding_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Onboarding"];
+                };
+            };
+            /** @description Not a student account. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    my_onboarding_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingUpdateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["OnboardingUpdateRequest"];
+                "multipart/form-data": components["schemas"]["OnboardingUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Onboarding"];
+                };
+            };
+            /** @description `daily_minutes` missing or outside 45–720, or `target_rank` below 1. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a student account. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
                 };
             };
         };
@@ -3832,6 +4769,47 @@ export interface operations {
             };
             /** @description No such block among this student's own. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    my_plan_explain_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PlanExplainDayRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PlanExplainDayRequest"];
+                "multipart/form-data": components["schemas"]["PlanExplainDayRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanExplain"];
+                };
+            };
+            /** @description `date` is not a `YYYY-MM-DD` date. DRF's field-error shape: `{"date": ["..."]}`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a student account. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4071,6 +5049,8 @@ export interface operations {
     my_topic_states_list: {
         parameters: {
             query?: {
+                /** @description Only chapters whose forecast `retention` is below 0.5, ordered by `retention` ascending — the chapters being forgotten fastest come first. Chapters never seen have a null retention and are excluded. Combines with `weak`. A presence filter: any value other than `true` is ignored. */
+                forgetting?: boolean;
                 /** @description A page number within the paginated result set. */
                 page?: number;
                 /** @description Number of results to return per page. */
@@ -4265,6 +5245,90 @@ export interface operations {
             };
         };
     };
+    papers_questions_retrieve: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperQuestions"];
+                };
+            };
+            /** @description No such paper in this institute. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    papers_questions_partial_update: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+                question_pk: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedQuestionContentUpdateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedQuestionContentUpdateRequest"];
+                "multipart/form-data": components["schemas"]["PatchedQuestionContentUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaggableQuestion"];
+                };
+            };
+            /** @description Nothing was written. DRF's validation-error shape: each field maps to a list of sentences. For `options` that is either a list of sentences (a problem with the list as a whole — a numerical question, a label named twice) or a list aligned with the request's `options`, each entry `{}` or `{field: [sentences]}` — e.g. the correct option given a misconception, a code not in the taxonomy, a code of another subject, or a tag on a question whose key a reviewer found wrong. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such paper in this institute, or no such question on it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
     questions_retrieve: {
         parameters: {
             query?: {
@@ -4297,6 +5361,86 @@ export interface operations {
                 };
             };
             /** @description No such question, or no such student, in this institute. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    review_disagreements_list: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description Only questions on this `TestPaper.id`. */
+                paper?: number;
+                /** @description `unreviewed`: still `disagreed`, nobody has decided. `reviewed`: any decision. Or one decision. Omitted (or anything else): all of them. */
+                status?: "key_stands" | "key_wrong" | "reviewed" | "unclear" | "unreviewed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedKeyDisagreementList"];
+                };
+            };
+        };
+    };
+    review_disagreements_create: {
+        parameters: {
+            query?: {
+                /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
+                institute?: number;
+            };
+            header?: never;
+            path: {
+                question_pk: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisagreementReviewRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["DisagreementReviewRequest"];
+                "multipart/form-data": components["schemas"]["DisagreementReviewRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDisagreement"];
+                };
+            };
+            /** @description `decision` missing or not one of the three. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such question in this institute, or one the cross-check did not disagree on — the same body either way. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4838,6 +5982,8 @@ export interface operations {
     students_topic_states_list: {
         parameters: {
             query?: {
+                /** @description Only chapters whose forecast `retention` is below 0.5, ordered by `retention` ascending — the chapters being forgotten fastest come first. Chapters never seen have a null retention and are excluded. Combines with `weak`. A presence filter: any value other than `true` is ignored. */
+                forgetting?: boolean;
                 /** @description Superusers only: the institute to scope this call to. Ignored for mentor and student accounts, whose institute comes from the account itself. A superuser who omits it gets an empty result rather than every tenant's rows. */
                 institute?: number;
                 /** @description A page number within the paginated result set. */

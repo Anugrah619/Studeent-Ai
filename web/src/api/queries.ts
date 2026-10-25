@@ -158,9 +158,8 @@ export function useMockScores(id: number) {
     queryKey: qk.mockScores(id),
     queryFn: () => apiGetRows("/api/students/{id}/mock-scores/", { path: { id } }),
     enabled: Number.isFinite(id),
-    // API_GAPS.MOCK_SCORES_ORDER — the view does sort by `held_on`, but the
-    // contract does not promise it, so the chart sorts rather than trusts.
-    select: (rows) => [...rows].sort((a, b) => a.held_on.localeCompare(b.held_on)),
+    // Oldest paper first, in the order given: the contract guarantees
+    // `held_on` ascending now, so the trend chart no longer re-sorts.
   });
 }
 

@@ -167,8 +167,9 @@ export function HealthKpis({
           value={state.risk_score}
           format="decimal"
           digits={2}
-          // Not "recomputed nightly": the recompute is a manual command and
-          // nothing schedules it (TECHNICAL_DOC.md, "there is no scheduler").
+          // The nightly refresh recomputes this now, and when it last ran is on
+          // the director console ("Data refreshed …") rather than repeated on
+          // every student: it is one job for the whole institute.
           caption={`${state.risk_score == null ? "Not scored yet" : band.label}, on a 0–1 scale, from mock trend, subject balance, revision and consistency`}
         />
         <KpiCard
