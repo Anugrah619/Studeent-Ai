@@ -2,7 +2,7 @@
 
 **What to do next.** For *why*, see [`PROJECT_LOG.md`](PROJECT_LOG.md). For the full spec, [`TECHNICAL_DOC.md`](TECHNICAL_DOC.md). Start at [`README.md`](README.md).
 
-Last updated: 18 Oct 2026
+Last updated: 25 Oct 2026
 
 ---
 
@@ -25,16 +25,17 @@ A task that doesn't serve that doesn't belong on this list.
 ✅ Screens           live API · diagnosis card · question panel · How it works · Data & trust
 ✅ Real data         official JEE Main + NEET 2026 syllabi (NCERT-linked);
                      NEET 2025 + JEE Main 2026 papers, cross-checked vs NTA keys
-✅ Safety net        490 backend + 36 frontend tests
-✅ Student API       /api/my/… ; roll-number sign-in with a forced first-password
-                     change, verified over real HTTP; students walled off from the
-                     console. No student app screens yet (a holding page stands in)
-✅ Results upload    paper → blueprint → CSV results, per-student all-or-nothing,
-                     idempotent. xlsx not yet; an institute's own paper has no
-                     option tags, so no misconception diagnosis for it
-✅ Day planner v1    three explicit rules, each block saying which; not the LLM plan_week
-🟡 Training data     195 traces, 1 mentor verdict (a test click) — corpus has started
-❌ NEET on screen    syllabus and paper loaded, no screen shows Biology yet
+✅ Safety net        914 backend + 61 frontend tests
+✅ Student app       Today · Revisions · Log · Confidence · Progress · Mistakes · Guide ·
+                     Onboarding, phone-first; roll-number sign-in with a forced first
+                     password change; walked through live on 25 Oct
+✅ Staff tools       issue/reset logins · papers · blueprint + results upload (CSV or
+                     Excel, check then import) · history · tagging · answer-key review
+✅ Runs nightly      features → revisions → flags → plans → findings reworded, with a receipt
+✅ Planner v2        the student's own minutes; lighter on hard days; subject balance;
+                     fading chapters; "Why this plan?" in words
+✅ NEET on screen    four subjects everywhere; subjects come from the syllabus
+🟡 Training data     198 traces, 1 mentor-agreed diagnosis — corpus has started
 ```
 
 **Pitch-ready today on the JEE diagnostic demo.** The NEET demo round (below) is what moves the pitch onto a real exam paper.
@@ -90,6 +91,36 @@ Moves the pitch onto a real exam: *"This is the actual NEET 2025 paper — here'
 
 ---
 
+## 🟣 Features 1–12 — done 25 Oct; your decisions, then what is left
+
+Built by five agents in parallel (three backend, two screens), merged, tested together, and walked through in a browser against the live server. **Decisions made on your behalf — overturn any:**
+
+- [ ] **A self-harm message gets a fixed, kind reply and alerts no one.** It is never sent to the AI and is not stored. Whether a mentor should be told, and who, is a decision for you and the institute (and the data agreement).
+- [ ] **A student sees an AI finding only after their mentor agreed with it.** Unreviewed and disagreed findings never reach the student app.
+- [ ] **The AI rewords a finding overnight, not while the student waits** (one live rewording took 40–107 s). Until then the student sees plain fixed wording.
+- [ ] **Forgetting model constants are priors**: a chapter met once is 50/50 after ~7 days; each revision cycle makes it last 2.5× longer. Fitting them needs "how much did you remember", which nothing collects yet.
+- [ ] **No R1 for a chapter first met more than 7 days ago**, so day one is not forty revisions at once; the forgetting model covers older chapters.
+- [ ] **The shortest day is 45 minutes** (onboarding and planner agree); the plan's ceiling is 6 hours.
+- [ ] **`target_rank` is recorded but not used** by the planner: nothing yet links a rank to a day's work honestly.
+- [ ] **"Key is wrong" and "unclear" make a question untrusted** (skipped by diagnosis, cannot be tagged); "unverifiable" figure questions are untrusted too.
+- [ ] **Backups go to `~/student_ai_backups`, unencrypted.** Fine for the demo; not for real student data.
+- [ ] **`docs/pilot/data-agreement-DRAFT.md` is a draft for a lawyer**, not a contract.
+- [ ] **A tick can be undone with a second tap**, and taps are saved in order (fixed on 25 Oct: a quick second tap used to be ignored).
+
+**Before any pilot** (`manage.py pilot_check` lists these): a person decides the 32 answer-key disagreements on `/review`; `rotate_demo_passwords`; `backup_db` and copy it off the machine, encrypted; run `scheduler` under a service manager; set `DEBUG=False`, a real `SECRET_KEY`, `ALLOWED_HOSTS`.
+
+**Still open**
+- [ ] A time limit on AI calls ("Why this plan?" and the question box still wait on a slow model)
+- [ ] Biology misconception codes (NEET options can only carry drafts today); consolidating the ~490 draft codes
+- [ ] Re-marking after an answer key is corrected
+- [ ] A unique constraint on `RevisionEvent` (student, topic, cycle)
+- [ ] `note` on `GET /api/my/plan/`; `max_marks` on `mock-scores`; `?paper=` on `/api/ingest/batches/`
+- [ ] A fourth subject colour token for NEET (Zoology draws grey)
+- [ ] The three `gaps.ts` entries whose workarounds live in `lib/explainer.ts`
+- [ ] An LLM `plan_week` (Phase 4) to reorder and word the rules-based plan
+
+---
+
 ## 🟣 Student API, login and results upload — done 18 Oct; what is left
 
 Built and tested end to end. The calls I made where the answer was yours are listed first so you can overturn them; each is reversible.
@@ -110,20 +141,20 @@ Built and tested end to end. The calls I made where the answer was yours are lis
 - [x] The four diagnosis gaps the frontend had recorded: `student_ref`, the `tally`, resolved `counter_evidence_questions` (D22/D23 are now clickable on real traces), a real `human_verdict` enum; `source` on papers and questions
 
 **Still open**
-- [ ] **xlsx upload.** Needs `openpyxl` parsing zip files from strangers — your call to add the dependency. The API says "Save As → CSV" until then.
-- [ ] **Diagnosis for an institute's own paper.** Its blueprint has chapter + key only, no option text or misconception tags, so `diagnosis` answers 422. Tagging distractors is the factory's job, or a person's.
+- [x] ~~xlsx upload~~ — built 25 Oct (`openpyxl`, read-only, zip-bomb and XML-entity guards)
+- [x] ~~Diagnosis for an institute's own paper~~ — possible once a person tags its wrong options on `/papers/:id`
 - [ ] **Re-marking after a key correction.** A key cannot change under recorded answers (it is refused); there is no deliberate re-mark step yet.
 - [ ] **Bulk logins over HTTP.** One password hash is ~1 s, so a batch is the command, not a request. A background job runner would let a director press a button.
 - [ ] **Per-process throttle counters.** Swap Django's default cache for a shared one before running more than one worker. Per-account lockout is left out on purpose (it lets anyone who knows a roll number lock that student out).
 - [ ] An LLM `plan_week` (Phase 4) to reorder and word the rules-based plan.
 
 **Frontend**
-- [x] Change-password screen and gate, a holding page for students (a console of 403s is not a fallback), typed against the new contract; the mock layer enforces the same rule as the server
-- [ ] **Screens for staff**: issue/reset a student's login, create a paper, upload a blueprint and results. All API-only today.
-- [ ] Sign-in field label: "Username" → "Username or roll number" (`routes/Login.tsx` is mid-redesign, so not touched)
-- [ ] Move Student 360's Day plan onto `GET /api/students/{id}/plan/`; a mentor still sees an empty plan
-- [ ] Delete the `gaps.ts` entries the server now answers (`COUNTER_EVIDENCE_UNRESOLVED`, `DISTRACTOR_TALLY_NOT_EXPOSED`, `STUDENT_REF_NOT_EXPOSED`, `QUESTION_PROVENANCE`, `MOCK_SCORES_ORDER`) together with the code that compensates for each; `ProvenanceExhibit` can count `usePapers()` by `source`
-- [ ] The real student app
+- [x] Change-password screen and gate, typed against the new contract; the mock layer enforces the same rule as the server
+- [x] Screens for staff: issue/reset a student's login, create a paper, upload a blueprint and results (25 Oct)
+- [x] Sign-in field label: "Username or roll number" (25 Oct)
+- [x] Student 360's Day plan reads `GET /api/students/{id}/plan/` (25 Oct)
+- [x] `QUESTION_PROVENANCE` and `MOCK_SCORES_ORDER` deleted from `gaps.ts`; three remain (above)
+- [x] The real student app (25 Oct)
 
 ---
 
@@ -167,7 +198,7 @@ Longest lead time. Doesn't block Phase 1–3 but blocks everything being *real*.
 cd app
 docker compose up -d
 .venv\Scripts\python.exe manage.py runserver     # localhost:8000
-.venv\Scripts\python.exe -m pytest -q            # 68 tests
+.venv\Scripts\python.exe -m pytest -q            # 914 tests
 
 cd ../web && npm run dev                         # localhost:5173
 ```

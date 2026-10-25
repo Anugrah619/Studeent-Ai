@@ -20,19 +20,21 @@ And every time Gemini does that reasoning, **we keep the transcript** — so tha
 
 ---
 
-## Where we are today — honest version (10 Oct 2026)
+## Where we are today — honest version (25 Oct 2026)
 
-**A working prototype.** The AI diagnosis runs live, on simulated students, and the console shows it.
+**A working prototype with both halves.** The AI diagnosis runs live, on simulated students; the console shows it to mentors, and students now have their own app.
 
 | ✅ Built and working | 🟡 Built, with a limit | ❌ Not built |
 |---|---|---|
-| AI diagnosis (Gemini) — found the right mistake for **4 of 4** test students | Runs on **simulated** students, 46 shown on screen | Upload screen for an institute's result files |
-| Diagnostic paper: 46 questions, every wrong option labelled with its mistake (15 mistakes) | Diagnosis runs on our own paper, **not yet on the real ones** | NEET or Biology on any screen |
-| Real papers loaded: **NEET 2025** (180 q) and **JEE Main 2026, 2 Apr S1** (75 q), checked against NTA's official keys (87–88% agreement, key upheld every time) | 32 cross-check disagreements reviewed by an agent, **not yet by a person** | Training our own model |
-| Official JEE Main + NEET 2026 syllabi, linked to NCERT | Demo still uses the old placeholder JEE chapter list | Hosting — runs on this laptop |
-| Director console, student page, clickable evidence, question panel, "How it works", "Data & trust" | Gemini free tier is **~20 requests per model per day** | |
-| Privacy walls between institutes; no names sent to the AI | | |
-| 190 backend + 21 frontend automatic tests, all passing | | |
+| AI diagnosis (Gemini) — found the right mistake for **4 of 4** test students | Runs on **simulated** students, 46 shown on screen | Training our own model |
+| **Student app**: today's plan, revisions, study log, confidence, progress, mistake review, a guide; first sign-in by roll number | Shown to a student only after their mentor agrees with a finding | Hosting — runs on this laptop |
+| **Staff tools**: issue student logins, add a paper, upload its answer key and results (CSV or Excel, checked before saving), tag wrong options, review answer-key disagreements | An institute's own paper is diagnosable only once someone tags its wrong options | Re-marking after an answer key is corrected |
+| **Runs itself every night**: refreshes the numbers, schedules revisions (R1/R2/R3), raises flags, makes each student's plan | The scheduler must be kept running (a service manager) | |
+| Plans fit the student's own hours, go lighter on hard days, and forecast what is being forgotten | The forgetting model's numbers are sensible guesses, not yet fitted to real memory | |
+| Real papers loaded: **NEET 2025** (180 q) and **JEE Main 2026, 2 Apr S1** (75 q), checked against NTA's official keys | 32 disagreements now have a review screen — **none decided by a person yet** | |
+| NEET's four subjects on every screen; official JEE + NEET syllabi linked to NCERT | No Biology mistake labels yet | |
+| Privacy walls between institutes; no names sent to the AI; backups, a pilot checklist, a draft data agreement | Backups unencrypted, on this machine; the agreement needs a lawyer | |
+| 914 backend + 61 frontend automatic tests, all passing | Gemini free tier is **~20 requests per model per day** | |
 
 ### What changed the outcome
 
@@ -153,10 +155,16 @@ Because reasoning and counting are cleanly separated, **Gemini can be swapped fo
 cd app
 docker compose up -d                                   # database
 .venv\Scripts\python.exe manage.py runserver           # backend  → localhost:8000
-.venv\Scripts\python.exe -m pytest -q                  # 490 tests
+.venv\Scripts\python.exe -m pytest -q                  # 914 tests
 .venv\Scripts\python.exe manage.py provision_student_accounts --institute aarambh --out slips.csv
                                                        # student logins: roll no + temporary password, printed once
-.venv\Scripts\python.exe manage.py generate_plans      # today's study plan for every active student
+.venv\Scripts\python.exe manage.py scheduler           # keeps running; every night at NIGHTLY_AT (02:00) it refreshes
+                                                       # numbers, schedules revisions, raises flags, makes plans
+.venv\Scripts\python.exe manage.py run_nightly         # the same refresh, once, now
+.venv\Scripts\python.exe manage.py backup_db --verify  # a dated database backup in BACKUP_DIR
+.venv\Scripts\python.exe manage.py pilot_check         # one tick or cross per thing a pilot needs
+.venv\Scripts\python.exe manage.py rotate_demo_passwords --out staff.csv
+                                                       # staff off the demo password, new ones printed once
 
 cd ../web && npm run dev                               # screens  → localhost:5173
 ```

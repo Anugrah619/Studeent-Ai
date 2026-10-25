@@ -1076,3 +1076,131 @@ the five main pages. Every text pair in the new bands and tints is at least
 **Not checked.** Live mode against the Django server: this was mock mode only.
 The focus rings on text links are the stock 50% tint, about 2:1 on white. Form
 controls also change their border, so they hold 3:1. Left as B had them.
+
+### 2026-10-24 — pulled, started the app, walked through it
+
+Pulled: nothing new on GitHub (`origin/main` still `93295e3`); switched the
+working folder from `redesign/package-b` to `main`, which tracks it.
+
+Started it fresh, beside two stale servers left running since 11 Oct: a
+backend on 8000 started with `--noreload` (still the old code, so every new
+route 404s) and a Vite on 5173 pointing at it; another Vite on 5174 from
+15 Oct. None stopped. The database container had exited; started it. New pair:
+backend on **8001**, frontend on **5180** in live mode (`VITE_USE_MOCKS=false`,
+`VITE_API_PROXY=http://127.0.0.1:8001`). Vite binds `localhost` (IPv6), not
+`127.0.0.1` — the first two readiness checks failed on that alone.
+
+Walked it in headless Chrome (playwright-core in the scratch folder, driving
+the installed Chrome): sign-in page, director console on live data, Aarav's
+Student 360 with the cached diagnosis, then a student's first sign-in by roll
+number → change-password screen → "too common" refused → own password →
+holding page; the student's own API answered and the console 403'd. The only
+console messages were the expected 403s before sign-in and the expected 400.
+
+Left in the dev database on purpose: a login for Aditya Rane (`A-4012`) on a
+fresh temporary password, for trying the first sign-in by hand.
+
+### 2026-10-24 (later) — pulled the "marking desk" merge and started it
+
+Pulled PR #1 (Atul-Shivnani, "Console identity: the marking desk", merged as
+`dbc0492`): 55 files, all `web/` plus this log — new type (Archivo, Source
+Serif 4), a new mark, restyled screens, and the login gate's `AuthFrame` /
+`RequireAuth` moved onto the new brand components. No backend, contract or
+migration changes. The merge and my uncommitted log entry both appended to this
+file, so mine was set aside, the pull fast-forwarded, and it was re-appended
+after theirs.
+
+`npm install` (the font swap), typecheck clean, **36/36 frontend tests pass**
+on the merged code. Started on the usual ports: database, backend 8000,
+frontend 5173 in live mode. Walked every screen in headless Chrome — sign-in,
+director console, Student 360, Mock intelligence, How it works, Data & trust,
+and a student's first sign-in reaching the change-password gate (stopped there
+so the demo temporary password stays unused). The only failed requests were the
+expected `/api/me/` 403s before signing in.
+
+Stale copy found, not changed (the frontend is being designed elsewhere): the
+Data & trust card "Simulated students" still says loading an institute's own
+results is "designed, not built yet" — it is built (§8.2).
+
+### 2026-10-25 — features 1–12: the student app, the staff tools, and an engine that runs itself
+
+Asked: build features 1–12 from the list (student screens, revision scheduler,
+staff screens, nightly jobs, NEET Biology, pilot preparation, onboarding, a
+smarter planner, AI guidance, a forgetting model, Excel uploads and tagging,
+the Data & trust sentence), with agents, frontend included, and a simple
+summary of every feature at the end.
+
+**How it was built.** Five agents, each in its own copy of the repo: three
+backend (engine — revisions, forgetting, nightly, onboarding, planner; content
+— NEET subjects, Excel, tagging, answer-key review, pilot tools; guidance) and
+two screens (the student app; the staff tools). Merged into the main folder by
+script, file by file, without touching git's index. The two screen agents
+stopped twice — an expired sign-in, then the session ending — and resumed from
+their own transcripts with nothing lost.
+
+**Fixed while merging** (gaps between agents): the features' subject balance
+iterated a hard-coded JEE list, so NEET's Botany and Zoology were invisible to
+it — it now reads the syllabus; the diagnosis read options from questions
+whose answer key a reviewer had found wrong — now trusted keys only;
+onboarding accepted 30 minutes while the planner floored every budget at 90 —
+both now 45; two merge conflicts (type aliases, mock handlers), both sides kept.
+
+**Found in the live walkthrough, fixed:**
+1. **The student's guide waited on the AI.** Rewording a mentor-approved
+   finding ran inside the page request; three overlapping loads each made the
+   same call and took 40, 66 and 107 s, holding up the home screen too. Now a
+   student's request reads the cache only, and the nightly job does the
+   rewording (at most 10 model requests per institute a night). Guide: 0.2 s.
+2. **A quick second tap on a plan bubble was ignored** — the bubble was
+   disabled while saving. A test that failed 2 runs in 5, in the agent's own
+   copy too, is what showed it. Taps now queue in order, the last answer wins,
+   and the plan is re-read from the server; 6 of 6 runs pass.
+3. The onboarding API's help text said 30–720 minutes; it is 45–720.
+4. The sign-in field says "Username or roll number".
+
+**Verified.** Backend 914 tests; frontend 61 (twice), typecheck clean,
+production build. 21 deliberate sabotages of the new rules, all caught — one at
+first only because a data folder was missing from the test copy, so all were
+rerun with it. Walked through in headless Chrome on the live server: as a
+mentor, the console ("Data refreshed: never" — true, the nightly job has not
+run on the dev database), student logins, Student 360, a paper's four tabs,
+the review queue, Data & trust; then the mentor issued Aarav a login from the
+console (the password left the page when the dialog closed), and Aarav, on a
+390 px screen, changed his password, answered onboarding, made and ticked a
+plan, and opened every screen. No sideways scrolling; the only errors were the
+expected 403s before signing in.
+
+**Dev data afterwards.** Aarav's login, today's five plan blocks and his
+onboarding answers were removed again. The three AI rewording traces were
+kept: they are real calls, and his guide now shows the reworded finding.
+
+The calls made on your behalf are listed in `TASKS.md` under "Features 1–12".
+Docs: TECHNICAL_DOC v3.1, README, TASKS, `.env.example`. Not committed.
+Running: backend on 8000, frontend on 5173 (live). The agents' worktrees are
+still in the local worktrees folder; their work is merged.
+
+### 2026-10-25 (later) — every feature, from the teacher's and the student's side
+
+Asked for a plain list of everything built, and how a teacher and a student
+each use it. Answered in the chat, checked against the code first. One thing
+worth knowing, stated there too: Intervene records what a mentor did and
+leaves the flag open on purpose; closing a flag with its outcome
+(recovered / declined) has a server route but no button yet. Nothing changed.
+
+### 2026-10-25 (later) — committed and pushed features 1–12
+
+Asked to commit and push, with no mention of the assistant in the messages
+(the standing rule). Three commits on `main`, each building on the last:
+backend + contract (`app/`, `openapi.yaml`), frontend (`web/`), docs. Fetched
+first: `origin/main` had not moved, so the push is a plain fast-forward.
+
+Caught before pushing: the review screen's mock data held five real NEET and
+JEE questions copied word for word from the live server, and exam content stays
+out of git because the repo is public (10 Oct). Replaced with five questions
+written for the demo, each keeping its row's kind of disagreement; ids, labels,
+keys and shape unchanged, tests pass. The pilot data agreement draft was read
+before it went public: generic, bracketed, no names. Not committed:
+the local tools folder (the design-skill licence question, and the agents' worktrees).
+On the other laptop: `git pull`, `pip install -r requirements.txt` (openpyxl),
+`manage.py migrate` (tenancy 0005, derived 0004, ingestion 0006, reasoning
+0004), `npm install` in `web/`.
