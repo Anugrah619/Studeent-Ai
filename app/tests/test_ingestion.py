@@ -297,7 +297,10 @@ def test_what_arrives_is_usable_by_the_rest_of_the_system(ready):
     aarav = ready.students["A-1"]
     scores = ready.client.get(f"/api/students/{aarav.id}/mock-scores/").json()["results"]
     assert scores == [{"paper_id": ready.paper.id, "paper_name": "Mock 15", "held_on": "2026-10-04",
-                       "physics": 8.0, "chemistry": 4.0, "maths": 4.0, "total": 16.0}]
+                       "physics": 8.0, "chemistry": 4.0, "maths": 4.0, "total": 16.0,
+                       "subjects": [{"subject": "Physics", "marks": 8.0},
+                                    {"subject": "Chemistry", "marks": 4.0},
+                                    {"subject": "Maths", "marks": 4.0}]}]
     lost = ready.client.get(f"/api/students/{ready.students['A-2'].id}/marks-lost/?paper={ready.paper.id}")
     assert lost.status_code == 200 and lost.json()["score"] == -2.0
     assert TopicState.objects.filter(student=aarav).exists(), "derived state was not refreshed"

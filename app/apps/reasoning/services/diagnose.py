@@ -258,10 +258,16 @@ def build_context(student, paper=None) -> dict:
     # One query for every option on the papers in play, rather than one per
     # attempt — this loop runs over a whole paper.
     paper_ids = {a.test_paper_id for a in attempts if a.test_paper_id}
+    # Only questions whose key can be trusted. A key a person marked wrong or
+    # unclear, or one the cross-check disputed and nobody has reviewed yet,
+    # decides nothing here: an answer marked against a doubtful key is neither
+    # evidence for a misconception nor counter-evidence against one. Its
+    # attempts simply find no option below and drop out.
     options = {
         (o.question.test_paper_id, o.question.question_id, o.label): o
         for o in QuestionOption.objects
-        .filter(question__test_paper_id__in=paper_ids)
+        .filter(question__test_paper_id__in=paper_ids,
+                question__verification__in=QuestionTopicMap.TRUSTED_VERIFICATIONS)
         .select_related("question", "misconception")
     }
 

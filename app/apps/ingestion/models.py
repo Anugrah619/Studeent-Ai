@@ -130,7 +130,10 @@ class Misconception(models.Model):
     """
 
     code = models.CharField(max_length=32, unique=True)      # "MIS-ROT-AXIS"
-    subject = models.CharField(max_length=32)                # Physics | Chemistry | Maths
+    # Physics | Chemistry | Maths | Biology. A tag must match its question's
+    # subject, read with the aliases in `services/tagging.py` (Botany and
+    # Zoology are Biology; Mathematics is Maths).
+    subject = models.CharField(max_length=32)
     name = models.CharField(max_length=120)                  # "Wrong axis of rotation"
     description = models.TextField(
         help_text="The wrong belief, stated as the student would hold it."
@@ -239,13 +242,44 @@ class QuestionTopicMap(tenancy.TenantScoped):
     MCQ, NUMERICAL = "mcq", "numerical"
     ANSWER_TYPE = [(MCQ, "Multiple choice"), (NUMERICAL, "Numerical value")]
 
+    # `verification` is the state of trust in this question's key. The first
+    # four values are the factory's machine cross-check; the last three are a
+    # person's answer to a `disagreed`, written by the review endpoint
+    # (`POST /api/review/disagreements/{pk}/`). Only a `disagreed` question can
+    # be reviewed, so every row in the last three was machine-disagreed —
+    # nothing about the cross-check is lost, and `verification_detail` still
+    # carries the model's answer and working. Trusted keys are `agreed`,
+    # `key_stands` and `""` (an institute's or demo paper, never
+    # cross-checked because the key is the institute's own); untrusted ones
+    # are `disagreed`, `key_wrong`, `key_unclear` and `unverifiable`.
     AGREED, DISAGREED, UNVERIFIABLE = "agreed", "disagreed", "unverifiable"
+    KEY_STANDS, KEY_WRONG, KEY_UNCLEAR = "key_stands", "key_wrong", "key_unclear"
     VERIFICATION = [
         ("", "Not cross-checked"),
         (AGREED, "Model agreed with the official key"),
         (DISAGREED, "Model disagreed — needs a person"),
         (UNVERIFIABLE, "Could not be checked (e.g. unreadable figure)"),
+        (KEY_STANDS, "Model disagreed; a person confirmed the key"),
+        (KEY_WRONG, "Model disagreed; a person found the key wrong"),
+        (KEY_UNCLEAR, "Model disagreed; a person could not settle it"),
     ]
+    #: Every value a reviewed or reviewable disagreement can hold — "the 32".
+    DISAGREEMENT_STATES = (DISAGREED, KEY_STANDS, KEY_WRONG, KEY_UNCLEAR)
+
+    # What a reviewer decided about a disagreement, and the `verification`
+    # each decision sets.
+    REVIEW_KEY_STANDS, REVIEW_KEY_WRONG, REVIEW_UNCLEAR = "key_stands", "key_wrong", "unclear"
+    KEY_REVIEW = [
+        ("", "Not reviewed"),
+        (REVIEW_KEY_STANDS, "The official key stands"),
+        (REVIEW_KEY_WRONG, "The key as stored is wrong"),
+        (REVIEW_UNCLEAR, "Unclear — needs a subject expert"),
+    ]
+    VERIFICATION_FOR_REVIEW = {
+        REVIEW_KEY_STANDS: KEY_STANDS,
+        REVIEW_KEY_WRONG: KEY_WRONG,
+        REVIEW_UNCLEAR: KEY_UNCLEAR,
+    }
 
     source = models.CharField(
         max_length=16, choices=Source.choices, default=Source.DEMO
@@ -274,9 +308,21 @@ class QuestionTopicMap(tenancy.TenantScoped):
         max_length=12, choices=VERIFICATION, blank=True, default=""
     )
     # Why it agreed or not, the model's short working, confidence, and the
-    # ids of every trace that touched this question.
+    # ids of every trace that touched this question. A human review appends
+    # to `verification_detail["key_reviews"]`, so a decision that is later
+    # revised is still on record.
     verification_detail = models.JSONField(default=dict, blank=True)
     has_diagram = models.BooleanField(default=False)
+
+    # --- human review of a disagreement --------------------------------
+    # The latest decision. Kept as columns, not only in the JSON above, so
+    # "how many are still unreviewed" is a query and not a scan.
+    key_review = models.CharField(max_length=12, choices=KEY_REVIEW, blank=True, default="")
+    key_review_note = models.TextField(blank=True)
+    key_reviewed_by = models.ForeignKey(
+        "tenancy.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    key_reviewed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["test_paper", "question_id"]
@@ -293,6 +339,17 @@ class QuestionTopicMap(tenancy.TenantScoped):
     @property
     def is_mapped(self) -> bool:
         return self.topic_id is not None and self.confirmed_at is not None
+
+    #: Verification states whose key may be marked and diagnosed against:
+    #: never cross-checked (our own and institute papers), cross-checked and
+    #: agreed, or disputed and then confirmed by a person. One tuple, so the
+    #: property below and the diagnosis queryset cannot disagree.
+    TRUSTED_VERIFICATIONS = ("", AGREED, KEY_STANDS)
+
+    @property
+    def key_trusted(self) -> bool:
+        """Whether this question's stored key may be marked and diagnosed against."""
+        return self.verification in self.TRUSTED_VERIFICATIONS
 
     @property
     def has_content(self) -> bool:

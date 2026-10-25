@@ -37,7 +37,15 @@ A KEY CANNOT CHANGE UNDER RESULTS
     marks were decided by the old key, and quietly changing the key would leave
     them marked against one that no longer exists. (Correcting a key after
     results are in is a real need; it deserves a deliberate re-marking step,
-    not a side effect of a CSV.)
+    not a side effect of an upload.)
+
+The file may be a CSV or an `.xlsx` workbook (first sheet); `tabular.read_table`
+turns either into the same rows of strings, so every rule here applies to both.
+
+A blueprint describes each question's chapter and key, not its options: the
+four options it creates have no text and no misconception. Describing them —
+what makes the paper diagnosable — is `PATCH /api/papers/{id}/questions/{pk}/`,
+and it is allowed under recorded answers because tags do not change marking.
 """
 
 from __future__ import annotations

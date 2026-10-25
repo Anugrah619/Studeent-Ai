@@ -17,7 +17,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
-from apps.derived.models import Flag, Intervention
+from apps.derived.models import Flag, Intervention, JobRun
 from apps.events.models import Attempt, RevisionEvent
 from apps.ingestion.models import QuestionTopicMap, Source, TestPaper
 from apps.tenancy.models import Batch, Mentor, Student
@@ -103,6 +103,33 @@ WEAK_PARAM = OpenApiParameter(
     ),
 )
 
+#: `?forgetting=true`: below even odds of recall. The same line the planner
+#: draws for a "fading" revise block (`planner.FADING_BELOW`).
+FORGETTING_BELOW = 0.5
+
+#: Shared by both topic-states routes, like `WEAK_PARAM`.
+FORGETTING_PARAM = OpenApiParameter(
+    "forgetting", bool,
+    description=(
+        f"Only chapters whose forecast `retention` is below {FORGETTING_BELOW}, "
+        "ordered by `retention` ascending — the chapters being forgotten "
+        "fastest come first. Chapters never seen have a null retention and "
+        "are excluded. Combines with `weak`. A presence filter: any value "
+        "other than `true` is ignored."
+    ),
+)
+
+
+def forgetting_filter(qs, request):
+    """Apply `?forgetting=true` to a `TopicState` queryset. One definition, two routes.
+
+    `retention__lt` already excludes NULL (`NULL < 0.5` is not true), which
+    is the point: "never seen" is not "forgotten".
+    """
+    if request.query_params.get("forgetting") != "true":
+        return qs
+    return qs.filter(retention__lt=FORGETTING_BELOW).order_by("retention", "id")
+
 #: `risk_score` at or above this lands a student in the console's at-risk
 #: set — the `?at_risk=true` filter and the "high" band in
 #: `StudentListSerializer.risk_score`'s documented scale. One constant so
@@ -144,6 +171,7 @@ _EMPTY_SUMMARY = {
     "latest_paper_max_marks": None, "latest_paper_students": 0,
     "revision_debt_pct": 0.0, "avg_revision_debt": 0.0,
     "flags_resolved": 0, "recovery_rate_pct": None,
+    "last_refreshed_at": None,
 }
 
 
@@ -402,7 +430,7 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
         return super().list(request, *args, **kwargs)
 
     @extend_schema(
-        parameters=[INSTITUTE_PARAM, WEAK_PARAM],
+        parameters=[INSTITUTE_PARAM, WEAK_PARAM, FORGETTING_PARAM],
         responses=ser.TopicStateSerializer(many=True),
         tags=["students"],
     )
@@ -412,12 +440,13 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
 
         Ordered by `mastery` ascending; Postgres sorts NULLs last on an
         ascending sort, so chapters with too little evidence to score sit
-        at the end rather than masquerading as the weakest ones.
+        at the end rather than masquerading as the weakest ones. With
+        `?forgetting=true`, ordered by `retention` ascending instead.
         """
         qs = rollups.topic_state_queryset(
             self.institute_id(), pk, weak=request.query_params.get("weak") == "true"
         )
-        return self.paginated(qs, ser.TopicStateSerializer)
+        return self.paginated(forgetting_filter(qs, request), ser.TopicStateSerializer)
 
     @extend_schema(
         parameters=[INSTITUTE_PARAM],
@@ -447,10 +476,11 @@ class StudentViewSet(TenantScopedMixin, viewsets.ReadOnlyModelViewSet):
     def subject_breakdown(self, request, pk=None):
         """Study-time share vs marks-lost share. The neglect chart.
 
-        Always exactly three rows, in the fixed order Physics, Chemistry,
-        Maths — a subject with no data comes back as zeroes rather than
-        being omitted, so the chart's three bars never renumber
-        themselves between students.
+        One row per subject of the student's syllabus, in syllabus order —
+        Physics, Chemistry, Maths for JEE; Physics, Chemistry, Botany,
+        Zoology for NEET. A subject with no data comes back as zeroes
+        rather than being omitted, so the chart's bars never renumber
+        themselves between students of one batch.
 
         `marks_lost_share_pct` is now a share of **marks**, computed by
         `features.marks_lost_by_topic`. It previously counted lost
@@ -1412,6 +1442,15 @@ class DashboardViewSet(TenantScopedMixin, viewsets.ViewSet):
         )
         debt_total = students.aggregate(d=Sum("state__revision_debt"))["d"] or 0
 
+        # Institute-wide whatever `?batch=` says: the nightly job refreshes an
+        # institute, not a batch. Served by `idx_jobrun_latest`.
+        last_refreshed_at = (
+            JobRun.objects.filter(institute_id=inst, kind=JobRun.NIGHTLY, status=JobRun.OK)
+            .order_by("-finished_at")
+            .values_list("finished_at", flat=True)
+            .first()
+        )
+
         data = {
             "batch_id": batch["id"] if batch else None,
             "batch_name": batch["name"] if batch else None,
@@ -1434,5 +1473,6 @@ class DashboardViewSet(TenantScopedMixin, viewsets.ViewSet):
             ),
             "flags_resolved": closed_n,
             "recovery_rate_pct": round(recovered / closed_n * 100, 1) if closed_n else None,
+            "last_refreshed_at": last_refreshed_at,
         }
         return Response(ser.DashboardSummarySerializer(data).data)

@@ -6,6 +6,11 @@ a model and replay history.
 
 That rule is the reason this is a separate app: the folder boundary makes
 "this is rebuildable" visible to anyone reading the code.
+
+Two kinds of row here are not rebuildable, and say so: the human half of
+`Flag` (`resolved_at`, `outcome`) and `Intervention`, which are judgements;
+and `JobRun`, which is a log of the engines running rather than anything
+they computed. None of them is hand-edited either.
 """
 
 from django.db import models
@@ -201,3 +206,57 @@ class PlanBlock(tenancy.TenantScoped):
 
     def __str__(self) -> str:
         return f"{self.student.name} {self.date} {self.topic.name}"
+
+
+class JobRun(tenancy.TenantScoped):
+    """One run of a scheduled job for one institute — the receipt.
+
+    Written by `run_nightly` (and so by `scheduler`) once per institute, at
+    the end of the run, whether it succeeded or failed. Three readers:
+
+    * `scheduler`, which will not run an institute twice on a day that
+      already has an `ok` row — so a restarted scheduler cannot double-run;
+    * the dashboard's `last_refreshed_at`, the latest `ok` `finished_at` —
+      so a director can see how fresh the numbers in front of them are;
+    * `pilot_check`, which reads `finished_at` and `status` to say whether
+      the nightly job is actually running. Keep those names.
+
+    A row is written only when the run is over, so there is no "running"
+    state to get stuck in when a process dies mid-run: a run that never
+    finished simply left no receipt, which is the truth.
+
+    Not derived from events and not rebuildable — it is a log, not a
+    computation — but it lives here because it is the derived engines'
+    own record, and it is tenant-scoped like everything they write.
+    """
+
+    NIGHTLY = "nightly"
+    KIND = [(NIGHTLY, "Nightly refresh")]
+
+    OK, FAILED = "ok", "failed"
+    STATUS = [(OK, "OK"), (FAILED, "Failed")]
+
+    kind = models.CharField(max_length=40, choices=KIND, default=NIGHTLY)
+    started_at = models.DateTimeField()
+    finished_at = models.DateTimeField()
+    status = models.CharField(max_length=10, choices=STATUS)
+    #: What each step did — counts, never names. JSON so a new step can add
+    #: its own numbers without a migration.
+    stats = models.JSONField(default=dict, blank=True)
+    #: Which step failed and the exception's one-line summary. The full
+    #: traceback goes to the log, not into a table a console might show.
+    error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+        indexes = [
+            # The two questions asked of this table: "latest ok run for this
+            # institute" (dashboard) and "is there an ok run today" (scheduler).
+            models.Index(
+                fields=["institute", "kind", "status", "-finished_at"],
+                name="idx_jobrun_latest",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.kind} {self.institute_id} {self.started_at:%Y-%m-%d %H:%M} {self.status}"

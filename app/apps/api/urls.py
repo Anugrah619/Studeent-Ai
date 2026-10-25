@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from . import auth, ingest_views, my_views, views
+from . import auth, content_views, guidance_views, ingest_views, my_views, views
 
 router = DefaultRouter()
 router.register("batches", views.BatchViewSet, basename="batch")
@@ -40,6 +40,7 @@ urlpatterns = [
     path("auth/login/", auth.LoginView.as_view(), name="auth-login"),
     path("auth/logout/", auth.LogoutView.as_view(), name="auth-logout"),
     path("auth/password/", auth.PasswordChangeView.as_view(), name="auth-password"),
+    path("auth/password/", auth.PasswordChangeView.as_view(), name="auth-password"),
     path("me/", auth.MeView.as_view(), name="me"),
     # Before the router: `papers/<pk>/blueprint/` and `ingest/results/` are
     # not viewset routes, and the router's catch-all detail pattern must not
@@ -47,5 +48,23 @@ urlpatterns = [
     path("papers/<int:pk>/blueprint/", ingest_views.PaperBlueprintView.as_view(),
          name="paper-blueprint"),
     path("ingest/results/", ingest_views.IngestResultsView.as_view(), name="ingest-results"),
+    # Content work: describing a paper's options, and answer-key review. See
+    # `content_views`. Before the router for the same reason as above.
+    path("papers/<int:pk>/questions/", content_views.PaperQuestionsView.as_view(),
+         name="paper-questions"),
+    path("papers/<int:pk>/questions/<int:question_pk>/", content_views.PaperQuestionView.as_view(),
+         name="paper-question"),
+    path("misconceptions/", content_views.MisconceptionListView.as_view(), name="misconceptions"),
+    path("review/disagreements/", content_views.DisagreementListView.as_view(),
+         name="review-disagreements"),
+    path("review/disagreements/<int:question_pk>/", content_views.DisagreementReviewView.as_view(),
+         name="review-disagreement"),
+    # Student guidance (`guidance_views`). Before the router, so `my/plan/`'s
+    # viewset never gets the first look at `my/plan/explain/`.
+    path("my/guidance/", guidance_views.MyGuidanceView.as_view(), name="my-guidance"),
+    path("my/guidance/ask/", guidance_views.MyGuidanceAskView.as_view(),
+         name="my-guidance-ask"),
+    path("my/plan/explain/", guidance_views.MyPlanExplainView.as_view(),
+         name="my-plan-explain"),
     path("", include(router.urls)),
 ]

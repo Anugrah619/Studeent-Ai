@@ -19,6 +19,7 @@ import hashlib
 import json
 
 from django.db import models
+from django.utils import timezone
 
 from apps.tenancy import models as tenancy
 
@@ -39,6 +40,14 @@ class ReasoningTrace(tenancy.TenantScoped):
     READ_PAPER = "read_paper"
     SOLVE_BLIND = "solve_blind"
     TAG_QUESTIONS = "tag_questions"
+    # The student app's guidance (apps/reasoning/services/guidance.py).
+    # Three tasks, not one, for the same reason as the factory's: each is a
+    # clean example of one skill. Rewording a mentor-approved diagnosis for
+    # a seventeen-year-old, answering a preparation question, and
+    # explaining a day's plan are different jobs with different inputs.
+    EXPLAIN_FOR_STUDENT = "explain_for_student"
+    STUDENT_ASK = "student_ask"
+    EXPLAIN_PLAN = "explain_plan"
     TASK = [
         (DIAGNOSE, "Diagnose misconception"),
         (DECLINE, "Analyse decline"),
@@ -49,6 +58,9 @@ class ReasoningTrace(tenancy.TenantScoped):
         (READ_PAPER, "Read an official paper"),
         (SOLVE_BLIND, "Solve questions without the key"),
         (TAG_QUESTIONS, "Tag chapter, difficulty, distractors"),
+        (EXPLAIN_FOR_STUDENT, "Reword an approved diagnosis for the student"),
+        (STUDENT_ASK, "Answer a student's preparation question"),
+        (EXPLAIN_PLAN, "Explain a day's plan to the student"),
     ]
 
     AGREED, DISAGREED, UNREVIEWED = "agreed", "disagreed", "unreviewed"
@@ -88,6 +100,12 @@ class ReasoningTrace(tenancy.TenantScoped):
     reviewed_by = models.ForeignKey(
         "tenancy.Mentor", null=True, blank=True, on_delete=models.SET_NULL
     )
+    # When `human_verdict` was last written. Stamped by `save()` below, not
+    # by the caller, so the one view that records a verdict cannot forget
+    # it. Null on a trace nobody has reviewed — and on any verdict recorded
+    # before this column existed, which is honest: that moment was not kept,
+    # and `created_at` is when the *model* answered, not when a mentor did.
+    reviewed_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -102,6 +120,49 @@ class ReasoningTrace(tenancy.TenantScoped):
     def __str__(self) -> str:
         who = self.student.name if self.student else "—"
         return f"{self.task} · {who} · {self.created_at:%d %b}"
+
+    @classmethod
+    def from_db(cls, db, field_names, values, *args, **kwargs):
+        # `*args, **kwargs` pass through whatever this Django adds (6.1 adds
+        # `fetch_mode`, and warns about overrides that do not accept it).
+        instance = super().from_db(db, field_names, values, *args, **kwargs)
+        # What the verdict was when this row was read, so `save()` can tell
+        # a review from an unrelated write. Absent if the field was deferred.
+        instance._verdict_as_loaded = instance.__dict__.get("human_verdict")
+        return instance
+
+    def save(self, *args, **kwargs):
+        """Stamp `reviewed_at` whenever a verdict is written.
+
+        Two ways a verdict arrives, and both are covered: the verdict view
+        names `human_verdict` in `update_fields` (a mentor pressing "agree"
+        again is a fresh review, so it re-stamps), and a full `save()` — the
+        admin, a test, a script — where the value differs from what was read.
+        A verdict set back to `unreviewed` clears the stamp, because "when
+        was this reviewed" then has no answer.
+
+        Not covered: `QuerySet.update(human_verdict=...)`, which never calls
+        `save()`. Nothing in the codebase does that.
+
+        Why it matters: the student app shows a diagnosis only once a mentor
+        has agreed with it, and says *when* (`approved_at`). Without this the
+        only date available was when the model answered.
+        """
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            verdict_written = "human_verdict" in update_fields
+        else:
+            verdict_written = (
+                self.human_verdict != getattr(self, "_verdict_as_loaded", self.UNREVIEWED)
+            )
+        if verdict_written:
+            self.reviewed_at = (
+                None if self.human_verdict == self.UNREVIEWED else timezone.now()
+            )
+            if update_fields is not None:
+                kwargs["update_fields"] = {*update_fields, "reviewed_at"}
+        super().save(*args, **kwargs)
+        self._verdict_as_loaded = self.human_verdict
 
     @property
     def succeeded(self) -> bool:

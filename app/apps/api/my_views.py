@@ -33,7 +33,9 @@ HOW LISTS AND SINGLETONS DEGRADE FOR A NON-STUDENT
 
 WHAT A STUDENT MAY WRITE
     Study sessions and confidence ratings (append-only), ticking plan blocks
-    on and off, and marking a revision done (once). Everything else is read.
+    on and off, marking a revision done (once), and their onboarding answers
+    (how long they can study a day, the rank they are aiming for).
+    Everything else is read.
 """
 
 from __future__ import annotations
@@ -41,6 +43,8 @@ from __future__ import annotations
 import datetime as dt
 import logging
 
+from django.db.models import DateTimeField, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
@@ -52,17 +56,18 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from apps.derived.models import PlanBlock
-from apps.derived.services import features, planner
+from apps.derived.services import features, planner, revisions
 from apps.events.models import Attempt, ConfidenceRating, RevisionEvent, StudyLog
 from apps.ingestion.models import QuestionTopicMap
 from apps.syllabus.services import chapters_for_student
 from apps.tenancy.models import Student
 
+from . import engine_serializers as eng
 from . import rollups
 from . import serializers as ser
 from .pagination import StandardPagination, SubResourcePagination
 from .permissions import IsStudentAccount
-from .views import WEAK_PARAM, TenantScopedMixin
+from .views import FORGETTING_PARAM, WEAK_PARAM, TenantScopedMixin, forgetting_filter
 
 logger = logging.getLogger(__name__)
 
@@ -107,13 +112,30 @@ def refresh_derived_state(student: Student) -> None:
     `TopicState` and `StudentState` are disposable and rebuilt nightly from
     events. A failure here must not turn a successful, already-committed write
     into an error the student retries — so it is logged and swallowed, and the
-    nightly rebuild heals it. (There is no scheduler yet, so until there is,
-    `manage.py recompute_features` is that rebuild.)
+    nightly rebuild heals it (`manage.py run_nightly`, kept running by
+    `manage.py scheduler`).
     """
     try:
         features.recompute(student.institute_id, [student.id])
     except Exception:                                       # pragma: no cover
         logger.exception("could not refresh derived state for student %s", student.id)
+
+
+def schedule_next_revision(student: Student, topic_id: int) -> None:
+    """Schedule whatever revision cycle this chapter has just earned, now.
+
+    After a study log (a first exposure earns R1 tomorrow) and after a
+    revision is marked done (R1 done earns R2 a week out). Scoped to the one
+    chapter, so logging Kinematics schedules Kinematics and nothing else; the
+    nightly run applies the same rules to everything. **Best effort**, for
+    the reason `refresh_derived_state` gives: the event the student just
+    wrote is committed and true, the schedule is derived from it, and the
+    nightly run will write the same row if this one could not.
+    """
+    try:
+        revisions.schedule_revisions(student.institute_id, [student.id], topic_ids=[topic_id])
+    except Exception:
+        logger.exception("could not schedule revisions for student %s", student.id)
 
 
 @extend_schema(tags=["student-app"])
@@ -127,25 +149,89 @@ class MyViewSet(OwnDataMixin, viewsets.GenericViewSet):
     pagination_class = SubResourcePagination
 
     #: Singletons: no sensible empty answer for a non-student, so a 403.
-    STUDENT_ONLY_ACTIONS = frozenset({"profile", "marks_lost"})
+    STUDENT_ONLY_ACTIONS = frozenset({"profile", "marks_lost", "onboarding"})
+
+    #: Read by `ScopedRateThrottle`; set per request in `get_throttles`.
+    throttle_scope = None
 
     def get_permissions(self):
         return self.permissions_for(self.action in self.STUDENT_ONLY_ACTIONS)
 
-    @extend_schema(responses={200: ser.MyProfileSerializer})
+    def get_throttles(self):
+        # Only the onboarding *write* is limited. Reading it, or any read
+        # model here, is a screen refreshing.
+        if self.action == "onboarding" and self.request.method == "PUT":
+            self.throttle_scope = "onboarding"
+            return [ScopedRateThrottle()]
+        return []
+
+    @extend_schema(responses={200: eng.MyProfileWithOnboardingSerializer})
     @action(detail=False)
     def profile(self, request):
         """Who I am: name, batch, mentor, target, and how I am progressing.
 
         `progress` is the student-safe slice of `StudentState` — no
         `risk_score`. See `MyProgressSerializer` for what is withheld and
-        why.
+        why. `needs_onboarding` is true until `PUT /api/my/onboarding/` has
+        been saved once.
         """
         student = (
             Student.objects.select_related("batch__exam", "mentor", "state")
             .get(pk=self.current_student().pk)
         )
-        return Response(ser.MyProfileSerializer(student).data)
+        return Response(eng.MyProfileWithOnboardingSerializer(student).data)
+
+    _ONBOARDING_403 = OpenApiResponse(
+        response=ser.DetailSerializer, description="Not a student account."
+    )
+
+    @extend_schema(
+        methods=["GET"],
+        responses={200: eng.OnboardingSerializer, 403: _ONBOARDING_403},
+    )
+    @extend_schema(
+        methods=["PUT"],
+        request=eng.OnboardingUpdateSerializer,
+        responses={
+            200: eng.OnboardingSerializer,
+            400: OpenApiResponse(
+                description="`daily_minutes` missing or outside 45–720, or `target_rank` below 1."
+            ),
+            403: _ONBOARDING_403,
+            429: ser.DetailSerializer,
+        },
+    )
+    @action(detail=False, methods=["get", "put"])
+    def onboarding(self, request):
+        """My onboarding: the exam I am preparing for, and what I can give it.
+
+        `GET` shows what the institute set — exam, exam date, batch, target —
+        alongside my own answers, and `needs_onboarding` while I have not
+        saved them yet. The exam and batch are read-only: they come from my
+        batch, and changing them is the institute's decision.
+
+        `PUT {daily_minutes, target_rank}` saves my answers. `daily_minutes`
+        (45–720) is required; `target_rank` (1 or more) is optional and a PUT
+        replaces it, so leaving it out clears it. The first save sets
+        `onboarded_at`; later saves change the answers but never move it.
+        `daily_minutes` becomes the budget my day plan is built to (see
+        `POST /api/my/plan/generate/`).
+        """
+        student = self.current_student()
+        if request.method == "PUT":
+            form = eng.OnboardingUpdateSerializer(data=request.data)
+            form.is_valid(raise_exception=True)
+            # One statement: the answers always, `onboarded_at` only if it is
+            # still null — so two first saves racing cannot both set it.
+            Student.objects.filter(pk=student.pk, institute_id=student.institute_id).update(
+                daily_minutes=form.validated_data["daily_minutes"],
+                target_rank=form.validated_data.get("target_rank"),
+                onboarded_at=Coalesce(
+                    "onboarded_at", Value(timezone.now(), output_field=DateTimeField())
+                ),
+            )
+        fresh = Student.objects.select_related("batch__exam").get(pk=student.pk)
+        return Response(eng.OnboardingSerializer(fresh).data)
 
     @extend_schema(responses=ser.MyTopicSerializer(many=True))
     @action(detail=False)
@@ -162,7 +248,7 @@ class MyViewSet(OwnDataMixin, viewsets.GenericViewSet):
         return self.paginated(rows, ser.MyTopicSerializer)
 
     @extend_schema(
-        parameters=[WEAK_PARAM],
+        parameters=[WEAK_PARAM, FORGETTING_PARAM],
         responses=ser.TopicStateSerializer(many=True),
     )
     @action(detail=False, url_path="topic-states")
@@ -170,13 +256,17 @@ class MyViewSet(OwnDataMixin, viewsets.GenericViewSet):
         """My per-chapter mastery, weakest first.
 
         `mastery` is null below the evidence floor — null is "not enough
-        attempts to say", never zero.
+        attempts to say", never zero. `?forgetting=true` lists the chapters
+        I am forecast to be forgetting, fastest first.
         """
         student = self.current_student()
         rows = (
-            rollups.topic_state_queryset(
-                student.institute_id, student.id,
-                weak=request.query_params.get("weak") == "true",
+            forgetting_filter(
+                rollups.topic_state_queryset(
+                    student.institute_id, student.id,
+                    weak=request.query_params.get("weak") == "true",
+                ),
+                request,
             )
             if student is not None else []
         )
@@ -199,7 +289,7 @@ class MyViewSet(OwnDataMixin, viewsets.GenericViewSet):
     @extend_schema(responses=ser.SubjectBreakdownSerializer(many=True))
     @action(detail=False, url_path="subject-breakdown")
     def subject_breakdown(self, request):
-        """Where my study time goes against where my marks go. Three rows, fixed order."""
+        """Where my study time goes against where my marks go: one row per subject of my syllabus, in its order."""
         student = self.current_student()
         rows = (
             rollups.subject_breakdown_rows(student.institute_id, student.id)
@@ -445,14 +535,21 @@ class MyPlanViewSet(OwnDataMixin, mixins.ListModelMixin, viewsets.GenericViewSet
     )
     @action(detail=False, methods=["post"])
     def generate(self, request):
-        """Make my plan for a day — three explicit rules, each block saying which.
+        """Make my plan for a day — explicit rules, each block saying which.
 
-        **Rules, not a model.** Overdue revisions first, then my weakest
-        *taught* chapters, then one chapter taught but never attempted; sized
-        to what I actually log on a typical day. Every block's `reason_text`
-        names the rule that chose it, so the plan can be argued with. See
+        **Rules, not a model.** Due revisions first, then chapters I am
+        forecast to be forgetting (at most two revise blocks in all), then my
+        weakest *taught* chapters — a neglected subject's first — then one
+        chapter taught but never attempted. Sized to the minutes a day I gave
+        at onboarding, else to what I actually log, else a default. Every
+        block's `reason_text` names the rule that chose it, so the plan can be
+        argued with; `reason_code` is one of `revision_r1`–`revision_r3`,
+        `low_retention`, `weak_topic`, `subject_balance` or `syllabus`. See
         `apps/derived/services/planner.py` for the rules and for why blocks
         carry no start time.
+
+        Some days are deliberately lighter or shorter; `note` then says so in
+        a sentence safe to show as it is. It is null on an ordinary day.
 
         Idempotent: if a plan already exists it is returned as it stands
         (200). `replace: true` rebuilds it, keeping anything I have ticked.
@@ -471,13 +568,16 @@ class MyPlanViewSet(OwnDataMixin, mixins.ListModelMixin, viewsets.GenericViewSet
                 {"date": f"Plans go at most {planner.MAX_DAYS_AHEAD} days ahead."}
             )
 
-        blocks, generated = planner.generate_for_student(
+        result = planner.plan_for_student(
             self.current_student(), day, replace=form.validated_data["replace"]
         )
-        payload = ser.PlanGenerationSerializer(
-            {"date": day, "generated": generated, "blocks": blocks}
-        ).data
-        return Response(payload, status=status.HTTP_201_CREATED if generated else status.HTTP_200_OK)
+        payload = ser.PlanGenerationSerializer({
+            "date": day, "generated": result.generated,
+            "blocks": result.blocks, "note": result.note,
+        }).data
+        return Response(
+            payload, status=status.HTTP_201_CREATED if result.generated else status.HTTP_200_OK
+        )
 
 
 @extend_schema(tags=["student-app"])
@@ -492,6 +592,9 @@ class StudyLogViewSet(ThrottledWritesMixin, OwnDataMixin, mixins.CreateModelMixi
     The `topic` must be a chapter of the student's own syllabus
     (`GET /api/my/topics/`), `minutes` is 1–720, and `ts` may be in the past
     but not the future. A mentor posting here is a 403; it used to be a 500.
+
+    The first time a chapter is met, logging it schedules its first revision
+    (R1, the next day) straight away — see `schedule_next_revision`.
     """
 
     serializer_class = ser.StudyLogCreateSerializer
@@ -511,7 +614,8 @@ class StudyLogViewSet(ThrottledWritesMixin, OwnDataMixin, mixins.CreateModelMixi
 
     def perform_create(self, serializer):
         student = self.current_student()
-        serializer.save(student=student, institute_id=student.institute_id)
+        log = serializer.save(student=student, institute_id=student.institute_id)
+        schedule_next_revision(student, log.topic_id)
 
 
 @extend_schema(tags=["student-app"])
@@ -610,9 +714,11 @@ class RevisionViewSet(OwnDataMixin, mixins.ListModelMixin, viewsets.GenericViewS
         done_at IS NULL` is what makes that true under two simultaneous
         requests, which a read-then-write would not be.
 
-        Also refreshes my derived state (`revision_debt`, `last_revised`,
-        `retention`) so the screen reflects it straight away; see
-        `refresh_derived_state` for why that cannot fail the request.
+        Also schedules the next cycle at once (R2 a week after R1 is done, R3
+        a month after R2, never past the exam) and refreshes my derived state
+        (`revision_debt`, `last_revised`, `retention`) so the screen reflects
+        it straight away; see `refresh_derived_state` for why neither can
+        fail the request.
         """
         student = self.current_student()
         revision = self.get_queryset().filter(pk=pk).first()
@@ -623,6 +729,7 @@ class RevisionViewSet(OwnDataMixin, mixins.ListModelMixin, viewsets.GenericViewS
             done_at=timezone.now()
         )
         if recorded:
+            schedule_next_revision(student, revision.topic_id)
             refresh_derived_state(student)
         revision.refresh_from_db()
         return Response(ser.MyRevisionSerializer(revision).data)

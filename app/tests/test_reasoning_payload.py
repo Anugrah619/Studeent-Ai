@@ -649,3 +649,27 @@ def test_the_serialiser_carries_all_of_it_and_a_real_verdict_value(scene):
     assert body["tally"]["wrong"] == 3
     assert body["hypotheses"][0]["counter_evidence_questions"][0]["label"] == "Q3"
     assert body["human_verdict"] == "unreviewed"
+
+
+# ============================================ 4 · Only trusted answer keys count
+
+
+@pytest.mark.parametrize("verification, counts", [
+    ("", True),                 # never cross-checked: our own and institute papers
+    ("agreed", True),
+    ("key_stands", True),       # disputed, then a person confirmed the key
+    ("disagreed", False),       # disputed and not yet reviewed
+    ("key_wrong", False),
+    ("key_unclear", False),
+])
+def test_an_answer_counts_only_when_its_key_is_trusted(scene, verification, counts):
+    """Q5 is a wrong answer tagged with the misconception under study. Marked
+    against a key a reviewer doubts, it must be neither evidence for the
+    finding nor anything else in the payload."""
+    from apps.ingestion.models import QuestionTopicMap
+
+    QuestionTopicMap.objects.filter(pk=scene.questions["Q5"].pk).update(verification=verification)
+    context = dx.build_context(scene.student)
+    cited = {w["q"] for w in context["wrong_answers"]} | {r["q"] for r in context["correct_answers"]}
+    assert ("Q5" in cited) is counts
+    assert context["marks_lost_by_pattern"].get("MIS-ORG-EAS") == (10 if counts else 5)

@@ -77,6 +77,7 @@ from apps.derived.services.features import (
 from apps.events.models import Attempt, ChapterStatus, RevisionEvent
 from apps.ingestion.models import TestPaper
 from apps.syllabus.models import Topic
+from apps.syllabus.services import subject_order, subjects_by_batch
 from apps.tenancy.models import Student
 
 logger = logging.getLogger(__name__)
@@ -87,7 +88,10 @@ logger = logging.getLogger(__name__)
 #: know when they read it the first time.
 DEFAULT_COOLDOWN_DAYS = 14
 
-SUBJECTS = ["Physics", "Chemistry", "Maths"]
+# There is no subject list here any more. Which subjects a student has is a
+# property of their syllabus — `StudentFacts.subject_order`, from the tree —
+# and a typed "Physics, Chemistry, Maths" made a NEET student's Botany and
+# Zoology invisible to every per-subject rule.
 
 
 # ===================================================================== facts
@@ -130,6 +134,9 @@ class StudentFacts:
     units: dict[int, str]
     topic_names: dict[int, str]
     topic_weights: dict[int, float]
+    #: The subjects of this student's syllabus, in syllabus order. Every
+    #: per-subject rule iterates this, never a typed list.
+    subject_order: list[str] = dataclasses.field(default_factory=list)
 
     # ------------------------------------------------------------ helpers
 
@@ -203,6 +210,11 @@ class CohortFacts:
         }
 
         self.subjects = subject_map(institute_id)
+        # Per batch rather than per student: everyone in a batch is taught
+        # the same tree, and this keeps it three queries for any cohort.
+        self.subjects_by_batch = subjects_by_batch(
+            institute_id, {s.batch_id for s in self.students.values()}
+        )
         self.units = unit_map(institute_id)
         topics = dict(
             Topic.objects.filter(syllabus__institute_id=institute_id).values_list(
@@ -307,6 +319,7 @@ class CohortFacts:
             units=self.units,
             topic_names=self.topic_names,
             topic_weights=self.topic_weights,
+            subject_order=self.subjects_by_batch.get(student.batch_id, []),
         )
 
     def recent_attempts(self, student_id: int) -> list[tuple[int, str]]:
@@ -776,10 +789,22 @@ class SubjectImbalanceDetector(Detector):
     no windowed figure beside it to be mismatched against. The evidence
     already carries `papers`, and the headline already names the mock
     count. Both halves stay as they are.
+
+    WHICH SUBJECTS (v2)
+        The subjects compared are the student's own syllabus's, in syllabus
+        order (`StudentFacts.subject_order`), plus any other subject they
+        have time or marks in. v1 iterated a typed Physics/Chemistry/Maths,
+        so on a NEET batch it compared Physics and Chemistry against a Maths
+        row of zeroes and never saw Botany or Zoology at all — the most
+        likely subject for a NEET student to be neglecting was the one the
+        rule could not name. On a JEE syllabus v2 is byte-identical to v1;
+        the bump is so a v1 flag on any other syllabus is read as what it
+        was.
     """
 
     type = "subject_imbalance"
-    rule_version = "v1"
+    #: v2: subjects come from the student's syllabus. See WHICH SUBJECTS.
+    rule_version = "v2"
     tier = 1
     min_evidence = "3+ mock papers and 14+ logged study days"
     baseline = "the student's own split of study time against their own lost marks"
@@ -806,7 +831,7 @@ class SubjectImbalanceDetector(Detector):
             return None
 
         rows = []
-        for subject in SUBJECTS:
+        for subject in subject_order(student.subject_order, [*time_by, *lost_by]):
             time_share = time_by.get(subject, 0) / t_tot * 100
             lost_share = lost_by.get(subject, 0) / l_tot * 100
             rows.append(

@@ -41,6 +41,46 @@ TWO DECISIONS WORTH THE PARAGRAPHS THEY COST
     weighted toward their more recent performance"; `retention` answers
     "what would they recall today". Two questions, two fields.
 
+THE FORGETTING MODEL (`retention`)
+    An exponential forgetting curve, the oldest model in the field
+    (Ebbinghaus, 1885) and the shape FSRS and SM-2 refine:
+
+        retention = exp(-t / S)
+
+        t = days from the later of `last_seen` (newest attempt) and
+            `last_revised` (newest completed revision) to `as_of`, ≥ 0
+        S = RETENTION_BASE_DAYS
+              × RETENTION_CYCLE_GROWTH ** completed cycles (at most 3)
+              × (0.5 + m),   m = mastery, or 0.5 when mastery is null
+
+    `S` is stability, in days: how slowly this chapter is being forgotten.
+    It grows with every completed revision cycle — that is the whole claim
+    of spaced repetition — and with mastery, because a chapter understood
+    decays slower than one guessed at. An unmeasured mastery counts as the
+    neutral 0.5 (factor 1.0) rather than as zero: "not enough attempts to
+    say" must not read as "weak" here any more than it does anywhere else.
+
+    The base, 10 days, is calibrated to the revision schedule rather than
+    pulled from a paper: a chapter met once, at middling mastery, crosses
+    even odds of recall after 10·ln 2 ≈ 7 days — the R2 interval. After
+    R1, R2 and R3 the same chapter's half-life is roughly 17, 43 and 108
+    days. These are priors, like the risk weights; fitting them needs
+    graded recall data (a "done" revision says nothing about how much was
+    remembered), which the product does not collect yet.
+
+    Null when the chapter was never *seen* — no attempt and no completed
+    revision. A study log alone is not enough: it is self-reported, the
+    least reliable data in the system, and `last_seen` is deliberately
+    the measured anchor. A chapter only ever logged is the planner's
+    "learn" case, not a forgetting one.
+
+    **Deterministic for a given `as_of`**, which is what keeps it inside
+    the rebuild-equivalence guarantee: replay the same events with the same
+    `as_of` and the same number comes back. The price of being a forecast
+    is that a stored value is "as of the last recompute" (`computed_at`);
+    the nightly job (`run_nightly`) recomputes every institute daily, and a
+    student's own events refresh their rows immediately.
+
 IDEMPOTENCE
     Every function here is an upsert plus a scoped delete of rows whose
     source events no longer exist. Running twice changes nothing but
@@ -64,6 +104,7 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import logging
+import math
 from collections import defaultdict
 
 from django.db import connection, transaction
@@ -90,7 +131,8 @@ logger = logging.getLogger(__name__)
 # commented rather than inlined. Changing one changes what mentors see, and
 # `FEATURE_VERSION` is how we tell which rules produced a stored row.
 
-FEATURE_VERSION = "rung0-v1"
+#: v2: `retention` is computed (the forgetting model below) instead of null.
+FEATURE_VERSION = "rung0-v2"
 
 #: Attempts considered for mastery, newest first. Matches the
 #: `ROWS BETWEEN 19 PRECEDING AND CURRENT ROW` in SYSTEM_DESIGN.md §4.
@@ -121,6 +163,15 @@ EVIDENCE_FLOOR = 4
 RECENT_WINDOW_DAYS = 30
 RECENT_FLOOR = 3
 
+#: The forgetting model — see "THE FORGETTING MODEL" in the module docstring.
+#: Stability, in days, of a chapter seen once at neutral mastery.
+RETENTION_BASE_DAYS = 10.0
+#: Each completed revision cycle multiplies stability by this much.
+RETENTION_CYCLE_GROWTH = 2.5
+#: Cycles beyond this add nothing — the scheduler writes three at most, and
+#: an unbounded power would let a seeded duplicate push stability to years.
+RETENTION_MAX_CYCLES = 3
+
 #: Windows for the per-student rollup.
 CONSISTENCY_WINDOW_DAYS = 60
 LOAD_WINDOW_DAYS = 28
@@ -129,9 +180,6 @@ LOAD_WINDOW_DAYS = 28
 #: O(attempts) rather than O(pairs); at 20M attempts the unchunked form
 #: would be a bad afternoon.
 STUDENT_CHUNK = 250
-
-SUBJECT_ORDER = ["Physics", "Chemistry", "Maths"]
-
 
 @dataclasses.dataclass
 class RecomputeStats:
@@ -399,6 +447,36 @@ def _decayed_accuracy(rows: list[tuple[dt.datetime, str]]) -> float | None:
     return round(num / den, 4)
 
 
+def retention_stability(cycles_done: int, mastery: float | None) -> float:
+    """`S` in the forgetting model, in days. Always > 0."""
+    cycles = max(0, min(cycles_done, RETENTION_MAX_CYCLES))
+    m = 0.5 if mastery is None else _clamp(mastery)
+    return RETENTION_BASE_DAYS * RETENTION_CYCLE_GROWTH**cycles * (0.5 + m)
+
+
+def forecast_retention(
+    as_of: dt.datetime,
+    *,
+    last_seen: dt.datetime | None,
+    last_revised: dt.datetime | None,
+    cycles_done: int,
+    mastery: float | None,
+) -> float | None:
+    """Forecast recall of one chapter at `as_of`, 0–1. None if never seen.
+
+    Pure, and deterministic for its arguments — see "THE FORGETTING MODEL"
+    in the module docstring for the formula and why each term is there.
+    An anchor later than `as_of` (a rebuild run "as of" a past date over a
+    log that has since grown) counts as zero days, not as a negative age.
+    """
+    anchors = [d for d in (last_seen, last_revised) if d is not None]
+    if not anchors:
+        return None
+    # t ≥ 0 and S > 0, so exp(-t/S) is already in (0, 1].
+    days = max(0.0, (as_of - max(anchors)).total_seconds() / 86400.0)
+    return round(math.exp(-days / retention_stability(cycles_done, mastery)), 4)
+
+
 def recompute_topic_state(
     institute_id: int, student_ids=None, as_of=None
 ) -> RecomputeStats:
@@ -464,14 +542,20 @@ def _topic_state_chunk(
         .values("student_id", "topic_id")
         .annotate(mins=Sum("minutes"))
     }
-    revised = {
-        (r["student_id"], r["topic_id"]): r["last"]
-        for r in RevisionEvent.objects.filter(
+    # Completed revisions: the newest one (`last_revised`) and how many
+    # distinct cycles are done, which is what grows retention's stability.
+    revised: dict[tuple[int, int], dt.datetime] = {}
+    cycles_done: dict[tuple[int, int], int] = {}
+    for r in (
+        RevisionEvent.objects.filter(
             institute_id=institute_id, student_id__in=ids, done_at__isnull=False
         )
         .values("student_id", "topic_id")
-        .annotate(last=Max("done_at"))
-    }
+        .annotate(last=Max("done_at"), cycles=Count("cycle", distinct=True))
+    ):
+        key = (r["student_id"], r["topic_id"])
+        revised[key] = r["last"]
+        cycles_done[key] = r["cycles"]
     # Latest rating by timestamp, not the highest one. `Max("self_rating")`
     # would report a student's most optimistic historical answer, which is
     # precisely backwards for a detector looking for overconfidence.
@@ -511,11 +595,17 @@ def _topic_state_chunk(
                 student_id=student_id,
                 topic_id=topic_id,
                 mastery=mastery,
-                # Rung 0 has no retention model. TECHNICAL_DOC.md §6.2 is
-                # explicit that exam-deadline FSRS is research, not an
-                # install, so this stays null rather than becoming a
-                # decorative number nobody can defend.
-                retention=None,
+                # The forgetting model, deterministic for `as_of`. Not FSRS:
+                # TECHNICAL_DOC.md §6.2 is explicit that exam-deadline FSRS
+                # is research, not an install. This is the exponential curve
+                # underneath it with stated priors — see the module docstring.
+                retention=forecast_retention(
+                    as_of,
+                    last_seen=agg.get("last"),
+                    last_revised=revised.get(key),
+                    cycles_done=cycles_done.get(key, 0),
+                    mastery=mastery,
+                ),
                 attempts_n=agg.get("n") or 0,
                 correct_n=agg.get("correct") or 0,
                 accuracy_30d=accuracy_30d,
@@ -737,10 +827,14 @@ def _student_state_chunk(
         t_by, l_by = time_by.get(sid, {}), lost_by.get(sid, {})
         t_tot, l_tot = sum(t_by.values()), sum(l_by.values())
         if t_tot and l_tot:
+            # Every subject the student has time or lost marks in — not a fixed
+            # Physics/Chemistry/Maths list, which ignored Botany and Zoology for
+            # NEET. Identical for JEE: a subject with neither contributes a gap
+            # of 0, which can never be the max.
             balance_index = round(
                 max(
                     abs(l_by.get(s, 0) / l_tot - t_by.get(s, 0) / t_tot)
-                    for s in SUBJECT_ORDER
+                    for s in sorted(set(l_by) | set(t_by))
                 ),
                 3,
             )

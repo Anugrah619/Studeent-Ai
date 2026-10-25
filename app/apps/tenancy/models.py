@@ -108,6 +108,21 @@ class Student(TenantScoped):
     target = models.CharField(max_length=100, blank=True)        # "AIR < 5000"
     joined_at = models.DateField()
 
+    # Onboarding — what the student tells us about themselves the first time
+    # they open the app (`/api/my/onboarding/`). All three are null until then.
+    #
+    # `daily_minutes` is the time a day they *say* they can study, 45–720.
+    # The planner prefers it over the median of what they log, because a
+    # student who has not logged anything yet still has a day to plan.
+    # `target_rank` is the number behind the free-text `target` ("AIR < 5000"
+    # stays as the institute wrote it); it is recorded, not yet used by any
+    # engine. `onboarded_at` is set once, the first time onboarding is saved,
+    # and never moves — it is the answer to "has this student been through
+    # onboarding", not "when did they last edit it".
+    daily_minutes = models.PositiveSmallIntegerField(null=True, blank=True)
+    target_rank = models.PositiveIntegerField(null=True, blank=True)
+    onboarded_at = models.DateTimeField(null=True, blank=True)
+
     # Dropout label. Supervised-learning ground truth for the risk model —
     # cheap to capture now, impossible to reconstruct later.
     exited_at = models.DateField(null=True, blank=True)

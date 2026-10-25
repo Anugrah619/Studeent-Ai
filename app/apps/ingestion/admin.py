@@ -121,8 +121,10 @@ class QuestionTopicMapAdmin(admin.ModelAdmin):
     list_editable = ("topic",)
     # `verification` is the question factory's review queue: filter to
     # "disagreed" and a person sees only the questions where the model's
-    # blind answer and NTA's official key differ.
-    list_filter = (MappingStatusFilter, "verification", "source", "has_diagram",
+    # blind answer and NTA's official key differ and nobody has decided yet.
+    # Decisions are made in the console (`/api/review/disagreements/`), which
+    # moves a reviewed question to key_stands / key_wrong / key_unclear.
+    list_filter = (MappingStatusFilter, "verification", "key_review", "source", "has_diagram",
                    "institute", "test_paper", "proposed_by")
     search_fields = ("question_id", "question_text", "topic__name")
     # Autocomplete rather than raw_id for `topic`: a reviewer knows the
@@ -142,12 +144,16 @@ class QuestionTopicMapAdmin(admin.ModelAdmin):
               "topic", "proposed_by", "confirmed_by", "confirmed_at",
               "source", "source_ref", "nta_question_id", "subject_name", "chapter_name",
               "answer_type", "official_answer", "numeric_answer", "model_answer",
-              "verification", "verification_detail", "has_diagram")
+              "verification", "verification_detail", "has_diagram",
+              "key_review", "key_review_note", "key_reviewed_by", "key_reviewed_at")
     # Provenance is evidence, not an opinion: it is set by the loader from
-    # the official documents and is not editable by hand.
+    # the official documents and is not editable by hand. The key review is
+    # read-only here too: it is recorded through the review endpoint, which
+    # keeps its history in `verification_detail`.
     readonly_fields = ("source", "source_ref", "nta_question_id", "official_answer",
                        "numeric_answer", "model_answer", "verification",
-                       "verification_detail")
+                       "verification_detail", "key_review", "key_review_note",
+                       "key_reviewed_by", "key_reviewed_at")
 
     @admin.display(description="topic path")
     def topic_path(self, obj):

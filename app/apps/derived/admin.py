@@ -20,7 +20,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
-from .models import Flag, Intervention, PlanBlock, StudentState, TopicState
+from .models import Flag, Intervention, JobRun, PlanBlock, StudentState, TopicState
 
 SEVERITY_COLOUR = {
     Flag.CRITICAL: "#dc2626",
@@ -214,3 +214,13 @@ class PlanBlockAdmin(ComputedAdmin):
     list_select_related = ("student", "topic")
     date_hierarchy = "date"
     show_full_result_count = False
+
+
+@admin.register(JobRun)
+class JobRunAdmin(ComputedAdmin):
+    """The nightly job's receipts. Read-only: a receipt that can be edited is not one."""
+
+    list_display = ("started_at", "institute", "kind", "status", "finished_at", "error")
+    list_filter = ("institute", "kind", "status")
+    raw_id_fields = ("institute",)
+    date_hierarchy = "started_at"

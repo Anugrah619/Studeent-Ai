@@ -160,6 +160,13 @@ REST_FRAMEWORK = {
     #   plan_generate  per student. Building a plan reads their whole state.
     #   ingest       per staff account. Parsing a results file is the heaviest
     #                thing a request can ask for.
+    #   onboarding   per student, `PUT /api/my/onboarding/` only. Saving it a
+    #                few times while choosing is normal; hundreds is not.
+    #   guidance_ask   per student, counted only when a question needs a live
+    #                model call (a repeat is a free cache hit). The free tier
+    #                is ~20 requests per model per day for the whole install.
+    #   plan_explain   per student, likewise counted per live model call. Over
+    #                it, the plan is explained by a fixed summary, never a 429.
     #
     # Per-account lockout is deliberately absent: it hands anyone who knows a
     # roll number the ability to lock that student out. The cache behind this
@@ -172,6 +179,9 @@ REST_FRAMEWORK = {
         "student_write": "120/hour",
         "plan_generate": "30/hour",
         "ingest": "20/hour",
+        "onboarding": "30/hour",
+        "guidance_ask": "20/day",
+        "plan_explain": "30/day",
     },
     # Zero trusted proxies: identify a client by the socket address, never by
     # an `X-Forwarded-For` header the client wrote itself. With DRF's default
@@ -198,6 +208,16 @@ SPECTACULAR_SETTINGS = {
         "StatusEnum": "apps.api.enums.ATTEMPT_STATUS",
         "SourceEnum": "apps.api.enums.ATTEMPT_SOURCE",
         "PaperSourceEnum": "apps.api.enums.PAPER_SOURCE",
+        # Content work (apps/api/content_serializers.py). Two sit on fields
+        # named `status`, which must not disturb `StatusEnum` above.
+        "KeyReviewStatusEnum": "apps.api.content_serializers.KEY_REVIEW_STATUSES",
+        "KeyReviewDecisionEnum": "apps.api.content_serializers.KEY_REVIEW_DECISIONS",
+        "DraftMisconceptionStatusEnum": "apps.api.content_serializers.DRAFT_STATUSES",
+        "VerificationEnum": "apps.api.content_serializers.VERIFICATION_CHOICES",
+        # `NextAction.kind` shares its field name with `Topic.kind`; both are
+        # pinned, or the existing `KindEnum` is renamed to a hash.
+        "KindEnum": "apps.api.guidance_serializers.TOPIC_KIND_CHOICES",
+        "GuidanceActionKindEnum": "apps.api.guidance_serializers.NEXT_ACTION_KIND_CHOICES",
     },
 }
 
@@ -218,7 +238,26 @@ CORS_ALLOW_CREDENTIALS = True
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
 GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-2.5-flash")
 
+
+# ------------------------------------------------------------ operations
+
+# `manage.py backup_db` writes here and `manage.py pilot_check` reads the age
+# of the newest file. Outside the repository by default, on purpose: a dump
+# holds every student's record, and the GitHub repo is publicly readable.
+BACKUP_DIR = Path(env("BACKUP_DIR", default=str(Path.home() / "student_ai_backups")))
+# The Postgres container `backup_db` falls back to (`docker exec … pg_dump`)
+# when there is no local pg_dump. Matches docker-compose.yml.
+DB_CONTAINER = env("DB_CONTAINER", default="student_ai_db")
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# ---------------------------------------------------------- nightly jobs
+
+# When `manage.py scheduler` runs `run_nightly` each day: "HH:MM", 24-hour,
+# in TIME_ZONE. Two in the morning is after the last student has logged a
+# day's study and before the first opens the app.
+NIGHTLY_AT = env("NIGHTLY_AT", default="02:00")
 
 MAILERS = {
     "default": {

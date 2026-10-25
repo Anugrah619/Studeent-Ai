@@ -38,7 +38,9 @@ TWO LAYOUTS, ONE PARSER
 
     Wide is what OMR exports look like; long is what an app would send and the
     only layout that carries per-question time. Which one a file is follows
-    from its columns, so the institute never has to say.
+    from its columns, so the institute never has to say. Either layout may
+    arrive as a CSV or as an `.xlsx` workbook; `tabular.read_table` hands both
+    over as the same strings.
 
 WHAT A CELL MEANS
     A–D (or 1–4, which NTA's own keys use) is the option chosen. A numeric-value

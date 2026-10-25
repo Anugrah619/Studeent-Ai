@@ -17,10 +17,11 @@ from django.core.management import call_command
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.derived.models import PlanBlock, TopicState
+from apps.derived.models import Flag, PlanBlock, TopicState
 from apps.derived.services import planner
 from apps.derived.services.planner import (
-    ChapterFact, PlanInputs, RevisionFact, build_plan, budget_from_logs,
+    ChapterFact, PlanInputs, RevisionFact, build_plan, budget_from_logs, choose_budget,
+    effective_budget, note_for_existing, plan_note,
 )
 from apps.events.models import ChapterStatus
 from apps.tenancy.models import Student, User
@@ -32,18 +33,20 @@ DAY = dt.date(2026, 10, 15)
 LONG_AGO = dt.date(2026, 8, 1)
 
 
-def chapter(tid, name="Chapter", *, mastery=None, attempts=0, taught=LONG_AGO, weight=4.0):
-    return ChapterFact(tid, name, weight, mastery, attempts, taught)
+def chapter(tid, name="Chapter", *, mastery=None, attempts=0, taught=LONG_AGO, weight=4.0,
+            subject="", retention=None, touched=None):
+    return ChapterFact(tid, name, weight, mastery, attempts, taught,
+                       subject=subject, retention=retention, last_touched=touched)
 
 
 def revision(tid, cycle=1, days_late=2, name="Chapter"):
     return RevisionFact(tid, name, cycle, DAY - dt.timedelta(days=days_late))
 
 
-def plan(chapters=(), revisions=(), budget=360, already=()):
+def plan(chapters=(), revisions=(), budget=360, already=(), flags=(), neglected=None):
     return build_plan(PlanInputs(
         day=DAY, budget=budget, chapters=list(chapters), revisions=list(revisions),
-        already_planned=set(already),
+        already_planned=set(already), open_flags=frozenset(flags), neglected_subject=neglected,
     ))
 
 
@@ -212,6 +215,205 @@ def test_the_weak_line_is_exactly_half_and_strict(mastery, planned):
     pins the line itself — and 0.5 is "not weak", matching `?weak=true`."""
     specs = plan(chapters=[chapter(1, mastery=mastery, attempts=10)])
     assert bool(specs) is planned
+
+
+# ------------------------------------------------- budget precedence (new)
+
+
+@pytest.mark.parametrize("stated, logged, expected", [
+    (120, [300, 300, 300, 300], 120),            # what they said beats what they log
+    (None, [300, 300, 300, 300], 300),           # …and the logs come next
+    (None, [300], planner.DEFAULT_BUDGET),       # …then the default
+    (45, [], 45),                                # a short stated day is honoured…
+    (30, [], planner.STATED_MIN_BUDGET),         # …down to onboarding's own minimum
+    (720, [], planner.MAX_BUDGET),
+    (0, [150, 150, 150], 150),                   # zero is "not said", not a budget
+])
+def test_the_students_own_minutes_come_first_then_the_logs_then_the_default(stated, logged, expected):
+    assert choose_budget(stated, logged) == expected
+
+
+def test_the_shortest_stated_day_still_fits_a_revision_and_a_practice_block():
+    """The reason the floor is 45: both of the planner's short blocks fit, so a
+    student who says 45 minutes gets a 45-minute plan, not an empty one."""
+    budget = choose_budget(planner.STATED_MIN_BUDGET, [])
+    assert planner.MINUTES["revise"] <= budget and planner.MINUTES["practice"] <= budget
+    (spec,) = plan(chapters=[chapter(1, mastery=0.2, attempts=9)], budget=budget)
+    assert spec.mode == "practice" and spec.minutes <= budget
+
+
+def test_onboarding_and_the_planner_agree_on_the_shortest_day():
+    from apps.api.engine_serializers import MIN_DAILY_MINUTES
+    assert MIN_DAILY_MINUTES == planner.STATED_MIN_BUDGET
+
+
+# ------------------------------------------------------ the burnout guard (new)
+
+
+def test_an_open_overload_flag_cuts_the_day_to_sixty_percent():
+    assert effective_budget(180, {"overload"}) == 108
+    assert effective_budget(360, {"overload"}) == 216
+    assert planner.OVERLOAD_FACTOR == 0.6
+
+
+def test_an_overloaded_day_has_no_new_material_and_fits_the_lighter_budget():
+    chapters = [
+        chapter(1, "Weak A", mastery=0.1, attempts=9),
+        chapter(2, "Weak B", mastery=0.2, attempts=9),
+        chapter(3, "Fresh", attempts=0),
+    ]
+    normal = plan(chapters=chapters, budget=180)
+    light = plan(chapters=chapters, budget=180, flags={"overload"})
+    assert modes(normal) == ["practice", "practice", "learn"]          # 150 of 180
+    assert modes(light) == ["practice", "practice"]                    # 90 of 108
+    assert sum(s.minutes for s in light) <= 108
+
+
+def test_overload_drops_learn_even_when_it_would_fit():
+    specs = plan(chapters=[chapter(3, "Fresh", attempts=0)], budget=360, flags={"overload"})
+    assert specs == []
+
+
+def test_an_open_disengagement_flag_makes_a_short_day():
+    assert effective_budget(360, {"disengagement"}) == planner.SHORT_DAY_MINUTES == 90
+    assert effective_budget(60, {"disengagement"}) == 60        # never longer than it was
+    specs = plan(
+        chapters=[chapter(1, mastery=0.1, attempts=9), chapter(2, mastery=0.2, attempts=9)],
+        revisions=[revision(3), revision(4)],
+        budget=360, flags={"disengagement"},
+    )
+    assert sum(s.minutes for s in specs) <= 90
+    assert modes(specs) == ["revise", "revise"]
+
+
+def test_a_short_day_may_still_start_something_new():
+    """Disengagement shortens the day; unlike overload it does not forbid learning."""
+    assert modes(plan(chapters=[chapter(1, attempts=0)], flags={"disengagement"})) == ["learn"]
+
+
+def test_both_flags_together_take_the_stricter_of_each():
+    assert effective_budget(360, {"overload", "disengagement"}) == 90
+    assert plan(chapters=[chapter(1, attempts=0)], flags={"overload", "disengagement"}) == []
+
+
+@pytest.mark.parametrize("flags, note", [
+    (set(), None),
+    ({"weak_topic"}, None),
+    ({"subject_imbalance"}, None),
+    ({"overload"}, planner.NOTE_LIGHTER),
+    ({"disengagement"}, planner.NOTE_SHORT),
+    ({"overload", "disengagement"}, planner.NOTE_SHORT_AND_LIGHT),
+])
+def test_a_lighter_day_says_so_and_an_ordinary_one_says_nothing(flags, note):
+    assert plan_note(flags) == note
+
+
+@pytest.mark.parametrize("note", [planner.NOTE_LIGHTER, planner.NOTE_SHORT, planner.NOTE_SHORT_AND_LIGHT])
+def test_the_notes_never_name_a_flag_or_a_risk(note):
+    """Students are minors, reading this alone. The note says what is
+    different about today, never what the system concluded about them."""
+    lowered = note.lower()
+    for word in ("overload", "disengage", "flag", "risk", "burnout", "burn out", "detector",
+                 "critical", "warning", "imbalance", "struggl", "falling", "worr", "mentor"):
+        assert word not in lowered, f"{word!r} in {note!r}"
+    assert note.endswith(".") and len(note) < 200
+
+
+@pytest.mark.parametrize("flags, minutes, has_learn, honest", [
+    ({"overload"}, 75, False, planner.NOTE_LIGHTER),       # fits 108, no learn: true
+    ({"overload"}, 135, False, None),                      # made before the flag: too long
+    ({"overload"}, 90, True, None),                        # has new material: not "nothing new"
+    ({"disengagement"}, 90, True, planner.NOTE_SHORT),
+    ({"disengagement"}, 135, False, None),
+    ({"overload", "disengagement"}, 75, False, planner.NOTE_SHORT_AND_LIGHT),
+    ({"overload", "disengagement"}, 75, True, planner.NOTE_SHORT),
+])
+def test_an_existing_plan_is_only_described_as_lighter_if_it_is(flags, minutes, has_learn, honest):
+    assert note_for_existing(flags, budget=180, minutes=minutes, has_learn=has_learn) == honest
+
+
+# ------------------------------------------------- the neglected subject (new)
+
+
+def test_a_neglected_subjects_weak_chapters_take_the_practice_slots_first():
+    chapters = [
+        chapter(1, "Kinematics", mastery=0.10, attempts=9, subject="Physics"),
+        chapter(2, "Limits", mastery=0.15, attempts=9, subject="Maths"),
+        chapter(3, "Hydrocarbons", mastery=0.40, attempts=12, subject="Chemistry"),
+    ]
+    assert [s.topic_id for s in plan(chapters=chapters)] == [1, 2]       # weakest first, as before
+    first, second = plan(chapters=chapters, neglected="Chemistry")
+    assert (first.topic_id, first.reason_code) == (3, "subject_balance")
+    assert (second.topic_id, second.reason_code) == (1, "weak_topic")
+
+
+def test_the_subject_reason_says_why_in_plain_words():
+    (spec,) = plan(chapters=[chapter(1, mastery=0.4, attempts=12, subject="Chemistry")],
+                   neglected="Chemistry")
+    assert spec.reason_text == (
+        "Chemistry is costing you more marks than the time it gets, so it comes "
+        "first: 40% over 12 questions"
+    )
+
+
+def test_a_neglected_subject_does_not_make_a_strong_chapter_weak():
+    """The flag reorders weak chapters; it does not lower the line."""
+    specs = plan(chapters=[chapter(1, mastery=0.7, attempts=12, subject="Chemistry")],
+                 neglected="Chemistry")
+    assert specs == []
+
+
+def test_neglected_subject_chapters_must_still_be_taught():
+    specs = plan(chapters=[chapter(1, mastery=0.2, attempts=12, subject="Chemistry", taught=None)],
+                 neglected="Chemistry")
+    assert specs == []
+
+
+# ------------------------------------------------------ fading chapters (new)
+
+
+def test_a_fading_chapter_is_revised_after_due_revisions_and_before_practice():
+    specs = plan(
+        chapters=[
+            chapter(1, "Weak", mastery=0.2, attempts=9),
+            chapter(2, "Fading", retention=0.3, touched=DAY - dt.timedelta(days=12), mastery=0.8),
+        ],
+        revisions=[revision(3, name="Due")],
+    )
+    assert [(s.topic_id, s.mode, s.reason_code) for s in specs] == [
+        (3, "revise", "revision_r1"), (2, "revise", "low_retention"), (1, "practice", "weak_topic"),
+    ]
+    assert specs[1].reason_text == "You last worked on this 12 days ago — a short revision now keeps it fresh"
+
+
+def seen(tid, name, retention):
+    """A chapter attempted and known well — only its retention can plan it."""
+    return chapter(tid, name, retention=retention, mastery=0.9, attempts=8)
+
+
+def test_due_and_fading_revisions_share_one_cap_of_two():
+    specs = plan(
+        chapters=[seen(i, f"Fading {i}", 0.1 * i) for i in (1, 2, 3)],
+        revisions=[revision(9)],
+    )
+    assert [(s.topic_id, s.reason_code) for s in specs] == [(9, "revision_r1"), (1, "low_retention")]
+
+
+def test_the_fastest_fading_chapter_goes_first():
+    specs = plan(chapters=[seen(1, "Slow", 0.45), seen(2, "Fast", 0.05), seen(3, "Mid", 0.25)])
+    assert [s.topic_id for s in specs] == [2, 3]
+
+
+@pytest.mark.parametrize("retention, planned", [(0.49, True), (0.5, False), (0.9, False), (None, False)])
+def test_the_fading_line_is_half_and_never_seen_is_not_fading(retention, planned):
+    assert bool(plan(chapters=[chapter(1, retention=retention, mastery=0.9, attempts=9)])) is planned
+
+
+def test_a_fading_chapter_with_its_revision_due_is_revised_once():
+    specs = plan(chapters=[chapter(1, retention=0.1)], revisions=[revision(1)])
+    assert [(s.topic_id, s.reason_code) for s in specs] == [(1, "revision_r1")]
+
+
 # ------------------------------------------------------------ the endpoint
 
 
@@ -267,7 +469,10 @@ def test_a_new_student_with_nothing_to_plan_gets_an_honest_empty_answer(cohort):
     client.force_login(f.make_student_user(s, "newcomer"))
     response = generate(client)
     assert response.status_code == 200
-    assert response.json() == {"date": str(timezone.localdate()), "generated": False, "blocks": []}
+    # `note` is always present and null on an ordinary (here: empty) day.
+    assert response.json() == {
+        "date": str(timezone.localdate()), "generated": False, "blocks": [], "note": None,
+    }
 
 
 def test_regenerating_keeps_what_i_ticked_and_does_not_plan_it_twice(pupil):
@@ -343,6 +548,107 @@ def test_one_students_plan_never_uses_anothers_evidence(pupil, cohort):
     # (The chapter he has not attempted is, though: it was taught to the batch.)
     modes_for_bhavna = [b["mode"] for b in generate(client).json()["blocks"]]
     assert modes_for_bhavna == ["learn"]
+
+
+# ------------------------------------- the new rules, end to end (new)
+
+
+def raise_flag(student, ftype, *, resolved=False, evidence=None):
+    return Flag.objects.create(
+        institute=student.institute, student=student, type=ftype, severity=Flag.HIGH,
+        headline="for the mentor", evidence=evidence or {}, raised_at=timezone.now(),
+        resolved_at=timezone.now() if resolved else None,
+        outcome=Flag.UNKNOWN if resolved else "",
+    )
+
+
+def test_the_minutes_i_gave_at_onboarding_size_my_plan(pupil):
+    for days_ago in range(1, 6):                       # logs alone would allow 300
+        f.study(pupil.student, pupil.weak, 300, timezone.now() - dt.timedelta(days=days_ago))
+    pupil.student.daily_minutes = 100
+    pupil.student.save(update_fields=["daily_minutes"])
+    blocks = generate(pupil.client).json()["blocks"]
+    assert [b["mode"] for b in blocks] == ["revise", "practice"]        # 75 of 100
+    assert sum(b["minutes"] for b in blocks) <= 100
+
+
+def test_an_open_overload_flag_gives_a_lighter_day_with_a_gentle_note(pupil):
+    raise_flag(pupil.student, "overload")
+    body = generate(pupil.client).json()
+    assert [b["mode"] for b in body["blocks"]] == ["revise", "practice"]   # no learn
+    assert body["note"] == planner.NOTE_LIGHTER
+
+
+def test_an_open_disengagement_flag_gives_a_short_day(pupil):
+    raise_flag(pupil.student, "disengagement")
+    body = generate(pupil.client).json()
+    assert sum(b["minutes"] for b in body["blocks"]) <= 90
+    assert body["note"] == planner.NOTE_SHORT
+
+
+def test_no_note_on_a_day_with_nothing_to_plan(cohort):
+    s = f.make_student(cohort, "Newcomer", roll_no="N-2")
+    raise_flag(s, "disengagement")
+    client = APIClient()
+    client.force_login(f.make_student_user(s, "newcomer2"))
+    body = generate(client).json()
+    assert body["blocks"] == [] and body["note"] is None
+
+
+def test_a_resolved_flag_changes_nothing(pupil):
+    raise_flag(pupil.student, "overload", resolved=True)
+    body = generate(pupil.client).json()
+    assert [b["mode"] for b in body["blocks"]] == ["revise", "practice", "learn"]
+    assert body["note"] is None
+
+
+def test_a_classmates_flag_changes_nothing(pupil, cohort):
+    raise_flag(f.make_student(cohort, "Bhavna Rao", roll_no="B-2"), "overload")
+    body = generate(pupil.client).json()
+    assert body["note"] is None and len(body["blocks"]) == 3
+
+
+def test_the_imbalance_flags_subject_is_read_from_its_evidence(pupil, cohort):
+    physics_weak = cohort.chapter("Laws of Motion")
+    TopicState.objects.create(institute=cohort.institute, student=pupil.student, topic=physics_weak,
+                              mastery=0.05, attempts_n=20, correct_n=1)
+    ChapterStatus.objects.create(institute=cohort.institute, batch=cohort.batch,
+                                 topic=physics_weak, taught_at=LONG_AGO)
+    raise_flag(pupil.student, "subject_imbalance", evidence={"subject": "Chemistry", "gap_pts": 31.0})
+    practice = [b for b in generate(pupil.client).json()["blocks"] if b["mode"] == "practice"]
+    assert [b["topic_name"] for b in practice] == ["Thermodynamics", "Laws of Motion"]
+    assert practice[0]["reason_text"].startswith("Chemistry is costing you more marks")
+
+
+def test_a_fading_chapter_in_the_store_becomes_a_revise_block(pupil, cohort):
+    TopicState.objects.create(
+        institute=cohort.institute, student=pupil.student, topic=cohort.chapter("Matrices"),
+        mastery=0.9, attempts_n=10, retention=0.2,
+        last_seen=timezone.now() - dt.timedelta(days=12),
+    )
+    blocks = generate(pupil.client).json()["blocks"]
+    assert [(b["topic_name"], b["reason_code"]) for b in blocks][:2] == [
+        ("Limits", "revision_r1"), ("Matrices", "low_retention"),
+    ]
+    assert "12 days ago" in blocks[1]["reason_text"]
+
+
+def test_an_existing_plan_is_not_called_lighter_after_the_fact(pupil):
+    generate(pupil.client)                               # an ordinary three-block day
+    raise_flag(pupil.student, "overload")
+    again = generate(pupil.client)
+    assert again.status_code == 200 and again.json()["note"] is None
+    rebuilt = generate(pupil.client, replace=True).json()
+    assert rebuilt["note"] == planner.NOTE_LIGHTER
+    assert "learn" not in [b["mode"] for b in rebuilt["blocks"]]
+
+
+def test_the_plan_never_shows_the_student_a_flag(pupil):
+    raise_flag(pupil.student, "overload", evidence={"hours_change_pct": 30})
+    raise_flag(pupil.student, "subject_imbalance", evidence={"subject": "Chemistry"})
+    text = generate(pupil.client).content.decode().lower()
+    for word in ("overload", "subject_imbalance", "flag", "risk", "severity", "hours_change"):
+        assert word not in text
 
 
 # -------------------------------------------------------- the commands

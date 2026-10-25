@@ -252,12 +252,30 @@ class StudentDetailSerializer(LoginStatusMixin, serializers.ModelSerializer):
     batch = BatchSerializer(read_only=True)
     mentor = MentorSerializer(read_only=True)
     state = StudentStateSerializer(read_only=True)
+    # What the student said at onboarding (`/api/my/onboarding/`). Read-only
+    # here: they are the student's answers, not the institute's to edit.
+    daily_minutes = serializers.IntegerField(
+        read_only=True, allow_null=True,
+        help_text=(
+            "Minutes a day the student says they can study (45–720). Null "
+            "until they onboard. The day planner uses it first."
+        ),
+    )
+    target_rank = serializers.IntegerField(
+        read_only=True, allow_null=True,
+        help_text="The rank the student says they are aiming for. Null until they say.",
+    )
+    onboarded_at = serializers.DateTimeField(
+        read_only=True, allow_null=True,
+        help_text="When the student first completed onboarding. Null: not yet.",
+    )
 
     class Meta:
         model = Student
         fields = [
             "id", "name", "roll_no", "target", "joined_at", "exited_at",
             "batch", "mentor", "state", "login_status",
+            "daily_minutes", "target_rank", "onboarded_at",
         ]
 
 
@@ -285,7 +303,23 @@ class TopicStateSerializer(serializers.ModelSerializer):
     )
     retention = serializers.FloatField(
         read_only=True, allow_null=True,
-        help_text="Forecast recall probability, 0–1, decayed since `last_revised`.",
+        help_text=(
+            "Forecast probability, 0–1, that the student would recall this "
+            "chapter today — an exponential forgetting curve, "
+            "`exp(-t / S)`. `t` is days since the later of `last_seen` (newest "
+            "attempt) and `last_revised` (newest completed revision). `S`, the "
+            "stability in days, is `10 × 2.5^(completed revision cycles, at "
+            "most 3) × (0.5 + mastery)`, with a null mastery counted as 0.5: "
+            "so a chapter met once at middling mastery falls to 50% in about "
+            "a week, and each completed revision cycle makes it fade 2.5× "
+            "slower. **Null when the chapter was never seen** (no attempt and "
+            "no completed revision; a study log alone does not count). "
+            "Computed as of the last recompute — nightly, and after the "
+            "student's own events — so it is a forecast for that moment, not "
+            "a live clock. Below 0.5 is what `?forgetting=true` returns and "
+            "what the planner treats as worth a revise block. The constants "
+            "are stated priors, not fitted values."
+        ),
     )
     # `accuracy_30d` was here and is **removed from the contract in
     # v0.3**. It is still computed and still stored — the column is an
@@ -879,22 +913,68 @@ class InterventionSerializer(serializers.ModelSerializer):
 
 
 class SubjectBreakdownSerializer(serializers.Serializer):
-    """Time share vs marks-lost share — the neglect chart."""
+    """Time share vs marks-lost share — the neglect chart.
 
-    subject = serializers.CharField()
+    **One row per subject of the student's syllabus, in syllabus order** —
+    not a fixed three. JEE comes back as Physics, Chemistry, Maths exactly as
+    before; NEET as Physics, Chemistry, Botany, Zoology. A subject with no
+    data is a row of zeroes (and a null `accuracy_pct`), never omitted, so
+    the bars do not renumber between students of one batch. A subject the
+    student has history in that their current syllabus lacks is appended
+    after, alphabetically. Render the rows in the order given.
+    """
+
+    subject = serializers.CharField(
+        help_text="The subject's name as the syllabus tree spells it."
+    )
     time_share_pct = serializers.FloatField()
     marks_lost_share_pct = serializers.FloatField()
     accuracy_pct = serializers.FloatField(allow_null=True)
 
 
+class MockScoreSubjectSerializer(serializers.Serializer):
+    subject = serializers.CharField(
+        help_text="The subject's name as the syllabus tree spells it."
+    )
+    marks = serializers.FloatField(
+        help_text="Marks scored in this subject on this paper, after negative marking."
+    )
+
+
 class MockScoreSerializer(serializers.Serializer):
+    """One paper's marks, split by subject.
+
+    `subjects` is **additive** and is the field to read: one entry per
+    subject of the student's syllabus, in syllabus order, present on every
+    row (0 when the paper had none of that subject). `physics`, `chemistry`
+    and `maths` are kept unchanged for clients written before it, and are 0
+    for an exam without that subject — a NEET row has `maths: 0` and its
+    Biology only in `subjects`.
+    """
+
     paper_id = serializers.IntegerField()
     paper_name = serializers.CharField()
     held_on = serializers.DateField()
-    physics = serializers.FloatField()
-    chemistry = serializers.FloatField()
-    maths = serializers.FloatField()
-    total = serializers.FloatField()
+    physics = serializers.FloatField(
+        help_text="Legacy. The Physics entry of `subjects`, or 0."
+    )
+    chemistry = serializers.FloatField(
+        help_text="Legacy. The Chemistry entry of `subjects`, or 0."
+    )
+    maths = serializers.FloatField(
+        help_text="Legacy. The Maths (or Mathematics) entry of `subjects`, or 0 — always 0 for NEET."
+    )
+    total = serializers.FloatField(
+        help_text="The sum of `subjects[].marks` — every subject, not only the legacy three."
+    )
+    subjects = MockScoreSubjectSerializer(
+        many=True,
+        help_text=(
+            "Additive. One entry per subject of the student's syllabus, in "
+            "syllabus order, on every row; a subject the student has marks "
+            "in that their current syllabus lacks is appended after."
+        ),
+    )
 
 
 class MarksLostCauseSerializer(serializers.Serializer):
@@ -1093,7 +1173,10 @@ class TestPaperCreateSerializer(serializers.ModelSerializer):
 
 class BlueprintUploadSerializer(serializers.Serializer):
     file = serializers.FileField(
-        help_text="CSV: question_id, chapter, correct_option (or answer for a numeric question)."
+        help_text=(
+            "CSV or Excel `.xlsx` (first sheet): question_id, chapter, correct_option "
+            "(or answer for a numeric question). Legacy `.xls` is refused with how to re-save it."
+        )
     )
     dry_run = serializers.BooleanField(
         required=False, default=False,
@@ -1104,8 +1187,9 @@ class BlueprintUploadSerializer(serializers.Serializer):
 class ResultsUploadSerializer(serializers.Serializer):
     file = serializers.FileField(
         help_text=(
-            "CSV. Either one row per student with a column per question (`roll_no, "
-            "Q1, Q2, …`), or one row per answer (`roll_no, question_id, answer`)."
+            "CSV or Excel `.xlsx` (first sheet). Either one row per student with a "
+            "column per question (`roll_no, Q1, Q2, …`), or one row per answer "
+            "(`roll_no, question_id, answer`). Legacy `.xls` is refused with how to re-save it."
         )
     )
     paper = serializers.IntegerField(help_text="The `TestPaper.id` the file is the results of.")
@@ -1283,6 +1367,15 @@ class PlanGenerationSerializer(serializers.Serializer):
         )
     )
     blocks = PlanBlockSerializer(many=True)
+    note = serializers.CharField(
+        allow_null=True,
+        help_text=(
+            "One gentle sentence when today's plan is deliberately lighter or "
+            "shorter than usual — written for the student, safe to show as it "
+            "is, and never naming why. Null on an ordinary day (and on an "
+            "empty one). Always present."
+        ),
+    )
 
 
 #: The longest single study log a student may enter. A sanity bound, not a
@@ -1533,6 +1626,17 @@ class DashboardSummarySerializer(serializers.Serializer):
     flags_resolved = serializers.IntegerField()
     recovery_rate_pct = serializers.FloatField(
         allow_null=True, help_text="Share of closed flags whose outcome was 'recovered'."
+    )
+
+    last_refreshed_at = serializers.DateTimeField(
+        allow_null=True,
+        help_text=(
+            "When the nightly refresh (features, revisions, flags, plans) last "
+            "finished successfully for this institute — how fresh the numbers "
+            "on this strip are. Institute-wide even under `?batch=`. Null when "
+            "it has never run, which means everything here comes from manual "
+            "or on-event updates only."
+        ),
     )
 
 

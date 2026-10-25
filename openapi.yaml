@@ -923,6 +923,47 @@ paths:
               schema:
                 $ref: '#/components/schemas/Mentor'
           description: ''
+  /api/misconceptions/:
+    get:
+      operationId: misconceptions_list
+      description: |-
+        The misconception taxonomy, for the tagging screen's picker.
+
+        Global, not tenant-scoped: every institute shares one curated vocabulary,
+        which is what makes a diagnosis comparable across them. Console only —
+        the taxonomy is a description of wrong beliefs, and is not shown to
+        students. Ordered by subject, then code.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: subject
+        schema:
+          type: string
+        description: 'Only misconceptions of this subject — pass `TaggableQuestion.subject`.
+          Spellings of one subject match each other: `Botany` and `Zoology` find `Biology`
+          entries, `Mathematics` finds `Maths`. Blank or omitted: the whole taxonomy.'
+      tags:
+      - misconceptions
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMisconceptionList'
+          description: ''
   /api/my/attempts/:
     get:
       operationId: my_attempts_list
@@ -1045,6 +1086,97 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConfidenceRating'
           description: ''
+  /api/my/guidance/:
+    get:
+      operationId: my_guidance_retrieve
+      description: |-
+        My next actions and my mentor-approved findings.
+
+        `next_actions` are rules over my own data — no model — at most five,
+        ranked by kind (see `NextAction.kind`). `findings` are diagnoses my
+        mentor marked **agreed**, one per paper, reworded for me; a diagnosis
+        nobody has reviewed, or that my mentor disagreed with, never appears.
+
+        Never a 503, and never a wait on the model: a finding shows the
+        rewording the nightly job made, or — until it has — a fixed template
+        (`reworded: false`).
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guidance'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Not a student account.
+  /api/my/guidance/ask/:
+    post:
+      operationId: my_guidance_ask_create
+      description: |-
+        Answer a question about my preparation — not a doubt about a chapter.
+
+        "What should I focus on this week?" and "why is X in my plan?" are
+        answered from my own plan, weakest chapters, due revisions and recent
+        mocks. A request to solve a question or explain a concept is politely
+        declined with a pointer to my teacher; health and wellbeing get a kind
+        pointer to my mentor or a trusted adult and no advice.
+
+        My name, roll number, mentor, institute, and any phone number or email
+        are removed from the question before it leaves the server.
+      tags:
+      - student-app
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AskRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AskRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AskRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AskAnswer'
+          description: ''
+        '400':
+          description: '`question` missing, blank, or over 500 characters. DRF''s
+            field-error shape: `{"question": ["..."]}`.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Not a student account.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Today's questions are used up (`guidance_ask`, about 20 a day).
+            Repeating a question already answered is not counted.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: The guide cannot answer now. `detail` is a sentence for the
+            student, safe to show verbatim.
   /api/my/marks-lost/:
     get:
       operationId: my_marks_lost_retrieve
@@ -1119,6 +1251,94 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedMockScoreList'
+          description: ''
+  /api/my/onboarding/:
+    get:
+      operationId: my_onboarding_retrieve
+      description: |-
+        My onboarding: the exam I am preparing for, and what I can give it.
+
+        `GET` shows what the institute set — exam, exam date, batch, target —
+        alongside my own answers, and `needs_onboarding` while I have not
+        saved them yet. The exam and batch are read-only: they come from my
+        batch, and changing them is the institute's decision.
+
+        `PUT {daily_minutes, target_rank}` saves my answers. `daily_minutes`
+        (45–720) is required; `target_rank` (1 or more) is optional and a PUT
+        replaces it, so leaving it out clears it. The first save sets
+        `onboarded_at`; later saves change the answers but never move it.
+        `daily_minutes` becomes the budget my day plan is built to (see
+        `POST /api/my/plan/generate/`).
+      tags:
+      - student-app
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Onboarding'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Not a student account.
+    put:
+      operationId: my_onboarding_update
+      description: |-
+        My onboarding: the exam I am preparing for, and what I can give it.
+
+        `GET` shows what the institute set — exam, exam date, batch, target —
+        alongside my own answers, and `needs_onboarding` while I have not
+        saved them yet. The exam and batch are read-only: they come from my
+        batch, and changing them is the institute's decision.
+
+        `PUT {daily_minutes, target_rank}` saves my answers. `daily_minutes`
+        (45–720) is required; `target_rank` (1 or more) is optional and a PUT
+        replaces it, so leaving it out clears it. The first save sets
+        `onboarded_at`; later saves change the answers but never move it.
+        `daily_minutes` becomes the budget my day plan is built to (see
+        `POST /api/my/plan/generate/`).
+      tags:
+      - student-app
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OnboardingUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OnboardingUpdateRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Onboarding'
+          description: ''
+        '400':
+          description: '`daily_minutes` missing or outside 45–720, or `target_rank`
+            below 1.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Not a student account.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
           description: ''
   /api/my/plan/:
     get:
@@ -1219,18 +1439,67 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: No such block among this student's own.
+  /api/my/plan/explain/:
+    post:
+      operationId: my_plan_explain_create
+      description: |-
+        Why my plan for a day is what it is, from its blocks' own reasons.
+
+        **Always a 200** for a valid request. When the model is unavailable,
+        or the `plan_explain` budget is spent, `summary` is a fixed summary
+        built from the same reasons and `available` is false. A day with no
+        plan says so, with `available: false`. Cached on the plan's content:
+        ticking a block or asking again costs nothing.
+      tags:
+      - student-app
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanExplainDayRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PlanExplainDayRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PlanExplainDayRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanExplain'
+          description: ''
+        '400':
+          description: '`date` is not a `YYYY-MM-DD` date. DRF''s field-error shape:
+            `{"date": ["..."]}`.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Not a student account.
   /api/my/plan/generate/:
     post:
       operationId: my_plan_generate_create
       description: |-
-        Make my plan for a day — three explicit rules, each block saying which.
+        Make my plan for a day — explicit rules, each block saying which.
 
-        **Rules, not a model.** Overdue revisions first, then my weakest
-        *taught* chapters, then one chapter taught but never attempted; sized
-        to what I actually log on a typical day. Every block's `reason_text`
-        names the rule that chose it, so the plan can be argued with. See
+        **Rules, not a model.** Due revisions first, then chapters I am
+        forecast to be forgetting (at most two revise blocks in all), then my
+        weakest *taught* chapters — a neglected subject's first — then one
+        chapter taught but never attempted. Sized to the minutes a day I gave
+        at onboarding, else to what I actually log, else a default. Every
+        block's `reason_text` names the rule that chose it, so the plan can be
+        argued with; `reason_code` is one of `revision_r1`–`revision_r3`,
+        `low_retention`, `weak_topic`, `subject_balance` or `syllabus`. See
         `apps/derived/services/planner.py` for the rules and for why blocks
         carry no start time.
+
+        Some days are deliberately lighter or shorter; `note` then says so in
+        a sentence safe to show as it is. It is null on an ordinary day.
 
         Idempotent: if a plan already exists it is returned as it stands
         (200). `replace: true` rebuilds it, keeping anything I have ticked.
@@ -1284,7 +1553,8 @@ paths:
 
         `progress` is the student-safe slice of `StudentState` — no
         `risk_score`. See `MyProgressSerializer` for what is withheld and
-        why.
+        why. `needs_onboarding` is true until `PUT /api/my/onboarding/` has
+        been saved once.
       tags:
       - student-app
       security:
@@ -1384,9 +1654,11 @@ paths:
         done_at IS NULL` is what makes that true under two simultaneous
         requests, which a read-then-write would not be.
 
-        Also refreshes my derived state (`revision_debt`, `last_revised`,
-        `retention`) so the screen reflects it straight away; see
-        `refresh_derived_state` for why that cannot fail the request.
+        Also schedules the next cycle at once (R2 a week after R1 is done, R3
+        a month after R2, never past the exam) and refreshes my derived state
+        (`revision_debt`, `last_revised`, `retention`) so the screen reflects
+        it straight away; see `refresh_derived_state` for why neither can
+        fail the request.
       parameters:
       - in: path
         name: id
@@ -1423,6 +1695,9 @@ paths:
         The `topic` must be a chapter of the student's own syllabus
         (`GET /api/my/topics/`), `minutes` is 1–720, and `ts` may be in the past
         but not the future. A mentor posting here is a 403; it used to be a 500.
+
+        The first time a chapter is met, logging it schedules its first revision
+        (R1, the next day) straight away — see `schedule_next_revision`.
       parameters:
       - name: page
         required: false
@@ -1459,6 +1734,9 @@ paths:
         The `topic` must be a chapter of the student's own syllabus
         (`GET /api/my/topics/`), `minutes` is 1–720, and `ts` may be in the past
         but not the future. A mentor posting here is a 403; it used to be a 500.
+
+        The first time a chapter is met, logging it schedules its first revision
+        (R1, the next day) straight away — see `schedule_next_revision`.
       tags:
       - student-app
       requestBody:
@@ -1485,8 +1763,8 @@ paths:
   /api/my/subject-breakdown/:
     get:
       operationId: my_subject_breakdown_list
-      description: Where my study time goes against where my marks go. Three rows,
-        fixed order.
+      description: 'Where my study time goes against where my marks go: one row per
+        subject of my syllabus, in its order.'
       parameters:
       - name: page
         required: false
@@ -1518,8 +1796,17 @@ paths:
         My per-chapter mastery, weakest first.
 
         `mastery` is null below the evidence floor — null is "not enough
-        attempts to say", never zero.
+        attempts to say", never zero. `?forgetting=true` lists the chapters
+        I am forecast to be forgetting, fastest first.
       parameters:
+      - in: query
+        name: forgetting
+        schema:
+          type: boolean
+        description: 'Only chapters whose forecast `retention` is below 0.5, ordered
+          by `retention` ascending — the chapters being forgotten fastest come first.
+          Chapters never seen have a null retention and are excluded. Combines with
+          `weak`. A presence filter: any value other than `true` is ignored.'
       - name: page
         required: false
         in: query
@@ -1783,6 +2070,119 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: ''
+  /api/papers/{id}/questions/:
+    get:
+      operationId: papers_questions_retrieve
+      description: |-
+        A paper's questions for the tagging screen, whole, with progress counts.
+
+        `summary.wrong_options_tagged` against `summary.wrong_options` is how
+        far the paper is from being diagnosable. Only what students actually
+        chose matters to a diagnosis, so a paper does not have to be finished
+        to be useful — but an untagged option a student picked is a wrong
+        answer the diagnosis cannot explain.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      tags:
+      - papers
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaperQuestions'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: No such paper in this institute.
+  /api/papers/{id}/questions/{question_pk}/:
+    patch:
+      operationId: papers_questions_partial_update
+      description: |-
+        Set a question's text and solution, and tag or describe its options.
+
+        Partial: only what is sent changes, and within `options` only the
+        labels named. Every problem is reported at once and nothing is written
+        unless there are none. Allowed on questions students have already
+        answered — a tag changes no one's marks, only what the next diagnosis
+        can say. Returns the question as `GET …/questions/` shows it.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      - in: path
+        name: question_pk
+        schema:
+          type: integer
+        required: true
+      tags:
+      - papers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedQuestionContentUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedQuestionContentUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedQuestionContentUpdateRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaggableQuestion'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: 'Nothing was written. DRF''s validation-error shape: each field
+            maps to a list of sentences. For `options` that is either a list of sentences
+            (a problem with the list as a whole — a numerical question, a label named
+            twice) or a list aligned with the request''s `options`, each entry `{}`
+            or `{field: [sentences]}` — e.g. the correct option given a misconception,
+            a code not in the taxonomy, a code of another subject, or a tag on a question
+            whose key a reviewer found wrong.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: No such paper in this institute, or no such question on it.
   /api/questions/{id}/:
     get:
       operationId: questions_retrieve
@@ -1835,6 +2235,126 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: No such question, or no such student, in this institute.
+  /api/review/disagreements/:
+    get:
+      operationId: review_disagreements_list
+      description: |-
+        The answer-key review queue, oldest paper first, in paper order.
+
+        Every question the cross-check ever disagreed on — reviewed or not —
+        so a decision stays visible after it is made. `?status=unreviewed` is
+        the queue itself.
+      parameters:
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: paper
+        schema:
+          type: integer
+        description: Only questions on this `TestPaper.id`.
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - key_stands
+          - key_wrong
+          - reviewed
+          - unclear
+          - unreviewed
+        description: '`unreviewed`: still `disagreed`, nobody has decided. `reviewed`:
+          any decision. Or one decision. Omitted (or anything else): all of them.'
+      tags:
+      - review
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedKeyDisagreementList'
+          description: ''
+  /api/review/disagreements/{question_pk}/:
+    post:
+      operationId: review_disagreements_create
+      description: |-
+        `key_stands`, `key_wrong` or `unclear`, with an optional note.
+
+        Records who decided and when, moves the question's `verification` out
+        of `disagreed` (to `key_stands`, `key_wrong` or `key_unclear`), and
+        keeps every earlier decision in its history. A later decision
+        replaces this one — an `unclear` can become `key_stands` once an
+        expert has looked. Returns the updated row.
+      parameters:
+      - in: query
+        name: institute
+        schema:
+          type: integer
+        description: 'Superusers only: the institute to scope this call to. Ignored
+          for mentor and student accounts, whose institute comes from the account
+          itself. A superuser who omits it gets an empty result rather than every
+          tenant''s rows.'
+      - in: path
+        name: question_pk
+        schema:
+          type: integer
+        required: true
+      tags:
+      - review
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisagreementReviewRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DisagreementReviewRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DisagreementReviewRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyDisagreement'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: '`decision` missing or not one of the three.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: No such question in this institute, or one the cross-check
+            did not disagree on — the same body either way.
   /api/students/:
     get:
       operationId: students_list
@@ -2603,10 +3123,11 @@ paths:
       description: |-
         Study-time share vs marks-lost share. The neglect chart.
 
-        Always exactly three rows, in the fixed order Physics, Chemistry,
-        Maths — a subject with no data comes back as zeroes rather than
-        being omitted, so the chart's three bars never renumber
-        themselves between students.
+        One row per subject of the student's syllabus, in syllabus order —
+        Physics, Chemistry, Maths for JEE; Physics, Chemistry, Botany,
+        Zoology for NEET. A subject with no data comes back as zeroes
+        rather than being omitted, so the chart's bars never renumber
+        themselves between students of one batch.
 
         `marks_lost_share_pct` is now a share of **marks**, computed by
         `features.marks_lost_by_topic`. It previously counted lost
@@ -2662,8 +3183,17 @@ paths:
 
         Ordered by `mastery` ascending; Postgres sorts NULLs last on an
         ascending sort, so chapters with too little evidence to score sit
-        at the end rather than masquerading as the weakest ones.
+        at the end rather than masquerading as the weakest ones. With
+        `?forgetting=true`, ordered by `retention` ascending instead.
       parameters:
+      - in: query
+        name: forgetting
+        schema:
+          type: boolean
+        description: 'Only chapters whose forecast `retention` is below 0.5, ordered
+          by `retention` ascending — the chapters being forgotten fastest come first.
+          Chapters never seen have a null retention and are excluded. Combines with
+          `weak`. A presence filter: any value other than `true` is ignored.'
       - in: path
         name: id
         schema:
@@ -2710,6 +3240,45 @@ paths:
           description: ''
 components:
   schemas:
+    AnswerTypeEnum:
+      enum:
+      - mcq
+      - numerical
+      type: string
+      description: |-
+        * `mcq` - Multiple choice
+        * `numerical` - Numerical value
+    AskAnswer:
+      type: object
+      properties:
+        answer:
+          type: string
+          description: At most about 120 words, safe to show verbatim.
+        available:
+          type: boolean
+          description: Always true on a 200. When no answer can be given the response
+            is a 503.
+        from_cache:
+          type: boolean
+          description: True if this exact question over the same data was answered
+            before.
+      required:
+      - answer
+      - available
+      - from_cache
+    AskRequest:
+      type: object
+      properties:
+        question:
+          type: string
+          minLength: 1
+          description: A preparation question, at most 500 characters — 'what should
+            I focus on this week?', 'why is Thermodynamics in my plan?'. Names, roll
+            numbers, the mentor's and institute's names, phone numbers and emails
+            are removed before it is sent anywhere.
+          maxLength: 500
+      required:
+      - question
     Attempt:
       type: object
       properties:
@@ -2824,8 +3393,9 @@ components:
         file:
           type: string
           format: binary
-          description: 'CSV: question_id, chapter, correct_option (or answer for a
-            numeric question).'
+          description: 'CSV or Excel `.xlsx` (first sheet): question_id, chapter,
+            correct_option (or answer for a numeric question). Legacy `.xls` is refused
+            with how to re-save it.'
         dry_run:
           type: boolean
           default: false
@@ -3062,6 +3632,15 @@ components:
           format: double
           nullable: true
           description: Share of closed flags whose outcome was 'recovered'.
+        last_refreshed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the nightly refresh (features, revisions, flags, plans)
+            last finished successfully for this institute — how fresh the numbers
+            on this strip are. Institute-wide even under `?batch=`. Null when it has
+            never run, which means everything here comes from manual or on-event updates
+            only.
       required:
       - active_students
       - avg_revision_debt
@@ -3071,6 +3650,7 @@ components:
       - critical_flags
       - flagged_this_week
       - flags_resolved
+      - last_refreshed_at
       - latest_paper_held_on
       - latest_paper_id
       - latest_paper_max_marks
@@ -3336,6 +3916,168 @@ components:
         * `easy` - Easy
         * `medium` - Medium
         * `hard` - Hard
+    DisagreementOption:
+      type: object
+      properties:
+        label:
+          type: string
+        text:
+          type: string
+        is_correct:
+          type: boolean
+          description: Correct according to the official key.
+      required:
+      - is_correct
+      - label
+      - text
+    DisagreementReviewRequest:
+      type: object
+      properties:
+        decision:
+          allOf:
+          - $ref: '#/components/schemas/KeyReviewDecisionEnum'
+          description: |-
+            `key_stands`: the official key is right (the key becomes trusted). `key_wrong`: the key as stored is wrong — usually a misread question (the key becomes untrusted and its options cannot be tagged). `unclear`: needs a subject expert (still untrusted, no longer unreviewed).
+
+            * `key_stands` - The official key stands
+            * `key_wrong` - The key as stored is wrong
+            * `unclear` - Unclear — needs a subject expert
+        note:
+          type: string
+          default: ''
+          description: Why. Kept with the decision and in its history.
+          maxLength: 2000
+      required:
+      - decision
+    DraftMisconception:
+      type: object
+      description: A proposed misconception for one option. **Not a tag** — diagnosis
+        ignores it.
+      properties:
+        code:
+          type: string
+          description: The code proposed — an existing taxonomy code, or a new one
+            the model invented. Blank for a proposal made in the console, which names
+            a belief rather than a code.
+        name:
+          type: string
+        description:
+          type: string
+          description: The wrong belief, in the student's voice.
+        is_new:
+          type: boolean
+          description: True when the proposal is not (yet) in the taxonomy.
+        proposed_by:
+          $ref: '#/components/schemas/ProposedByEnum'
+        status:
+          allOf:
+          - $ref: '#/components/schemas/DraftMisconceptionStatusEnum'
+          description: |-
+            `draft` until a person tags the option; then `accepted` if they used this draft's code, `superseded` if they chose another.
+
+            * `draft` - Proposed, not yet acted on
+            * `accepted` - A person tagged the option with this code
+            * `superseded` - A person tagged the option with a different code
+      required:
+      - code
+      - description
+      - is_new
+      - name
+      - proposed_by
+      - status
+    DraftMisconceptionProposalRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: A short name for the belief.
+          maxLength: 120
+        description:
+          type: string
+          minLength: 1
+          description: The wrong belief, stated as the student would hold it.
+          maxLength: 2000
+      required:
+      - description
+      - name
+    DraftMisconceptionStatusEnum:
+      enum:
+      - draft
+      - accepted
+      - superseded
+      type: string
+      description: |-
+        * `draft` - Proposed, not yet acted on
+        * `accepted` - A person tagged the option with this code
+        * `superseded` - A person tagged the option with a different code
+    Finding:
+      type: object
+      description: |-
+        A diagnosis the student's mentor agreed with, in the student's words.
+
+        **Only `agreed` diagnoses appear.** Unreviewed and disagreed ones never
+        reach the student app. No misconception code, risk score or flag is
+        included; the wording is the model's rewording of the approved finding
+        (`reworded: true`) or a fixed template built from it when the model is
+        unavailable (`reworded: false`).
+      properties:
+        paper_id:
+          type: integer
+          nullable: true
+          description: The paper this finding is about — the `paper_id` of `GET /api/my/mock-scores/`.
+            Null when the diagnosis spanned every paper the student had sat, or its
+            paper no longer exists.
+        paper_name:
+          type: string
+          nullable: true
+          description: Null when the finding spans several papers.
+        title:
+          type: string
+          description: Plain words, encouraging, at most about 12 words.
+        explanation:
+          type: string
+          description: Two or three sentences, addressed to 'you'.
+        what_to_do:
+          type: string
+          description: One concrete next step the student can take.
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/FindingQuestion'
+          description: The questions the finding rests on, in the order cited.
+        approved_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the mentor agreed. Null only for an agreement recorded
+            before the time was kept.
+        reworded:
+          type: boolean
+          description: True if the wording is the model's rewording for students;
+            false if it is the fixed template, used while the model is unavailable.
+      required:
+      - approved_at
+      - explanation
+      - paper_id
+      - paper_name
+      - questions
+      - reworded
+      - title
+      - what_to_do
+    FindingQuestion:
+      type: object
+      properties:
+        question_pk:
+          type: integer
+          description: Opens with `GET /api/my/questions/{id}/`. Only questions this
+            student answered are ever listed, so the link always opens.
+        label:
+          type: string
+          description: The question as the paper prints it, e.g. `"Q16"`.
+      required:
+      - label
+      - question_pk
     Flag:
       type: object
       description: |-
@@ -3470,6 +4212,41 @@ components:
           description: Optional. If given, also logged as an Intervention.
       required:
       - outcome
+    Guidance:
+      type: object
+      properties:
+        next_actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/NextAction'
+          description: At most five, most useful first. Empty is a real answer.
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Finding'
+          description: One per paper, newest approval first. Empty until a mentor
+            agrees.
+      required:
+      - findings
+      - next_actions
+    GuidanceActionKindEnum:
+      enum:
+      - start_plan
+      - make_plan
+      - revisions_due
+      - mock_recoverable
+      - weak_chapter
+      - log_study
+      - rate_confidence
+      type: string
+      description: |-
+        * `start_plan` - Today's plan is ready and not started
+        * `make_plan` - No plan for today yet
+        * `revisions_due` - Revisions due or overdue
+        * `mock_recoverable` - Marks on the latest mock that needed no new learning
+        * `weak_chapter` - The weakest measured chapter
+        * `log_study` - No study logged recently
+        * `rate_confidence` - Weak chapters with no confidence rating
     HumanVerdictEnum:
       enum:
       - agreed
@@ -3607,6 +4384,130 @@ components:
       - action
       - flag
       - mentor
+    KeyDisagreement:
+      type: object
+      description: One question where the factory's blind answer and the official
+        key differ.
+      properties:
+        id:
+          type: integer
+          description: '`QuestionTopicMap.id` — the `question_pk` the review POST
+            takes.'
+        paper_id:
+          type: integer
+        paper_name:
+          type: string
+        label:
+          type: string
+        subject:
+          type: string
+          nullable: true
+        answer_type:
+          $ref: '#/components/schemas/AnswerTypeEnum'
+        question_text:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisagreementOption'
+        official_answer:
+          type: string
+          description: 'NTA''s key, mapped to this paper''s labels: `2`, `1,2`, `225`.'
+        model_answer:
+          type: string
+          description: What the model got solving blind. Never the answer.
+        has_diagram:
+          type: boolean
+        verification:
+          description: |-
+            Trust in this question's answer key. `agreed`: the factory's blind solve matched the official key. `disagreed`: it did not, and nobody has reviewed it. `key_stands` / `key_wrong` / `key_unclear`: a person's decision on a disagreement. `unverifiable`: could not be checked. Blank: never cross-checked — an institute's own or a demo paper, whose key is its author's. Trusted keys: blank, `agreed`, `key_stands`.
+
+            * `` - Not cross-checked
+            * `agreed` - Model agreed with the official key
+            * `disagreed` - Model disagreed — needs a person
+            * `unverifiable` - Could not be checked (e.g. unreadable figure)
+            * `key_stands` - Model disagreed; a person confirmed the key
+            * `key_wrong` - Model disagreed; a person found the key wrong
+            * `key_unclear` - Model disagreed; a person could not settle it
+          oneOf:
+          - $ref: '#/components/schemas/VerificationEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        detail_summary:
+          type: string
+          description: '`verification_detail` in one paragraph: the model''s answer
+            and confidence, its note, transcription issues, and the factory agent''s
+            first look — labelled as not a human review.'
+        model_working:
+          type: string
+          description: The model's blind working, truncated to 1,500 characters.
+        review:
+          $ref: '#/components/schemas/KeyReview'
+      required:
+      - answer_type
+      - detail_summary
+      - has_diagram
+      - id
+      - label
+      - model_answer
+      - model_working
+      - official_answer
+      - options
+      - paper_id
+      - paper_name
+      - question_text
+      - review
+      - subject
+      - verification
+    KeyReview:
+      type: object
+      properties:
+        status:
+          allOf:
+          - $ref: '#/components/schemas/KeyReviewStatusEnum'
+          description: |-
+            `unreviewed`, or the latest decision.
+
+            * `unreviewed` - Not reviewed yet
+            * `key_stands` - The official key stands
+            * `key_wrong` - The key as stored is wrong
+            * `unclear` - Unclear — needs a subject expert
+        note:
+          type: string
+        reviewed_by:
+          type: string
+          nullable: true
+          description: Who made the latest decision (their username). Null if nobody.
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - note
+      - reviewed_at
+      - reviewed_by
+      - status
+    KeyReviewDecisionEnum:
+      enum:
+      - key_stands
+      - key_wrong
+      - unclear
+      type: string
+      description: |-
+        * `key_stands` - The official key stands
+        * `key_wrong` - The key as stored is wrong
+        * `unclear` - Unclear — needs a subject expert
+    KeyReviewStatusEnum:
+      enum:
+      - unreviewed
+      - key_stands
+      - key_wrong
+      - unclear
+      type: string
+      description: |-
+        * `unreviewed` - Not reviewed yet
+        * `key_stands` - The official key stands
+        * `key_wrong` - The key as stored is wrong
+        * `unclear` - Unclear — needs a subject expert
     KindEnum:
       enum:
       - subject
@@ -3933,8 +4834,27 @@ components:
       - description
       - name
       - subject
+    MisconceptionRef:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+      required:
+      - code
+      - name
     MockScore:
       type: object
+      description: |-
+        One paper's marks, split by subject.
+
+        `subjects` is **additive** and is the field to read: one entry per
+        subject of the student's syllabus, in syllabus order, present on every
+        row (0 when the paper had none of that subject). `physics`, `chemistry`
+        and `maths` are kept unchanged for clients written before it, and are 0
+        for an exam without that subject — a NEET row has `maths: 0` and its
+        Biology only in `subjects`.
       properties:
         paper_id:
           type: integer
@@ -3946,15 +4866,28 @@ components:
         physics:
           type: number
           format: double
+          description: Legacy. The Physics entry of `subjects`, or 0.
         chemistry:
           type: number
           format: double
+          description: Legacy. The Chemistry entry of `subjects`, or 0.
         maths:
           type: number
           format: double
+          description: Legacy. The Maths (or Mathematics) entry of `subjects`, or
+            0 — always 0 for NEET.
         total:
           type: number
           format: double
+          description: The sum of `subjects[].marks` — every subject, not only the
+            legacy three.
+        subjects:
+          type: array
+          items:
+            $ref: '#/components/schemas/MockScoreSubject'
+          description: Additive. One entry per subject of the student's syllabus,
+            in syllabus order, on every row; a subject the student has marks in that
+            their current syllabus lacks is appended after.
       required:
       - chemistry
       - held_on
@@ -3962,7 +4895,22 @@ components:
       - paper_id
       - paper_name
       - physics
+      - subjects
       - total
+    MockScoreSubject:
+      type: object
+      properties:
+        subject:
+          type: string
+          description: The subject's name as the syllabus tree spells it.
+        marks:
+          type: number
+          format: double
+          description: Marks scored in this subject on this paper, after negative
+            marking.
+      required:
+      - marks
+      - subject
     ModeEnum:
       enum:
       - learn
@@ -4058,12 +5006,18 @@ components:
           - $ref: '#/components/schemas/MyProgress'
           readOnly: true
           nullable: true
+        needs_onboarding:
+          type: boolean
+          readOnly: true
+          description: True until the student has saved `/api/my/onboarding/` once.
+            The student app shows onboarding first while this is true.
       required:
       - batch
       - id
       - joined_at
       - mentor_name
       - name
+      - needs_onboarding
       - progress
       - roll_no
     MyProgress:
@@ -4315,9 +5269,178 @@ components:
       - ncert_ref
       - subject
       - unit
+    NextAction:
+      type: object
+      description: |-
+        One thing to do next, worked out by rules from the student's own data.
+
+        No model is involved, and nothing here is a label about the student:
+        every `title` and `detail` is an action and the fact behind it.
+      properties:
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/GuidanceActionKindEnum'
+          description: |-
+            Which rule produced this. The list is ranked by kind, in the order the enum lists them: `start_plan`/`make_plan`, `revisions_due`, `mock_recoverable`, `weak_chapter`, `log_study`, `rate_confidence`. At most one of each.
+
+            * `start_plan` - Today's plan is ready and not started
+            * `make_plan` - No plan for today yet
+            * `revisions_due` - Revisions due or overdue
+            * `mock_recoverable` - Marks on the latest mock that needed no new learning
+            * `weak_chapter` - The weakest measured chapter
+            * `log_study` - No study logged recently
+            * `rate_confidence` - Weak chapters with no confidence rating
+        title:
+          type: string
+          description: One line, safe to show verbatim.
+        detail:
+          type: string
+          description: 'One or two sentences: the fact behind the action.'
+        target:
+          oneOf:
+          - type: string
+            enum:
+            - plan
+            - revisions
+            - topics
+            - study-log
+            - confidence
+            description: 'A screen of the student app: `plan`, `revisions`, `topics`
+              (chapter mastery), `study-log`, or `confidence`.'
+          - type: object
+            properties:
+              mock:
+                type: integer
+                description: A `paper_id` this student sat — what `GET /api/my/marks-lost/?paper=`
+                  takes.
+            required:
+            - mock
+          description: 'Where tapping this should go. A screen name, or `{"mock":
+            paper_id}`.'
+      required:
+      - detail
+      - kind
+      - target
+      - title
     NullEnum:
       enum:
       - null
+    Onboarding:
+      type: object
+      description: |-
+        What onboarding shows and stores — read model for `/api/my/onboarding/`.
+
+        The exam, its date and the batch are the institute's decisions, read off
+        the student's batch and shown for confirmation only: a student cannot
+        move themselves to another exam or batch here. What the student owns is
+        how long they can study a day and the rank they are aiming for.
+      properties:
+        exam_code:
+          type: string
+          readOnly: true
+          description: The batch's exam, e.g. `JEE_MAIN`. Read-only.
+        exam_name:
+          type: string
+          readOnly: true
+          description: Display name of the exam. Read-only.
+        exam_date:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+          description: The day the batch sits the exam. Null when the institute has
+            not set it. Read-only.
+        batch_name:
+          type: string
+          readOnly: true
+          description: The batch the institute placed the student in. Read-only.
+        target:
+          type: string
+          readOnly: true
+          description: The free-text target the institute recorded ("AIR < 5000"),
+            or an empty string. Read-only here; `target_rank` is the student's own
+            number.
+        target_rank:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: The rank the student is aiming for (1 or more). Null until
+            they say.
+        daily_minutes:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Minutes a day the student says they can study, 45–720. Null
+            until onboarding. The day planner uses it before the median of what they
+            log, clamped to its 90–360 minute budget.
+        onboarded_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: When onboarding was first saved. Set once; later edits do not
+            move it.
+        needs_onboarding:
+          type: boolean
+          readOnly: true
+          description: True until onboarding has been saved once (`onboarded_at` is
+            null).
+      required:
+      - batch_name
+      - daily_minutes
+      - exam_code
+      - exam_date
+      - exam_name
+      - needs_onboarding
+      - onboarded_at
+      - target
+      - target_rank
+    OnboardingUpdateRequest:
+      type: object
+      description: The body of `PUT /api/my/onboarding/`. A PUT replaces both fields.
+      properties:
+        daily_minutes:
+          type: integer
+          maximum: 720
+          minimum: 45
+          description: Required. Minutes a day you can study, 45–720.
+        target_rank:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 'The rank you are aiming for, 1 or more. Optional: omitting
+            it or sending null clears it, because a PUT replaces the whole answer.'
+      required:
+      - daily_minutes
+    OptionContentUpdateRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          minLength: 1
+          description: 'Which option: `A`, or `1` on an official paper.'
+          maxLength: 2
+        text:
+          type: string
+          description: The option's text. Omit to leave it unchanged.
+          maxLength: 500
+        misconception_code:
+          type: string
+          nullable: true
+          description: Tag this wrong option with a taxonomy code (`GET /api/misconceptions/`).
+            Null or blank removes the tag; omit to leave it unchanged. Refused on
+            the correct option, for a code not in the taxonomy, and for a code of
+            another subject.
+          maxLength: 32
+        draft_misconception:
+          allOf:
+          - $ref: '#/components/schemas/DraftMisconceptionProposalRequest'
+          nullable: true
+          description: Propose a belief the taxonomy lacks. Stored as a draft that
+            counts for nothing until a person adds it to the taxonomy and tags the
+            option with it. Null clears the option's draft; omit to leave it.
+      required:
+      - label
     PaginatedAttemptList:
       type: object
       required:
@@ -4479,6 +5602,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Intervention'
+    PaginatedKeyDisagreementList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyDisagreement'
     PaginatedMentorList:
       type: object
       required:
@@ -4502,6 +5648,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Mentor'
+    PaginatedMisconceptionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Misconception'
     PaginatedMockScoreList:
       type: object
       required:
@@ -4732,6 +5901,62 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TopicState'
+    PaperQuestions:
+      type: object
+      description: |-
+        A paper's questions, whole, with how far through tagging it is.
+
+        Not paginated, on purpose: it is bounded by one paper (a paper has at most
+        300 questions; NEET's is 180), and a tagging screen that showed one page
+        beside counts for the whole paper would misreport its own progress.
+      properties:
+        paper_id:
+          type: integer
+        paper_name:
+          type: string
+        paper_source:
+          $ref: '#/components/schemas/PaperSourceEnum'
+        held_on:
+          type: string
+          format: date
+        summary:
+          $ref: '#/components/schemas/PaperQuestionsSummary'
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaggableQuestion'
+      required:
+      - held_on
+      - paper_id
+      - paper_name
+      - paper_source
+      - questions
+      - summary
+    PaperQuestionsSummary:
+      type: object
+      properties:
+        questions:
+          type: integer
+        with_text:
+          type: integer
+          description: Questions whose stem has been written.
+        wrong_options:
+          type: integer
+          description: Wrong options across the paper — every one a diagnosis could
+            use.
+        wrong_options_tagged:
+          type: integer
+          description: Wrong options carrying a confirmed misconception. A paper is
+            diagnosable once the options its students actually chose are tagged.
+        wrong_options_with_draft:
+          type: integer
+          description: Untagged wrong options with a pending proposal to act on.
+      required:
+      - questions
+      - with_text
+      - wrong_options
+      - wrong_options_tagged
+      - wrong_options_with_draft
     PaperSourceEnum:
       enum:
       - official_pyq
@@ -4764,6 +5989,22 @@ components:
       required:
       - current_password
       - new_password
+    PatchedQuestionContentUpdateRequest:
+      type: object
+      description: Every field optional; only what is sent changes. All or nothing.
+      properties:
+        question_text:
+          type: string
+          maxLength: 10000
+        solution:
+          type: string
+          maxLength: 20000
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/OptionContentUpdateRequest'
+          description: Only the options named here change; the rest are left as they
+            are.
     PlanBlock:
       type: object
       properties:
@@ -4808,6 +6049,36 @@ components:
       - start_time
       - subject
       - topic_name
+    PlanExplain:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        summary:
+          type: string
+          description: Two or three sentences, built from the blocks' own reasons.
+        available:
+          type: boolean
+          description: True if `summary` was written by the model. False means it
+            is the fixed summary — because the model is unavailable, the budget is
+            spent, or there is no plan for the day. Never an error.
+        from_cache:
+          type: boolean
+          description: True if this exact plan was explained before and the answer
+            replayed.
+      required:
+      - available
+      - date
+      - from_cache
+      - summary
+    PlanExplainDayRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: The day whose plan to explain, `YYYY-MM-DD`. Defaults to today.
     PlanGenerateRequestRequest:
       type: object
       properties:
@@ -4837,10 +6108,26 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PlanBlock'
+        note:
+          type: string
+          nullable: true
+          description: One gentle sentence when today's plan is deliberately lighter
+            or shorter than usual — written for the student, safe to show as it is,
+            and never naming why. Null on an ordinary day (and on an empty one). Always
+            present.
       required:
       - blocks
       - date
       - generated
+      - note
+    ProposedByEnum:
+      enum:
+      - model
+      - console
+      type: string
+      description: |-
+        * `model` - The question factory's tagger
+        * `console` - A person, in the console
     QuestionDetail:
       type: object
       description: |-
@@ -5096,9 +6383,10 @@ components:
         file:
           type: string
           format: binary
-          description: CSV. Either one row per student with a column per question
-            (`roll_no, Q1, Q2, …`), or one row per answer (`roll_no, question_id,
-            answer`).
+          description: CSV or Excel `.xlsx` (first sheet). Either one row per student
+            with a column per question (`roll_no, Q1, Q2, …`), or one row per answer
+            (`roll_no, question_id, answer`). Legacy `.xls` is refused with how to
+            re-save it.
         paper:
           type: integer
           description: The `TestPaper.id` the file is the results of.
@@ -5248,15 +6536,36 @@ components:
           allOf:
           - $ref: '#/components/schemas/LoginStatusEnum'
           readOnly: true
+        daily_minutes:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Minutes a day the student says they can study (45–720). Null
+            until they onboard. The day planner uses it first.
+        target_rank:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: The rank the student says they are aiming for. Null until they
+            say.
+        onboarded_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: 'When the student first completed onboarding. Null: not yet.'
       required:
       - batch
+      - daily_minutes
       - id
       - joined_at
       - login_status
       - mentor
       - name
+      - onboarded_at
       - roll_no
       - state
+      - target_rank
     StudentList:
       type: object
       description: |-
@@ -5481,10 +6790,20 @@ components:
       - ts
     SubjectBreakdown:
       type: object
-      description: Time share vs marks-lost share — the neglect chart.
+      description: |-
+        Time share vs marks-lost share — the neglect chart.
+
+        **One row per subject of the student's syllabus, in syllabus order** —
+        not a fixed three. JEE comes back as Physics, Chemistry, Maths exactly as
+        before; NEET as Physics, Chemistry, Botany, Zoology. A subject with no
+        data is a row of zeroes (and a null `accuracy_pct`), never omitted, so
+        the bars do not renumber between students of one batch. A subject the
+        student has history in that their current syllabus lacks is appended
+        after, alphabetically. Render the rows in the order given.
       properties:
         subject:
           type: string
+          description: The subject's name as the syllabus tree spells it.
         time_share_pct:
           type: number
           format: double
@@ -5500,6 +6819,114 @@ components:
       - marks_lost_share_pct
       - subject
       - time_share_pct
+    TaggableOption:
+      type: object
+      properties:
+        label:
+          type: string
+        text:
+          type: string
+          description: Blank on a blueprint paper until someone types it.
+        is_correct:
+          type: boolean
+        misconception:
+          allOf:
+          - $ref: '#/components/schemas/MisconceptionRef'
+          nullable: true
+          description: The confirmed tag — what diagnosis reads. Always null on a
+            correct option; null on a wrong option nobody has described yet.
+        draft_misconception:
+          allOf:
+          - $ref: '#/components/schemas/DraftMisconception'
+          nullable: true
+          description: A proposal awaiting a person, or its resolved record. Null
+            if none.
+      required:
+      - draft_misconception
+      - is_correct
+      - label
+      - misconception
+      - text
+    TaggableQuestion:
+      type: object
+      description: One question as the tagging screen edits it.
+      properties:
+        id:
+          type: integer
+          description: '`QuestionTopicMap.id` — the `question_pk` the PATCH route
+            takes.'
+        label:
+          type: string
+          description: 'As the paper prints it: `Q14`, `D16`.'
+        topic:
+          type: string
+          nullable: true
+          description: Chapter name. Null if unmapped.
+        topic_id:
+          type: integer
+          nullable: true
+        subject:
+          type: string
+          nullable: true
+          description: The question's subject — its chapter's root in the syllabus
+            tree. Pass it to `GET /api/misconceptions/?subject=` to offer only the
+            misconceptions a tag may use. Null when nothing places the question.
+        answer_type:
+          $ref: '#/components/schemas/AnswerTypeEnum'
+        correct_option:
+          type: string
+          nullable: true
+          description: Label of the correct option; comma-joined when the official
+            key accepts more than one (`1,2`). Null for a numerical-value question.
+        official_answer:
+          type: string
+          description: The key as stored — the number, for a numerical question.
+        question_text:
+          type: string
+        solution:
+          type: string
+        difficulty:
+          oneOf:
+          - $ref: '#/components/schemas/DifficultyEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        verification:
+          description: |-
+            Trust in this question's answer key. `agreed`: the factory's blind solve matched the official key. `disagreed`: it did not, and nobody has reviewed it. `key_stands` / `key_wrong` / `key_unclear`: a person's decision on a disagreement. `unverifiable`: could not be checked. Blank: never cross-checked — an institute's own or a demo paper, whose key is its author's. Trusted keys: blank, `agreed`, `key_stands`.
+
+            * `` - Not cross-checked
+            * `agreed` - Model agreed with the official key
+            * `disagreed` - Model disagreed — needs a person
+            * `unverifiable` - Could not be checked (e.g. unreadable figure)
+            * `key_stands` - Model disagreed; a person confirmed the key
+            * `key_wrong` - Model disagreed; a person found the key wrong
+            * `key_unclear` - Model disagreed; a person could not settle it
+          oneOf:
+          - $ref: '#/components/schemas/VerificationEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        has_answers:
+          type: boolean
+          description: 'Students have answers recorded here. Informational: tags and
+            text may still be edited, because they change no one''s marks.'
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaggableOption'
+          description: In label order. Empty for a numerical-value question.
+      required:
+      - answer_type
+      - correct_option
+      - difficulty
+      - has_answers
+      - id
+      - label
+      - official_answer
+      - options
+      - question_text
+      - solution
+      - subject
+      - topic
+      - topic_id
+      - verification
     TestPaper:
       type: object
       properties:
@@ -5649,7 +7076,19 @@ components:
           format: double
           readOnly: true
           nullable: true
-          description: Forecast recall probability, 0–1, decayed since `last_revised`.
+          description: 'Forecast probability, 0–1, that the student would recall this
+            chapter today — an exponential forgetting curve, `exp(-t / S)`. `t` is
+            days since the later of `last_seen` (newest attempt) and `last_revised`
+            (newest completed revision). `S`, the stability in days, is `10 × 2.5^(completed
+            revision cycles, at most 3) × (0.5 + mastery)`, with a null mastery counted
+            as 0.5: so a chapter met once at middling mastery falls to 50% in about
+            a week, and each completed revision cycle makes it fade 2.5× slower. **Null
+            when the chapter was never seen** (no attempt and no completed revision;
+            a study log alone does not count). Computed as of the last recompute —
+            nightly, and after the student''s own events — so it is a forecast for
+            that moment, not a live clock. Below 0.5 is what `?forgetting=true` returns
+            and what the planner treats as worth a revise block. The constants are
+            stated priors, not fitted values.'
         attempts_n:
           type: integer
           maximum: 2147483647
@@ -5702,6 +7141,23 @@ components:
       description: |-
         * `agreed` - agreed
         * `disagreed` - disagreed
+    VerificationEnum:
+      enum:
+      - agreed
+      - disagreed
+      - unverifiable
+      - key_stands
+      - key_wrong
+      - key_unclear
+      type: string
+      description: |-
+        * `` - Not cross-checked
+        * `agreed` - Model agreed with the official key
+        * `disagreed` - Model disagreed — needs a person
+        * `unverifiable` - Could not be checked (e.g. unreadable figure)
+        * `key_stands` - Model disagreed; a person confirmed the key
+        * `key_wrong` - Model disagreed; a person found the key wrong
+        * `key_unclear` - Model disagreed; a person could not settle it
   securitySchemes:
     cookieAuth:
       type: apiKey

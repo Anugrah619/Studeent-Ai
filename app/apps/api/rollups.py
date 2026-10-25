@@ -29,10 +29,32 @@ from apps.derived.services import features
 from apps.events.models import Attempt, ConfidenceRating, RevisionEvent, StudyLog
 from apps.events.services import mock_analysis
 from apps.ingestion.models import QuestionTopicMap
+from apps.syllabus.services import subject_order, subjects_for_student
+from apps.tenancy.models import Student
 
 from . import serializers as ser
 
-SUBJECTS = ["Physics", "Chemistry", "Maths"]
+#: The three per-subject keys `MockScore` carried before it learned the
+#: syllabus, kept so no client that reads them breaks. Keyed by the subject
+#: name lower-cased: JEE's official tree says "Mathematics" where the demo
+#: tree says "Maths", and both are the `maths` column.
+LEGACY_SUBJECT_KEYS = {
+    "physics": "physics",
+    "chemistry": "chemistry",
+    "maths": "maths",
+    "mathematics": "maths",
+}
+
+
+def _student(institute_id: int | None, student_id: int) -> Student | None:
+    """The student these rows are about, or None — never someone else's."""
+    if institute_id is None:
+        return None
+    return (
+        Student.objects.select_related("batch__syllabus")
+        .filter(pk=student_id, institute_id=institute_id)
+        .first()
+    )
 
 
 def day_param(request, name: str = "date") -> dt.date:
@@ -88,44 +110,74 @@ def mock_score_rows(institute_id: int | None, student_id: int) -> list[dict]:
 
     **Ordered by `held_on` ascending** — the payload is chart-ready in the
     order given, left to right.
+
+    `subjects` is one entry per subject of the student's own syllabus, in
+    syllabus order, on every row (0 where the paper had none of it) — so a
+    NEET student's Botany and Zoology are on the chart, and a JEE student's
+    payload has exactly the three subjects it always had. `total` is the sum
+    of `subjects`. The legacy `physics` / `chemistry` / `maths` keys are the
+    same numbers for clients that predate `subjects`, and 0 for an exam that
+    has no such subject.
     """
+    student = _student(institute_id, student_id)
+    if student is None:
+        return []
     rows = (
         Attempt.objects.filter(student_id=student_id, institute_id=institute_id,
                                test_paper__isnull=False)
-        .select_related("test_paper", "topic__parent__parent")
         .values("test_paper_id", "test_paper__name", "test_paper__held_on",
                 "topic__parent__parent__name")
         .annotate(marks=Sum("marks"))
     )
     papers: dict[int, dict] = {}
+    marks: dict[int, dict[str, float]] = {}
     for r in rows:
-        p = papers.setdefault(r["test_paper_id"], {
+        papers.setdefault(r["test_paper_id"], {
             "paper_id": r["test_paper_id"],
             "paper_name": r["test_paper__name"],
             "held_on": r["test_paper__held_on"],
-            "physics": 0.0, "chemistry": 0.0, "maths": 0.0, "total": 0.0,
         })
-        subject = (r["topic__parent__parent__name"] or "").lower()
-        if subject in ("physics", "chemistry", "maths"):
-            p[subject] = round(r["marks"] or 0, 1)
-        p["total"] = round(p["physics"] + p["chemistry"] + p["maths"], 1)
+        subject = r["topic__parent__parent__name"]
+        if subject:
+            by = marks.setdefault(r["test_paper_id"], {})
+            by[subject] = by.get(subject, 0.0) + (r["marks"] or 0)
+
+    order = subject_order(
+        subjects_for_student(student), (s for by in marks.values() for s in by)
+    )
+    for paper_id, p in papers.items():
+        by = marks.get(paper_id, {})
+        # Rounded per subject first, then summed — so `total` is exactly the
+        # sum of the numbers a reader sees, as it always was.
+        p["subjects"] = [{"subject": s, "marks": round(by.get(s, 0.0), 1)} for s in order]
+        legacy = {"physics": 0.0, "chemistry": 0.0, "maths": 0.0}
+        for row in p["subjects"]:
+            key = LEGACY_SUBJECT_KEYS.get(row["subject"].lower())
+            if key:
+                legacy[key] = round(legacy[key] + row["marks"], 1)
+        p.update(legacy)
+        p["total"] = round(sum(row["marks"] for row in p["subjects"]), 1)
     return sorted(papers.values(), key=lambda x: x["held_on"])
 
 
 def subject_breakdown_rows(institute_id: int | None, student_id: int) -> list[dict]:
     """Study-time share vs marks-lost share. The neglect chart.
 
-    Always exactly three rows, in the fixed order Physics, Chemistry,
-    Maths — a subject with no data comes back as zeroes rather than being
-    omitted, so the chart's three bars never renumber themselves between
-    students.
+    One row per subject of the student's own syllabus, in syllabus order —
+    Physics, Chemistry, Maths for JEE; Physics, Chemistry, Botany, Zoology
+    for NEET. A subject with no data comes back as zeroes rather than being
+    omitted, so the chart's bars never renumber themselves between students
+    of the same batch. (A subject the student has data in that their current
+    syllabus lacks — after a change of batch — is appended, alphabetically,
+    rather than silently left out of the shares.)
 
     `marks_lost_share_pct` is a share of **marks**, computed by
     `features.marks_lost_by_topic` — the same function the
     `subject_imbalance` detector reads, so the flag and this chart cannot
     disagree.
     """
-    if institute_id is None:
+    student = _student(institute_id, student_id)
+    if student is None:
         return []
 
     subjects = features.subject_map(institute_id)
@@ -152,6 +204,9 @@ def subject_breakdown_rows(institute_id: int | None, student_id: int) -> list[di
 
     t_tot = sum(time_by.values()) or 1
     l_tot = sum(lost_by.values()) or 1
+    order = subject_order(
+        subjects_for_student(student), [*time_by, *lost_by, *att_by]
+    )
     return [
         {
             "subject": s,
@@ -159,7 +214,7 @@ def subject_breakdown_rows(institute_id: int | None, student_id: int) -> list[di
             "marks_lost_share_pct": round(lost_by.get(s, 0) / l_tot * 100, 1),
             "accuracy_pct": round(cor_by.get(s, 0) / att_by[s] * 100, 1) if att_by.get(s) else None,
         }
-        for s in SUBJECTS
+        for s in order
     ]
 
 

@@ -186,12 +186,24 @@ def test_decay_is_anchored_to_the_pair_and_not_to_the_wall_clock(cohort):
     assert early == late
 
 
-def test_retention_is_null_at_rung_zero(cohort):
-    """There is no retention model yet, so the field stays honest."""
+def test_retention_is_a_forecast_once_a_chapter_has_been_seen(cohort):
+    """Rung 0 used to leave `retention` null; the forgetting model fills it.
+
+    Changed deliberately with the model (`tests/test_retention.py` covers the
+    formula). What this test still pins is the contract the old one was
+    about: retention is a number only when there is something to forecast
+    from, and it stays null for a chapter the student has only logged time
+    against — a study log is not a sighting.
+    """
     student = f.make_student(cohort)
     f.record(student, cohort.chapter("Kinematics"), "ccwc")
+    f.study(student, cohort.chapter("Magnetism"), 40, AS_OF - dt.timedelta(days=3))
     features.recompute_topic_state(cohort.institute.id, as_of=AS_OF)
-    assert TopicState.objects.get(student=student).retention is None
+
+    seen = TopicState.objects.get(student=student, topic=cohort.chapter("Kinematics"))
+    assert seen.retention == 1.0                         # attempted at AS_OF itself
+    logged = TopicState.objects.get(student=student, topic=cohort.chapter("Magnetism"))
+    assert logged.retention is None
 
 
 # ----------------------------------------------------------- the key set
